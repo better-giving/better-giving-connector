@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vercel Ignored Build Step: exit 1 builds, exit 0 skips.
+# Vercel Ignored Build Step: exit 1 to build, exit 0 to skip.
 # Build production deployments only; skip previews.
 env_name="${VERCEL_TARGET_ENV:-${VERCEL_ENV:-}}"
 echo "VERCEL_ENV=${VERCEL_ENV:-unset} VERCEL_TARGET_ENV=${VERCEL_TARGET_ENV:-unset}"
