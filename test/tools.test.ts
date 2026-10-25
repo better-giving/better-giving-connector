@@ -192,6 +192,30 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(waiting).toBe("publish_campaign or end_campaign");
 	});
 
+	test("the instructions name a single confirm tool bare, with no 'or'", async () => {
+		// Only one of the four confirm actions is served, so orList takes its
+		// one-name branch: the bare name, never "or".
+		deployment.setActions(
+			ALL_ACTIONS.filter(
+				(a) =>
+					a !== "campaigns.unpublish" &&
+					a !== "campaigns.end" &&
+					a !== "donation_page.reset",
+			),
+		);
+		const token = (await connectFlow(call, deployment, BASE).connect())
+			.access_token;
+		const { instructions } = (
+			await rpc(await call(mcpOpen(version, `Bearer ${token}`)))
+		).result;
+
+		const waiting = instructions.match(
+			/Before (.+), say what will change/,
+		)?.[1];
+		expect(waiting).toBe("publish_campaign");
+		expect(instructions).not.toContain(" or ");
+	});
+
 	test("publish, unpublish, end, reset, and whole-page block replacement are destructive", async () => {
 		const tools: {
 			name: string;

@@ -148,7 +148,7 @@ test("tools/list offers only the tools whose action the deployment serves", asyn
 	expect(names).not.toContain("unpublish_campaign");
 	expect(names).toContain("publish_campaign");
 	expect(names).toContain("list_campaigns");
-	expect(names).toHaveLength(ACTIONS.length - 1);
+	expect(names).toHaveLength(STANDALONE_ACTIONS.length);
 });
 
 test("a connection serving no actions offers no tools", async () => {
@@ -157,4 +157,24 @@ test("a connection serving no actions offers no tools", async () => {
 	const list = await rpc(await send("tools/list"));
 
 	expect(list.result.tools).toEqual([]);
+});
+
+test("a connection serving no actions has instructions with no confirm clause", async () => {
+	await reconnect([]);
+
+	const { instructions } = (
+		await rpc(
+			await send("initialize", {
+				protocolVersion: "2025-06-18",
+				capabilities: {},
+				clientInfo: { name: "chat-app", version: "1.0.0" },
+			}),
+		)
+	).result;
+
+	// Only the lead sentence: with no spec registered there is no tool to wait on.
+	expect(instructions).toContain(
+		"the operator's live Better Giving donation site",
+	);
+	expect(instructions).not.toContain("Before");
 });

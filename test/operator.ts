@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+import { generateSignedCookie } from "hono/cookie";
 import type { FakeDeployment } from "./fake-deployment";
 import {
 	type Authorization,
@@ -11,6 +13,32 @@ import {
 	registerClient,
 	type Tokens,
 } from "./oauth";
+
+// The key the state cookie is signed with, derived from BETTER_AUTH_SECRET the
+// way src/app.ts derives it. A test forging the cookie signs with the same key,
+// so if that derivation moves this goes red, as a real browser's cookie would.
+const stateSecret = (betterAuthSecret: string) =>
+	createHmac("sha256", betterAuthSecret)
+		.update("connect state cookie")
+		.digest("base64url");
+
+// Signs an arbitrary connect-state payload into the `__Secure-connect` cookie
+// header a browser would hold, using the same `generateSignedCookie` and key
+// `POST /connect/` signs with. The payload is unknown-shaped on purpose: this
+// is how a test forges a cookie written by an older release (one without
+// `actions`, say) to drive the return against it.
+export async function signedConnectCookie(
+	payload: unknown,
+	betterAuthSecret: string,
+): Promise<string> {
+	const set = await generateSignedCookie(
+		"connect",
+		JSON.stringify(payload),
+		stateSecret(betterAuthSecret),
+		{ prefix: "secure", path: "/connect" },
+	);
+	return set.split(";")[0] ?? "";
+}
 
 // The operator's side of connecting: the chat app opens its authorize URL,
 // the browser lands on /connect, submits an address, presses Allow (or Deny)
