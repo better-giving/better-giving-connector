@@ -148,6 +148,7 @@ async function cimdConnect(
 		oauthQuery: request.oauthQuery,
 		origin: ORIGIN,
 		orgName: "Example Org",
+		actions: null,
 		key: new Secret(KEY),
 	});
 	const back = redirectTarget(res, `${BASE}/connect/return`);
