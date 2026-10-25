@@ -656,6 +656,53 @@ test("an unexpected failure inside better-auth rejects the handler and writes no
 	expect(lines()).toEqual([]);
 });
 
+test("a store blip during oauth-provider's startup seed is caught, not an unhandled rejection, and the next request recovers", async () => {
+	const unhandled: unknown[] = [];
+	const onUnhandled = (reason: unknown) => unhandled.push(reason);
+	process.on("unhandledRejection", onUnhandled);
+	try {
+		// A network-style failure on the seed's first read of oauthResource, not
+		// the "no such table" the seed swallows on its own, and with a message
+		// that must not reach a log.
+		const broken = failingDb(db);
+		broken.failOn(
+			/from "oauthResource"/,
+			new StoreDown("store down: secret-9c2e"),
+		);
+		const lines = captureConsole();
+
+		const brokenAuth = createAuth({
+			db: broken.db,
+			connections: store,
+			env,
+			client: deploymentApi,
+		});
+
+		// Wait for the rejected seed to settle either way: the watcher logs it by
+		// name, or, unhandled, it reaches the process listener. Only then are the
+		// two assertions below meaningful independently of each other.
+		await vi.waitFor(() =>
+			expect([...lines(), ...unhandled].length).toBeGreaterThan(0),
+		);
+		expect(unhandled).toEqual([]);
+		expect(lines()).toContainEqual([
+			"error",
+			'{"kind":"error","where":"auth","errorName":"StoreDown"}',
+		]);
+
+		// The store answers again: the next request rebuilds and recovers.
+		broken.heal();
+		const res = await brokenAuth.handler(
+			new Request(`${BASE}/.well-known/oauth-authorization-server/api/auth`),
+		);
+
+		expect(res.status).toBe(200);
+		expect(JSON.stringify(lines())).not.toContain("secret-9c2e");
+	} finally {
+		process.off("unhandledRejection", onUnhandled);
+	}
+});
+
 test("a finished connection stores a placeholder account and the session token itself", async () => {
 	await connect();
 	const { rows: users } = await db.execute(
