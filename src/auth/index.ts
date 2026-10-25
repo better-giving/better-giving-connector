@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { mcp } from "@better-auth/mcp";
+import type { ClientMetadataResourceFetch } from "@better-auth/oauth-provider";
 import { verifyOAuthQueryParams } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -11,6 +14,7 @@ import type { Origin } from "../deployment/origin";
 import type { Env } from "../env";
 import { log } from "../log";
 import type { Secret } from "../secret";
+import { isCimdClientIdAllowed } from "./cimd-hosts";
 import { connectionPlugin } from "./connection-plugin";
 import { libsqlDialect } from "./libsql-dialect";
 import { isAllowedRedirectUri } from "./redirect-uris";
@@ -27,6 +31,10 @@ export type AuthDeps = {
 	connections: Connections;
 	env: Env;
 	client: Pick<DeploymentClient, "disconnect">;
+	// How the CIMD plugin fetches a Client ID Metadata Document. Production
+	// leaves this to the SSRF-safe Node transport; tests inject a fake so the
+	// suite stays hermetic (no DNS, no network).
+	fetchClientMetadata?: ClientMetadataResourceFetch;
 };
 
 export interface AuthFacade {
@@ -104,7 +112,11 @@ export class LoginRequestRefused extends Error {
 const CONSENT_PAGE = "/connect/consent";
 
 export function buildAuth(
-	{ db, env }: Pick<AuthDeps, "db" | "env">,
+	{
+		db,
+		env,
+		fetchClientMetadata = fetchClientMetadataResource,
+	}: Pick<AuthDeps, "db" | "env" | "fetchClientMetadata">,
 	authDb: AuthDb,
 	revoked: (token: string) => Promise<void>,
 ) {
@@ -154,6 +166,30 @@ export function buildAuth(
 			revoke: { window: 60, max: 600 },
 		},
 	});
+	// Client ID Metadata Documents, beside dynamic registration (DCR stays on
+	// for ChatGPT and older clients). Claude's directory sign-in takes this path:
+	// its `client_id` is the URL of a document the plugin fetches and validates.
+	// The plugin advertises `client_id_metadata_document_supported: true` into
+	// the authorization-server metadata, which with the `none` auth method is
+	// what makes Claude choose CIMD over DCR.
+	const clientMetadataDocuments = cimd({
+		// SSRF-safe in production, a fake in tests; see AuthDeps.fetchClientMetadata
+		fetchClientMetadataResource: fetchClientMetadata,
+		// the MCP 2026-07-28 profile: requires `client_name` and `redirect_uris`
+		metadataProfile: "mcp-2026-07-28",
+		// only ever reach out to Claude's own hosts. The plugin still runs the
+		// CIMD draft's URL checks and the transport's address guards after this.
+		isMetadataDocumentUrlAllowed: isCimdClientIdAllowed,
+		// bound request amplification: a fetch spends from these budgets when it
+		// starts, while fresh-cache hits spend nothing. Per address the chat apps
+		// come from one origin, so the per-origin caps are the ones that bite.
+		metadataFetchPolicy: {
+			maximumConcurrentFetches: 16,
+			maximumConcurrentFetchesPerOrigin: 4,
+			maximumFetchesPerMinute: 120,
+			maximumFetchesPerOriginPerMinute: 30,
+		},
+	});
 	return betterAuth({
 		baseURL: env.PUBLIC_URL,
 		secret: env.BETTER_AUTH_SECRET,
@@ -180,6 +216,7 @@ export function buildAuth(
 		rateLimit: { enabled: true, storage: "database" },
 		plugins: [
 			provider,
+			clientMetadataDocuments,
 			connectionPlugin({ provider: provider.options, resource, revoked }),
 		],
 	});
