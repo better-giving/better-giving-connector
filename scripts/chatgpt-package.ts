@@ -65,8 +65,7 @@ export function pluginManifest() {
 		},
 		homepage: "https://better.giving",
 		license: "MIT",
-		repository:
-			"https://github.com/AngelProtocolFinance/better-giving-connector",
+		repository: "https://github.com/better-giving/better-giving-connector",
 		keywords: ["nonprofit", "donations", "fundraising"],
 		extensions: {
 			"com.openai": {

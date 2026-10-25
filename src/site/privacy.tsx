@@ -6,11 +6,10 @@ import {
 	REFRESH_TOKEN_REUSE_INTERVAL,
 	SESSION_EXPIRES_IN,
 } from "../auth/token-lifetimes";
-import { EFFECTIVE_DATE } from "./effective-date";
+import { PRIVACY_VERSION } from "./effective-date";
 import { Page } from "./page";
 
 // Token lifetimes come from src/auth/token-lifetimes.ts.
-// The effective date is the build stamp in src/site/effective-date.ts.
 export function PrivacyPage() {
 	return (
 		<Page
@@ -18,9 +17,11 @@ export function PrivacyPage() {
 			title="Privacy Policy: Better Giving Connector"
 		>
 			<p class="meta">
-				Effective date: {EFFECTIVE_DATE}
+				Version {PRIVACY_VERSION.version}
 				<br />
-				Last updated: {EFFECTIVE_DATE}
+				Effective date: {PRIVACY_VERSION.effective}
+				<br />
+				Last updated: {PRIVACY_VERSION.lastUpdated}
 			</p>
 			<p>
 				This Privacy Policy explains how Better Giving, Inc. ("we", "us")
@@ -184,6 +185,11 @@ export function PrivacyPage() {
 				cross-context behavioral advertising, as those terms are used in the
 				California Consumer Privacy Act.
 			</p>
+			<p>
+				California residents may request to know, delete, or correct personal
+				information and will not be discriminated against for exercising these
+				rights. Contact support@better.giving.
+			</p>
 
 			<h2>4. Who receives it (recipients)</h2>
 			<div class="table-wrap">
@@ -229,8 +235,14 @@ export function PrivacyPage() {
 				It also receives tool requests, and disconnect and revoke calls.
 			</p>
 			<p>
+				When we act as processor for a nonprofit (Section 2.2), Vercel Inc. is
+				our sub-processor for hosting; that data is held in memory only while a
+				request runs. Nonprofits can request our data processing agreement and
+				current sub-processor list at support@better.giving.
+			</p>
+			<p>
 				We do not use analytics or telemetry. The Connector's code is{" "}
-				<a href="https://github.com/AngelProtocolFinance/better-giving-connector">
+				<a href="https://github.com/better-giving/better-giving-connector">
 					open source
 				</a>
 				.
@@ -316,7 +328,12 @@ export function PrivacyPage() {
 				</li>
 				<li>
 					<strong>Request deletion or access</strong> by emailing
-					support@better.giving. We respond within 30 days.
+					support@better.giving. We respond within 30 days (or as required by
+					law).
+				</li>
+				<li>
+					If we receive a request about donor data, we will forward it to the
+					relevant nonprofit.
 				</li>
 				<li>
 					Depending on where you live, you may have rights to access, correct,
@@ -362,10 +379,12 @@ export function PrivacyPage() {
 
 			<h2>11. Changes</h2>
 			<p>
-				We will post updates here and change the "Last updated" date. For
-				material changes we will give notice by email to the nonprofit's account
-				administrator and by posting the updated page, at least 7 days before
-				the change takes effect.
+				We will post updates on this page and change the "Last updated" date.
+				For material changes, we will post a notice on this page and, where we
+				have a contact address for your organization through your Better Giving
+				account, notify that address, at least 30 days before the change takes
+				effect. Earlier versions are listed in the{" "}
+				<a href="#changelog">changelog</a> below.
 			</p>
 
 			<h2>12. Contact</h2>
@@ -373,6 +392,14 @@ export function PrivacyPage() {
 				Better Giving, Inc. · 18 Cottekill Rd, Rosendale, NY 12472 ·
 				support@better.giving
 			</p>
+
+			<h2 id="changelog">13. Changelog</h2>
+			<ul>
+				<li>
+					Version {PRIVACY_VERSION.version}, effective{" "}
+					{PRIVACY_VERSION.effective}: first published version.
+				</li>
+			</ul>
 		</Page>
 	);
 }
