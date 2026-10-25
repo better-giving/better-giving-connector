@@ -71,7 +71,7 @@ export function TermsPage() {
 			<p>
 				You connect a Better Giving account at better.giving, or your own Better
 				Giving site's address. The{" "}
-				<a href="https://github.com/AngelProtocolFinance/better-giving-connector">
+				<a href="https://github.com/better-giving/better-giving-connector">
 					Better Giving connector
 				</a>{" "}
 				and Better Giving Standalone are open source. You are responsible for
@@ -144,7 +144,7 @@ export function TermsPage() {
 				support@better.giving
 			</p>
 
-			<h2>Changelog</h2>
+			<h2 id="changelog">15. Changelog</h2>
 			<ul>
 				<li>
 					Version {TERMS_VERSION.version}, effective {TERMS_VERSION.effective}:

@@ -100,10 +100,10 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"We process data in the United States. Where EU or UK law requires it, we rely on the European Commission&#39;s Standard Contractual Clauses and the UK Addendum.",
 	);
 	expect(flat).toContain(
-		"We will post updates on this page and change the &quot;Last updated&quot; date. For material changes, we will post a notice on this page and, where we have a contact address for your organization through your Better Giving account, notify that address, at least 30 days before the change takes effect. Earlier versions are listed in the changelog below.",
+		"We will post updates on this page and change the &quot;Last updated&quot; date. For material changes, we will post a notice on this page and, where we have a contact address for your organization through your Better Giving account, notify that address, at least 30 days before the change takes effect. Earlier versions are listed in the <a href=\"#changelog\">changelog</a> below.",
 	);
 	expect(terms).toContain(
-		'The <a href="https://github.com/AngelProtocolFinance/better-giving-connector">Better Giving connector</a> and Better Giving Standalone are open source.',
+		'The <a href="https://github.com/better-giving/better-giving-connector">Better Giving connector</a> and Better Giving Standalone are open source.',
 	);
 	expect(terms).toContain(
 		"Nonprofits that need a data processing agreement can request one at support@better.giving.",
@@ -154,7 +154,7 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"Your Better Giving site receives the connection key with each request.",
 	);
 	expect(flat).toContain(
-		'href="https://github.com/AngelProtocolFinance/better-giving-connector"',
+		'href="https://github.com/better-giving/better-giving-connector"',
 	);
 	expect(flat).toContain("open source");
 	expect(flat).toContain("No system is perfectly secure.");
@@ -181,8 +181,13 @@ test("privacy and terms use the filled wording and the version", async () => {
 	// Counsel allows Anthropic in exactly one terms sentence; guard against a
 	// second mention creeping in (the cross-page absence is checked below).
 	expect(terms.match(/Anthropic/g)).toHaveLength(1);
-	expect(privacy).toContain("<h2>Changelog</h2>");
-	expect(terms).toContain("<h2>Changelog</h2>");
+	expect(privacy).toContain('<h2 id="changelog">13. Changelog</h2>');
+	expect(privacy).toContain(
+		'listed in the <a href="#changelog">changelog</a> below.',
+	);
+	expect(terms).toContain('<h2 id="changelog">15. Changelog</h2>');
+	expect(terms).not.toContain("AngelProtocolFinance");
+	expect(privacy).not.toContain("AngelProtocolFinance");
 	const termsFlat = terms.replace(/\s+/g, " ");
 	expect(flat).toContain(
 		"Version 1.0, effective 2026-10-25: first published version.",

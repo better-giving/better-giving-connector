@@ -242,7 +242,7 @@ export function PrivacyPage() {
 			</p>
 			<p>
 				We do not use analytics or telemetry. The Connector's code is{" "}
-				<a href="https://github.com/AngelProtocolFinance/better-giving-connector">
+				<a href="https://github.com/better-giving/better-giving-connector">
 					open source
 				</a>
 				.
@@ -383,7 +383,8 @@ export function PrivacyPage() {
 				For material changes, we will post a notice on this page and, where we
 				have a contact address for your organization through your Better Giving
 				account, notify that address, at least 30 days before the change takes
-				effect. Earlier versions are listed in the changelog below.
+				effect. Earlier versions are listed in the{" "}
+				<a href="#changelog">changelog</a> below.
 			</p>
 
 			<h2>12. Contact</h2>
@@ -392,7 +393,7 @@ export function PrivacyPage() {
 				support@better.giving
 			</p>
 
-			<h2>Changelog</h2>
+			<h2 id="changelog">13. Changelog</h2>
 			<ul>
 				<li>
 					Version {PRIVACY_VERSION.version}, effective{" "}
