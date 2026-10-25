@@ -8,7 +8,6 @@ import {
 	SESSION_EXPIRES_IN,
 } from "../src/auth/token-lifetimes";
 import type { Db } from "../src/db";
-import { EFFECTIVE_DATE } from "../src/site/effective-date";
 import { fakeDeployment } from "./fake-deployment";
 import { BASE, env, warmUp } from "./harness";
 import type { Call } from "./oauth";
@@ -47,16 +46,17 @@ test.each(["/privacy", "/terms", "/docs", "/support"])(
 	},
 );
 
-test("privacy and terms use the filled wording and the build date", async () => {
+test("privacy and terms use the filled wording and the version", async () => {
 	const privacy = await (await get("/privacy")).text();
 	const terms = await (await get("/terms")).text();
 	const support = await (await get("/support")).text();
 	const both = privacy + terms + support;
 
-	expect(EFFECTIVE_DATE).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-	expect(privacy).toContain(`Effective date: ${EFFECTIVE_DATE}`);
-	expect(privacy).toContain(`Last updated: ${EFFECTIVE_DATE}`);
-	expect(terms).toContain(`Effective date: ${EFFECTIVE_DATE}`);
+	expect(privacy).toContain("Version 1.0");
+	expect(privacy).toContain("Effective date: 2026-10-25");
+	expect(privacy).toContain("Last updated: 2026-10-25");
+	expect(terms).toContain("Version 1.0");
+	expect(terms).toContain("Effective date: 2026-10-25");
 	expect(both).not.toContain("[EFFECTIVE DATE]");
 	expect(both).not.toContain("[30]");
 	expect(both).not.toContain("[APPLICATION LOG");
@@ -88,14 +88,19 @@ test("privacy and terms use the filled wording and the build date", async () => 
 		"Logs are kept for a limited period set by our hosting provider, then deleted. We don&#39;t send these logs to any other service.",
 	);
 	expect(privacy).not.toContain("up to 30 days");
-	expect(privacy).toContain("We respond within 30 days.");
+	expect(flat).toContain("We respond within 30 days (or as required by law).");
+	expect(flat).toContain(
+		"If we receive a request about donor data, we will forward it to the relevant nonprofit.",
+	);
 	expect(support).toContain("Response time: 30 days.");
-	expect(terms).toContain("no sooner than 30 days after notice");
+	expect(terms).toContain(
+		"no sooner than 30 days after we post notice on this page,",
+	);
 	expect(privacy).toContain(
 		"We process data in the United States. Where EU or UK law requires it, we rely on the European Commission&#39;s Standard Contractual Clauses and the UK Addendum.",
 	);
-	expect(privacy).toContain(
-		"by email to the nonprofit&#39;s account administrator and by posting the updated page, at least 7 days before the change takes effect.",
+	expect(flat).toContain(
+		"We will post updates on this page and change the &quot;Last updated&quot; date. For material changes, we will post a notice on this page and, where we have a contact address for your organization through your Better Giving account, notify that address, at least 30 days before the change takes effect. Earlier versions are listed in the changelog below.",
 	);
 	expect(terms).toContain(
 		'The <a href="https://github.com/AngelProtocolFinance/better-giving-connector">Better Giving connector</a> and Better Giving Standalone are open source.',
@@ -163,6 +168,28 @@ test("privacy and terms use the filled wording and the build date", async () => 
 	expect(terms).toContain("State of New York");
 	expect(terms).toContain("New York courts");
 	expect(terms).toContain("OR $100");
+
+	expect(flat).toContain(
+		"California residents may request to know, delete, or correct personal information and will not be discriminated against for exercising these rights. Contact support@better.giving.",
+	);
+	expect(flat).toContain(
+		"When we act as processor for a nonprofit (Section 2.2), Vercel Inc. is our sub-processor for hosting; that data is held in memory only while a request runs. Nonprofits can request our data processing agreement and current sub-processor list at support@better.giving.",
+	);
+	expect(terms).toContain(
+		"Anthropic is not a party to these Terms and is not responsible for the Connector.",
+	);
+	// Counsel allows Anthropic in exactly one terms sentence; guard against a
+	// second mention creeping in (the cross-page absence is checked below).
+	expect(terms.match(/Anthropic/g)).toHaveLength(1);
+	expect(privacy).toContain("<h2>Changelog</h2>");
+	expect(terms).toContain("<h2>Changelog</h2>");
+	const termsFlat = terms.replace(/\s+/g, " ");
+	expect(flat).toContain(
+		"Version 1.0, effective 2026-10-25: first published version.",
+	);
+	expect(termsFlat).toContain(
+		"Version 1.0, effective 2026-10-25: first published version.",
+	);
 });
 
 test("docs and support describe the connector and name the support address", async () => {
@@ -186,7 +213,10 @@ test("docs and support describe the connector and name the support address", asy
 
 	const pages = docs + support + privacy + terms;
 	expect(pages).not.toMatch(/self-hosted/i);
-	expect(pages).not.toMatch(/Claude|ChatGPT|Anthropic|OpenAI/);
+	expect(pages).not.toMatch(/Claude|ChatGPT|OpenAI/);
+	// Counsel requires naming Anthropic in one approved terms sentence (Section
+	// 4); it must not appear on any other page.
+	expect(docs + support + privacy).not.toMatch(/Anthropic/);
 	expect(docs).toContain("better.giving");
 	expect(docs).toContain("your own Better Giving site&#39;s address");
 	expect(docs).toContain("in cash or by check");

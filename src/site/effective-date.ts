@@ -1,13 +1,10 @@
-// The calendar day this process's bundle was built, UTC `YYYY-MM-DD`.
-// Privacy and terms show it as the effective date, so a text change is dated
-// by the bundle that ships it. `pnpm build` replaces BUILD_DATE. A runner that
-// executes this file directly (tsx, vitest) has no stamp, so it uses the UTC
-// day that process started.
-declare const BUILD_DATE: string;
-
-function stampedBuildDate(): string {
-	if (typeof BUILD_DATE === "string") return BUILD_DATE;
-	return new Date().toISOString().slice(0, 10);
-}
-
-export const EFFECTIVE_DATE = stampedBuildDate();
+// Change only when the legal text changes; add a CHANGELOG entry.
+export const PRIVACY_VERSION = {
+	version: "1.0",
+	effective: "2026-10-25",
+	lastUpdated: "2026-10-25",
+} as const;
+export const TERMS_VERSION = {
+	version: "1.0",
+	effective: "2026-10-25",
+} as const;
