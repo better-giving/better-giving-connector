@@ -117,11 +117,41 @@ export function DocsPage() {
 				</li>
 			</ul>
 
+			<h2>Example prompts</h2>
+			<p>Once connected, type things like these to your AI assistant:</p>
+			<ul>
+				<li>Show me my published campaigns.</li>
+				<li>How much have we raised this month?</li>
+				<li>Create a draft campaign called Spring Food Drive.</li>
+				<li>Record a 100 dollar check from Maria Lopez, dated today.</li>
+				<li>List our donors and how much each has given.</li>
+			</ul>
+
 			<h2>What it cannot do</h2>
 			<p>
 				It cannot charge a card, refund a gift, or pay out funds. It acts only
 				on the account you connected. It does not accept or return the
 				connection key.
+			</p>
+
+			<h2>Troubleshooting</h2>
+			<ul>
+				<li>
+					If the page says the connection timed out or didn't finish, go back to
+					your AI assistant and press Connect again.
+				</li>
+				<li>
+					If the address didn't answer, check it. If we couldn't find Better
+					Giving at that address, use better.giving or your own Better Giving
+					site's address.
+				</li>
+				<li>
+					If a tool tells you to reconnect, the account refused the key or
+					moved. Connect again and type the current address.
+				</li>
+			</ul>
+			<p>
+				Still stuck? See <a href="/support">Support</a>.
 			</p>
 
 			<h2>Disconnect</h2>
