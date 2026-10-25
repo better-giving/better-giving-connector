@@ -17,6 +17,7 @@ test("an empty connection key is not used as a redaction pattern", async () => {
 			userId: "user",
 			origin,
 			orgName: "Give",
+			actions: null,
 			key: new Secret(""),
 			createdAt: new Date(),
 		},

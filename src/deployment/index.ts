@@ -21,7 +21,7 @@ import {
 import { idempotencyKey, isKeyedAction } from "./idempotency";
 import { type Origin, parseOrigin } from "./origin";
 
-export { type ActionName, isActionName } from "./contract";
+export { type ActionName, isActionName, knownActions } from "./contract";
 export {
 	CodeInvalid,
 	DeploymentFailed,
@@ -38,6 +38,8 @@ export type Hello = {
 	origin: Origin;
 	release: string;
 	orgName: string;
+	/** The actions this deployment serves, or null when hello didn't state them. */
+	actions: ActionName[] | null;
 };
 
 export type DeploymentClient = {
@@ -143,12 +145,13 @@ export function deploymentClient(deps: {
 			if (status !== 404 && !isSuccess(status)) throw new Unreachable();
 			const hello = helloBody.safeParse(body);
 			if (status === 404 || !hello.success) throw new NeedsUpdate();
-			const { release, orgName } = hello.data;
+			const { release, orgName, actions } = hello.data;
 			// a name that cleans to nothing is shown as the site's own host
 			return {
 				origin,
 				release,
 				orgName: orgName || new URL(origin).hostname,
+				actions,
 			};
 		},
 

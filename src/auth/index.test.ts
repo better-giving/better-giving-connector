@@ -227,6 +227,7 @@ async function connect(
 		oauthQuery: request.oauthQuery,
 		origin,
 		orgName: "Example Org",
+		actions: null,
 		key: new Secret(key),
 	});
 	return { a, res, back: redirectTarget(res, `${BASE}/connect/return`) };
@@ -605,6 +606,7 @@ test("completeConnection refuses an expired login request and creates nothing", 
 		oauthQuery: request?.oauthQuery ?? "",
 		origin: ORIGIN,
 		orgName: "Example Org",
+		actions: null,
 		key: new Secret(KEY),
 	});
 
@@ -822,6 +824,7 @@ test("a resume that ends without a code undoes the connection and passes the err
 		oauthQuery: login.search.slice(1),
 		origin: ORIGIN,
 		orgName: "Example Org",
+		actions: null,
 		key: new Secret(KEY),
 	});
 
@@ -855,6 +858,7 @@ test("a failure after the user is created undoes the connection and rethrows", a
 		oauthQuery: login.search.slice(1),
 		origin: ORIGIN,
 		orgName: "Example Org",
+		actions: null,
 		key: new Secret(KEY),
 	});
 
@@ -1315,6 +1319,7 @@ test.each([
 			oauthQuery: login.search.slice(1),
 			origin: ORIGIN,
 			orgName: "Example Org",
+			actions: null,
 			key: new Secret(key),
 		})
 		.catch(() => {});
@@ -1347,6 +1352,7 @@ test("a full sweep batch whose deployments all hang finishes inside the cron's b
 			userId: `u${i}`,
 			origin: ORIGIN,
 			orgName: "Example Org",
+			actions: null,
 			key: new Secret(`${KEY}_${i}`),
 		});
 	}

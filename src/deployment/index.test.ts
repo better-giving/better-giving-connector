@@ -36,10 +36,49 @@ describe("hello", () => {
 			origin: "https://give.example.org",
 			release: "3.4.0",
 			orgName: "Hope Shelter",
+			actions: [...ALL_ACTIONS],
 		});
 		expect(dep.calls).toMatchObject([
 			{ method: "GET", path: "/connector/v1/hello", authorization: null },
 		]);
+	});
+
+	test("reads the actions the deployment serves, dropping names this contract doesn't know", async () => {
+		const dep = fakeDeployment();
+		dep.intercept(() =>
+			Response.json({
+				service: "better-giving",
+				contract: 1,
+				release: "1.0.0",
+				name: "Give",
+				actions: ["campaigns.list", "donations.record", "campaigns.teleport"],
+			}),
+		);
+		const client = deploymentClient({ fetch: dep.fetch });
+
+		expect(await client.hello(dep.origin)).toMatchObject({
+			actions: ["campaigns.list", "donations.record"],
+		});
+	});
+
+	test.each<[string, unknown]>([
+		["absent", undefined],
+		["null", null],
+		["not an array", "campaigns.list"],
+	])("reads actions that are %s as not stated (null)", async (_, actions) => {
+		const dep = fakeDeployment();
+		dep.intercept(() =>
+			Response.json({
+				service: "better-giving",
+				contract: 1,
+				release: "1.0.0",
+				name: "Give",
+				...(actions === undefined ? {} : { actions }),
+			}),
+		);
+		const client = deploymentClient({ fetch: dep.fetch });
+
+		expect(await client.hello(dep.origin)).toMatchObject({ actions: null });
 	});
 
 	test.each([

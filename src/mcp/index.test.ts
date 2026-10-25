@@ -2,12 +2,14 @@ import { beforeEach, expect, test } from "vitest";
 import {
 	type FakeDeployment,
 	fakeDeployment,
+	STANDALONE_ACTIONS,
 } from "../../test/fake-deployment";
 import { mcpRequest, rpc } from "../../test/harness";
 import { freshDb } from "../../test/support";
-import { connections, type Db } from "../db";
-import { deploymentClient } from "../deployment";
+import { type Connections, connections, type Db } from "../db";
+import { type ActionName, deploymentClient } from "../deployment";
 import type { Secret } from "../secret";
+import { ACTIONS } from "./actions";
 import { mcpRoute } from "./index";
 
 // mcpRoute on its own: the real tools, a stub for who is signed in. The whole
@@ -18,20 +20,35 @@ const USER = "user_1";
 let db: Db;
 let deployment: FakeDeployment;
 let key: Secret;
+let store: Connections;
 let signedInAs: string | null;
 let dropped: string[];
 let route: ReturnType<typeof mcpRoute>;
+
+// Re-stores USER's connection with the actions its deployment serves, as a new
+// connect would: null for a connection made before actions were stored.
+async function reconnect(actions: ActionName[] | null) {
+	await store.delete(USER);
+	await store.insert({
+		userId: USER,
+		origin: deployment.origin,
+		orgName: "Give Example",
+		actions,
+		key,
+	});
+}
 
 beforeEach(async () => {
 	db = await freshDb();
 	deployment = fakeDeployment({ name: "Give Example" });
 	const client = deploymentClient({ fetch: deployment.fetch });
 	key = (await client.exchange(deployment.origin, deployment.mintCode())).key;
-	const store = connections(db, "test-connection-key-secret-aaaaaaaaaaaa");
+	store = connections(db, "test-connection-key-secret-aaaaaaaaaaaa");
 	await store.insert({
 		userId: USER,
 		origin: deployment.origin,
 		orgName: "Give Example",
+		actions: null,
 		key,
 	});
 	signedInAs = USER;
@@ -107,4 +124,57 @@ test("no signed-in user is asked to sign in and nothing is dropped", async () =>
 
 	expect(res.status).toBe(401);
 	expect(dropped).toEqual([]);
+});
+
+const toolNames = async (): Promise<string[]> =>
+	(await rpc(await send("tools/list"))).result.tools.map(
+		(t: { name: string }) => t.name,
+	);
+
+test("a connection with no stated actions offers every tool", async () => {
+	await reconnect(null);
+
+	const names = await toolNames();
+
+	expect(names).toHaveLength(ACTIONS.length);
+	expect(names).toContain("unpublish_campaign");
+});
+
+test("tools/list offers only the tools whose action the deployment serves", async () => {
+	await reconnect([...STANDALONE_ACTIONS]);
+
+	const names = await toolNames();
+
+	expect(names).not.toContain("unpublish_campaign");
+	expect(names).toContain("publish_campaign");
+	expect(names).toContain("list_campaigns");
+	expect(names).toHaveLength(STANDALONE_ACTIONS.length);
+});
+
+test("a connection serving no actions offers no tools", async () => {
+	await reconnect([]);
+
+	const list = await rpc(await send("tools/list"));
+
+	expect(list.result.tools).toEqual([]);
+});
+
+test("a connection serving no actions has instructions with no confirm clause", async () => {
+	await reconnect([]);
+
+	const { instructions } = (
+		await rpc(
+			await send("initialize", {
+				protocolVersion: "2025-06-18",
+				capabilities: {},
+				clientInfo: { name: "chat-app", version: "1.0.0" },
+			}),
+		)
+	).result;
+
+	// Only the lead sentence: with no spec registered there is no tool to wait on.
+	expect(instructions).toContain(
+		"the operator's live Better Giving donation site",
+	);
+	expect(instructions).not.toContain("Before");
 });

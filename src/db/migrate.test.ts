@@ -145,19 +145,27 @@ async function legacyDb(names: string[]): Promise<void> {
 	}
 }
 
-test("a legacy table without hashes is upgraded, applying nothing, and stays quiet after", async () => {
+test("a legacy table without hashes is upgraded, applies the pending 0003, and stays quiet after", async () => {
 	await legacyDb([
 		"0001_better_auth.sql",
 		"0002_connection.sql",
 		"0003_used_client.sql",
 	]);
+	// the connection table 0002 created and a row it holds, which 0003's ALTER
+	// leaves as it was, its new actions column NULL
+	await db.execute("CREATE TABLE connection (user_id TEXT) STRICT");
+	await db.execute("INSERT INTO connection (user_id) VALUES ('user-1')");
 
-	expect(await migrate(db)).toEqual([]);
+	expect(await migrate(db)).toEqual(["0003_connection_actions.sql"]);
 	expect(await migrate(db)).toEqual([]);
 	const { rows } = await db.execute(
 		"SELECT name, sha256 FROM schema_migration WHERE name = '0003_used_client.sql'",
 	);
 	expect(rows[0]?.sha256).toBe(USED_CLIENT_SHA256);
+	const existing = await db.execute(
+		"SELECT actions FROM connection WHERE user_id = 'user-1'",
+	);
+	expect(existing.rows[0]?.actions).toBeNull();
 });
 
 test("a legacy table recording a file that is gone, and not retired, is refused, naming it", async () => {

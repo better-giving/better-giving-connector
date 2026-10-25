@@ -20,6 +20,7 @@ async function insertUser1(store = connections(db, SECRET)) {
 		userId: "user-1",
 		origin: ORIGIN,
 		orgName: "Example Org",
+		actions: null,
 		key: new Secret(KEY),
 	});
 }
@@ -57,6 +58,7 @@ test("get returns the inserted connection with its key as a Secret", async () =>
 		userId: "user-1",
 		origin: ORIGIN,
 		orgName: "Example Org",
+		actions: ["campaigns.list", "donations.record"],
 		key: new Secret(KEY),
 	});
 	const conn = await store.get("user-1");
@@ -64,10 +66,44 @@ test("get returns the inserted connection with its key as a Secret", async () =>
 	expect(conn?.userId).toBe("user-1");
 	expect(conn?.origin).toBe(ORIGIN);
 	expect(conn?.orgName).toBe("Example Org");
+	expect(conn?.actions).toEqual(["campaigns.list", "donations.record"]);
 	expect(conn?.key).toBeInstanceOf(Secret);
 	expect(conn?.key.reveal()).toBe(KEY);
 	expect(conn?.createdAt.getTime()).toBeGreaterThanOrEqual(before);
 	expect(conn?.createdAt.getTime()).toBeLessThanOrEqual(Date.now());
+});
+
+test("a connection stored with no actions reads them back as null", async () => {
+	const store = connections(db, SECRET);
+	await store.insert({
+		userId: "user-1",
+		origin: ORIGIN,
+		orgName: "Example Org",
+		actions: null,
+		key: new Secret(KEY),
+	});
+
+	expect((await store.get("user-1"))?.actions).toBeNull();
+});
+
+test("get drops a stored action name this contract no longer carries", async () => {
+	await insertUser1();
+	await db.execute(
+		`UPDATE connection SET actions = '["campaigns.list","campaigns.teleport"]' WHERE user_id = 'user-1'`,
+	);
+
+	expect((await connections(db, SECRET).get("user-1"))?.actions).toEqual([
+		"campaigns.list",
+	]);
+});
+
+test("get reads a stored actions value that isn't JSON as null", async () => {
+	await insertUser1();
+	await db.execute(
+		"UPDATE connection SET actions = 'not json' WHERE user_id = 'user-1'",
+	);
+
+	expect((await connections(db, SECRET).get("user-1"))?.actions).toBeNull();
 });
 
 test("the stored row never contains the plaintext key", async () => {
@@ -82,7 +118,7 @@ test("the stored row never contains the plaintext key", async () => {
 test("a row copied to another user fails to decrypt", async () => {
 	await insertUser1();
 	await db.execute(
-		"INSERT INTO connection SELECT 'user-2', origin, org_name, key_ct, created_at FROM connection WHERE user_id = 'user-1'",
+		"INSERT INTO connection SELECT 'user-2', origin, org_name, key_ct, created_at, actions FROM connection WHERE user_id = 'user-1'",
 	);
 
 	await expectUnreadable(connections(db, SECRET).get("user-2"));

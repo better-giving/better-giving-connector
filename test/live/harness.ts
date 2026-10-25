@@ -47,6 +47,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			userId: "live-harness",
 			origin: hello.origin,
 			orgName: hello.orgName,
+			actions: hello.actions,
 			key: exchanged.key,
 			createdAt: opts.now ?? new Date(),
 		};
