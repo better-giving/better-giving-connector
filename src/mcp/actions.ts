@@ -99,7 +99,7 @@ const CONFIRMED =
 const replacesBlocks = (read: string) =>
 	`A block left out is deleted. Each block follows a schema from get_block_catalog. ${read} returns the blocks that are there now.`;
 
-/** One tool per `/connector/v1` action; each is registered on every server. */
+/** One tool per `/connector/v1` action; a server registers the ones its connection's deployment serves. */
 export const ACTIONS = toolSpecs([
 	{
 		tool: "list_campaigns",

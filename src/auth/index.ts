@@ -6,7 +6,7 @@ import { APIError } from "better-auth/api";
 import { applySetCookies } from "better-auth/cookies";
 import { Kysely } from "kysely";
 import type { Connections, Db } from "../db";
-import type { DeploymentClient } from "../deployment";
+import type { ActionName, DeploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import type { Env } from "../env";
 import { log } from "../log";
@@ -49,6 +49,7 @@ export interface AuthFacade {
 		oauthQuery: string;
 		origin: Origin;
 		orgName: string;
+		actions: ActionName[] | null;
 		key: Secret;
 	}): Promise<Response>;
 	/**
@@ -388,6 +389,7 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 					userId: user.id,
 					origin: c.origin,
 					orgName: c.orgName,
+					actions: c.actions,
 					key: c.key,
 				});
 				next = await signInAndResume(user.id, c.oauthQuery);

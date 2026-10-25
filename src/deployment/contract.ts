@@ -48,6 +48,19 @@ export type ActionName = keyof typeof ROUTES;
 export const isActionName = (name: string): name is ActionName =>
 	Object.hasOwn(ROUTES, name);
 
+/**
+ * The known action names in `value`, or null when it is not an array. A name
+ * this contract doesn't carry is dropped, so hello's `actions` and a stored
+ * `actions` column read the same way: unknown names are absent, not stated.
+ */
+export const knownActions = (value: unknown): ActionName[] | null =>
+	Array.isArray(value)
+		? value.filter(
+				(name): name is ActionName =>
+					typeof name === "string" && isActionName(name),
+			)
+		: null;
+
 const ORG_NAME_MAX = 100;
 
 // The deployment writes the org name, and it reaches the model's instructions
@@ -65,15 +78,22 @@ const orgName = (name: string) =>
 		.join("")
 		.trim();
 
-// Unknown fields are ignored, never thrown on.
+// Unknown fields are ignored, never thrown on. `actions` lists what this
+// deployment serves; absent or not an array, it is unstated (null), and any
+// name this contract doesn't know is dropped.
 export const helloBody = z
 	.object({
 		service: z.literal("better-giving"),
 		contract: z.literal(1),
 		release: z.string(),
 		name: z.string(),
+		actions: z.unknown().optional(),
 	})
-	.transform(({ release, name }) => ({ release, orgName: orgName(name) }));
+	.transform(({ release, name, actions }) => ({
+		release,
+		orgName: orgName(name),
+		actions: knownActions(actions),
+	}));
 
 // `name` is kept and cleaned the same way hello's is. Absent, it is empty, so
 // the name hello already resolved stays.

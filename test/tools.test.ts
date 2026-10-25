@@ -15,6 +15,7 @@ import {
 	type FakeDeployment,
 	fakeDeployment,
 	fakeNetwork,
+	STANDALONE_ACTIONS,
 } from "./fake-deployment";
 import {
 	BASE,
@@ -143,6 +144,52 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			record_donation: { ...ADD, idempotentHint: true },
 			create_photo_upload_link: ADD,
 		});
+	});
+
+	// A fresh connection to the same deployment, after its served actions are
+	// set, so tools/list reflects what hello listed at connect time.
+	const connectWith = async (actions: readonly string[]) => {
+		deployment.setActions(actions);
+		const token = (await connectFlow(call, deployment, BASE).connect())
+			.access_token;
+		const listing = `Bearer ${token}`;
+		const res = await call(
+			mcpRequest(version, listing, "tools/list", undefined, ++rpcId),
+		);
+		return (await rpc(res)).result.tools.map((t: { name: string }) => t.name);
+	};
+
+	test("tools/list offers only the tools whose action the deployment serves", async () => {
+		const names = await connectWith(STANDALONE_ACTIONS);
+
+		expect(names).not.toContain("unpublish_campaign");
+		expect(names).toContain("publish_campaign");
+		expect(names).toContain("list_campaigns");
+	});
+
+	test("a deployment that serves every action offers every tool", async () => {
+		const names = await connectWith(ALL_ACTIONS);
+
+		expect(names).toContain("unpublish_campaign");
+		expect(new Set(names).size).toBe(ALL_ACTIONS.length);
+	});
+
+	test("the instructions name only the confirm tools the deployment serves", async () => {
+		deployment.setActions(
+			ALL_ACTIONS.filter(
+				(a) => a !== "campaigns.unpublish" && a !== "donation_page.reset",
+			),
+		);
+		const token = (await connectFlow(call, deployment, BASE).connect())
+			.access_token;
+		const { instructions } = (
+			await rpc(await call(mcpOpen(version, `Bearer ${token}`)))
+		).result;
+
+		const waiting = instructions.match(
+			/Before (.+), say what will change/,
+		)?.[1];
+		expect(waiting).toBe("publish_campaign or end_campaign");
 	});
 
 	test("publish, unpublish, end, reset, and whole-page block replacement are destructive", async () => {

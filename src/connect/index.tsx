@@ -13,6 +13,7 @@ import {
 	DeploymentFailed,
 	DeploymentRejected,
 	type Hello,
+	isActionName,
 	NeedsUpdate,
 	Unreachable,
 } from "../deployment";
@@ -80,6 +81,13 @@ const handshake = z.object({
 		return z.NEVER;
 	}),
 	orgName: z.string(),
+	// The actions hello listed, re-checked against this contract; null when hello
+	// didn't state them. Nullish, so a cookie written before this field reads as
+	// unstated rather than failing the whole handshake.
+	actions: z
+		.array(z.string())
+		.nullish()
+		.transform((names) => (names == null ? null : names.filter(isActionName))),
 	oauthQuery: z.string(),
 });
 type Handshake = z.output<typeof handshake>;
@@ -207,6 +215,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 			nonce: randomBytes(32).toString("base64url"),
 			origin: hello.origin,
 			orgName: hello.orgName,
+			actions: hello.actions,
 			oauthQuery: login.oauthQuery,
 		};
 		await setSignedCookie(
@@ -286,6 +295,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 				oauthQuery: state.oauthQuery,
 				origin: state.origin,
 				orgName: exchanged.orgName || state.orgName,
+				actions: state.actions,
 				key: exchanged.key,
 			});
 		} catch (error) {

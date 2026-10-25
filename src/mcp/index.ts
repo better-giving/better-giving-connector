@@ -82,14 +82,21 @@ function connectionServer(
 	connection: Connection,
 	ctx: RunToolContext,
 ): McpServer {
+	// null `actions` (a connection made before this was stored, or a hello that
+	// didn't state them) keeps every tool; otherwise only the actions the
+	// deployment serves, so the chat is never offered one that can only fail.
+	const specs = ACTIONS.filter(
+		(spec) =>
+			connection.actions === null || connection.actions.includes(spec.action),
+	);
 	const server = new McpServer(
 		{ name: "Better Giving", version: "1.0.0" },
 		{
 			capabilities: { tools: {} },
-			instructions: instructionsFor(connection.orgName),
+			instructions: instructionsFor(connection.orgName, specs),
 		},
 	);
-	for (const spec of ACTIONS) {
+	for (const spec of specs) {
 		server.registerTool(
 			spec.tool,
 			{
@@ -135,9 +142,31 @@ function loggedInput(
 	};
 }
 
-function instructionsFor(orgName: string): string {
-	return [
+// The tools that change what donors see say so in their own description; the
+// instructions name only those that are registered, so one its deployment
+// doesn't serve is never asked for.
+const WAITS_FOR_YES = "operator confirms it in the chat first";
+
+function instructionsFor(
+	orgName: string,
+	specs: readonly ActionSpec[],
+): string {
+	const lines = [
 		`These tools act on ${JSON.stringify(orgName)}, the operator's live Better Giving donation site: what they change, donors see.`,
-		"Before publish_campaign, unpublish_campaign, end_campaign or reset_donation_page, say what will change and wait for the operator's explicit yes in this chat.",
-	].join(" ");
+	];
+	const waiting = specs
+		.filter((spec) => spec.description.includes(WAITS_FOR_YES))
+		.map((spec) => spec.tool);
+	if (waiting.length > 0) {
+		lines.push(
+			`Before ${orList(waiting)}, say what will change and wait for the operator's explicit yes in this chat.`,
+		);
+	}
+	return lines.join(" ");
 }
+
+// "a", "a or b", "a, b or c": the tool names as one English list.
+const orList = (names: readonly string[]): string =>
+	names.length <= 1
+		? names.join("")
+		: `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
