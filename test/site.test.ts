@@ -100,7 +100,7 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"We process data in the United States. Where EU or UK law requires it, we rely on the European Commission&#39;s Standard Contractual Clauses and the UK Addendum.",
 	);
 	expect(flat).toContain(
-		"We will post updates on this page and change the &quot;Last updated&quot; date. For material changes, we will post a notice on this page and, where we have a contact address for your organization through your Better Giving account, notify that address, at least 30 days before the change takes effect. Earlier versions are listed in the <a href=\"#changelog\">changelog</a> below.",
+		'We will post updates on this page and change the &quot;Last updated&quot; date. For material changes, we will post a notice on this page and, where we have a contact address for your organization through your Better Giving account, notify that address, at least 30 days before the change takes effect. Earlier versions are listed in the <a href="#changelog">changelog</a> below.',
 	);
 	expect(terms).toContain(
 		'The <a href="https://github.com/better-giving/better-giving-connector">Better Giving connector</a> and Better Giving Standalone are open source.',
