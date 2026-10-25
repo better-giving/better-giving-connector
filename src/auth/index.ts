@@ -187,17 +187,60 @@ export function buildAuth(
 
 export function createAuth(deps: AuthDeps): AuthFacade {
 	const authDb = authTables(deps.db);
-	const auth = buildAuth(deps, authDb, endIfRevokedByChatApp);
 	const base = deps.env.PUBLIC_URL;
 
+	// better-auth builds its context (`auth.$context`) and runs each plugin's
+	// `init`, where oauth-provider seeds the `oauthResource` row, eagerly at
+	// construction and without awaiting. A database blip during that seed
+	// rejects `$context`; with no handler attached that rejection would crash
+	// the process, and because the promise is memoized the instance would stay
+	// broken even once the database answered again. So each instance's context
+	// is watched by name the moment it is built, and a rejected one is replaced.
+	const watch = () => {
+		const instance = buildAuth(deps, authDb, endIfRevokedByChatApp);
+		const healthy = instance.$context.then(
+			() => true,
+			(error) => {
+				log({
+					kind: "error",
+					where: "auth",
+					errorName: error instanceof Error ? error.name : "unknown",
+				});
+				return false;
+			},
+		);
+		return { instance, healthy };
+	};
+	let auth = watch();
+	let rebuilding: ReturnType<typeof watch> | null = null;
+
+	// The live better-auth instance, its context's rejection recovered from. A
+	// request that finds the context rejected rebuilds the instance; concurrent
+	// requests share that one rebuild. A rebuild whose own seed still fails is
+	// adopted and returned anyway, so the caller fails through the app's error
+	// path instead of hanging, and the request after it tries a fresh rebuild;
+	// the instance comes back on its own once the database answers again.
+	const ready = async () => {
+		if (await auth.healthy) return auth.instance;
+		rebuilding ??= watch();
+		const rebuilt = rebuilding;
+		await rebuilt.healthy;
+		if (rebuilding === rebuilt) {
+			auth = rebuilt;
+			rebuilding = null;
+		}
+		return rebuilt.instance;
+	};
+
 	const verifies = async (oauthQuery: string) =>
-		verifyOAuthQueryParams(oauthQuery, (await auth.$context).secret);
+		verifyOAuthQueryParams(oauthQuery, (await (await ready()).$context).secret);
 
 	// The browser never receives this session's cookie, so the next authorize
 	// from the same browser lands on /connect again rather than reusing this
 	// user. Returns where better-auth sends the browser next.
 	async function signInAndResume(userId: string, oauthQuery: string) {
-		const signedIn = await auth.api.signInConnection({
+		const instance = await ready();
+		const signedIn = await instance.api.signInConnection({
 			body: { userId, oauth_query: oauthQuery },
 			// oauth-provider's authorize needs a request; a bare one also keeps the
 			// operator's IP and user agent off the session row
@@ -212,7 +255,7 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 		// oauth-provider's own consent endpoint does.
 		const headers = new Headers();
 		applySetCookies(headers, signedIn.headers.getSetCookie());
-		const consented = await auth.api.oauth2Consent({
+		const consented = await instance.api.oauth2Consent({
 			body: { accept: true, oauth_query: next.search.slice(1) },
 			headers,
 			request: new Request(`${base}/api/auth/oauth2/consent`, {
@@ -308,7 +351,7 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 
 	async function deleteConnection(userId: string) {
 		await deps.connections.delete(userId);
-		const { adapter, internalAdapter } = await auth.$context;
+		const { adapter, internalAdapter } = await (await ready()).$context;
 		const byUser = [{ field: "userId", value: userId }];
 		// explicit, not left to FK cascades: foreign_keys is a per-connection
 		// libSQL setting. Access tokens first, as they reference refresh rows.
@@ -323,9 +366,9 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 	}
 
 	return {
-		handler: (req) => auth.handler(req),
-		authenticateMcp: (req) =>
-			auth.api.verifyMcpAccessToken({
+		handler: async (req) => (await ready()).handler(req),
+		authenticateMcp: async (req) =>
+			(await ready()).api.verifyMcpAccessToken({
 				body: {
 					authorization: req.headers.get("authorization") ?? undefined,
 					dpop: req.headers.get("dpop") ?? undefined,
@@ -361,7 +404,7 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 		},
 		async denyConnection(oauthQuery) {
 			if (!(await verifies(oauthQuery))) throw new LoginRequestRefused();
-			const denied = await auth.api.denyConnection({
+			const denied = await (await ready()).api.denyConnection({
 				body: { oauth_query: oauthQuery },
 			});
 			return new Response(null, {
@@ -371,7 +414,7 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 		},
 		async completeConnection(c) {
 			if (!(await verifies(c.oauthQuery))) throw new LoginRequestRefused();
-			const { internalAdapter } = await auth.$context;
+			const { internalAdapter } = await (await ready()).$context;
 			const user = await internalAdapter.createUser(
 				{
 					name: "Better Giving connection",
