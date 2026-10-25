@@ -6,5 +6,5 @@
 	"fluid": true,
 	"regions": ["iad1"],
 	"crons": [{ "path": "/cron/sweep", "schedule": "17 3 * * *" }],
-	"ignoreCommand": "[ \"$VERCEL_ENV\" != production ]"
+	"ignoreCommand": "bash scripts/vercel-ignore-build.sh"
 }
