@@ -25,6 +25,7 @@ export {
 	type ActionName,
 	isActionName,
 	knownActions,
+	replacementOf,
 	TOOL_ACTIONS,
 } from "./contract";
 export {

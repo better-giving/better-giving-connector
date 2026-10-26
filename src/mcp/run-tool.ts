@@ -9,6 +9,8 @@ import {
 	KeyRefused,
 	Moved,
 	NeedsUpdate,
+	replacementOf,
+	TOOL_ACTIONS,
 	Unreachable,
 } from "../deployment";
 import { log, type ToolOutcome } from "../log";
@@ -116,6 +118,8 @@ async function failure(
 		);
 	}
 	if (error instanceof DeploymentRejected) {
+		const replaced = replacedText(error, spec, connection);
+		if (replaced !== null) return said("replaced", replaced);
 		return said(
 			"rejected",
 			error.problem
@@ -131,6 +135,27 @@ async function failure(
 		);
 	}
 	throw error;
+}
+
+// Standalone answers a block action it retired with 422 `replaced`, naming
+// the content action in its place. The chat is told the tool that runs it; a
+// connection whose stored actions predate that tool offers it only after a
+// reconnect, which reads the site's actions afresh.
+function replacedText(
+	error: DeploymentRejected,
+	spec: ActionSpec,
+	connection: Connection,
+): string | null {
+	if (error.status !== 422 || error.problem?.code !== "replaced") return null;
+	const action = replacementOf(spec.action);
+	const tool = Object.entries(TOOL_ACTIONS).find(
+		([, served]) => served === action,
+	)?.[0];
+	if (action === null || tool === undefined) return null;
+	const text = `Better Giving at ${connection.orgName} no longer serves ${spec.tool}. It now edits a page's content and arranges the page from it. Use ${tool} instead.`;
+	return connection.actions === null || connection.actions.includes(action)
+		? text
+		: `${text} If ${tool} isn't offered yet, reconnect Better Giving in your AI assistant's connector settings to get it.`;
 }
 
 function unexpected(

@@ -4,6 +4,12 @@ import { z } from "zod";
 // (better-giving/better-giving, packages/app/src/lib/server/connector/) and
 // Platform (better-giving/better-giving-platform,
 // apps/platform/.server/connector/). When that surface moves, this file moves.
+//
+// Pages come in two models. Platform, and Standalone before its content
+// release, edit a page as a list of blocks (`*.update_blocks`,
+// `blocks.catalog`). Standalone now edits a page's content alone and picks how
+// it is drawn from that content (`*.update_content`, `content.catalog`); it
+// answers the block actions 422 `replaced`, naming the action in their place.
 
 export const BASE_PATH = "/connector/v1";
 export const ALLOW_PATH = "/admin/connector/allow";
@@ -13,6 +19,10 @@ export const ROUTES = {
 	"campaigns.get": { method: "GET", path: "/campaigns/:id" },
 	"campaigns.create": { method: "POST", path: "/campaigns" },
 	"campaigns.update_blocks": { method: "PATCH", path: "/campaigns/:id/blocks" },
+	"campaigns.update_content": {
+		method: "PATCH",
+		path: "/campaigns/:id/content",
+	},
 	"campaigns.update_settings": {
 		method: "PATCH",
 		path: "/campaigns/:id/settings",
@@ -24,8 +34,13 @@ export const ROUTES = {
 		method: "PATCH",
 		path: "/donation-page/blocks",
 	},
+	"donation_page.update_content": {
+		method: "PATCH",
+		path: "/donation-page/content",
+	},
 	"donation_page.reset": { method: "POST", path: "/donation-page/reset" },
 	"blocks.catalog": { method: "GET", path: "/blocks/catalog" },
+	"content.catalog": { method: "GET", path: "/content/catalog" },
 	"forms.list": { method: "GET", path: "/forms" },
 	"forms.get": { method: "GET", path: "/forms/:id" },
 	"forms.create": { method: "POST", path: "/forms" },
@@ -47,6 +62,18 @@ export type ActionName = keyof typeof ROUTES;
 export const isActionName = (name: string): name is ActionName =>
 	Object.hasOwn(ROUTES, name);
 
+/** Each block action Standalone retired, and the content action it answers `replaced` with. */
+export const REPLACED_BY = {
+	"campaigns.update_blocks": "campaigns.update_content",
+	"donation_page.update_blocks": "donation_page.update_content",
+	"blocks.catalog": "content.catalog",
+} as const satisfies Partial<Record<ActionName, ActionName>>;
+
+export const replacementOf = (action: ActionName): ActionName | null =>
+	Object.hasOwn(REPLACED_BY, action)
+		? REPLACED_BY[action as keyof typeof REPLACED_BY]
+		: null;
+
 /**
  * Each action's tool name, the other spelling hello's `actions` arrives in:
  * Standalone lists contract names, Platform lists tool names. src/mcp/actions.ts
@@ -57,13 +84,16 @@ export const TOOL_ACTIONS = {
 	get_campaign: "campaigns.get",
 	create_campaign: "campaigns.create",
 	update_campaign_blocks: "campaigns.update_blocks",
+	update_campaign_content: "campaigns.update_content",
 	update_campaign_settings: "campaigns.update_settings",
 	publish_campaign: "campaigns.publish",
 	end_campaign: "campaigns.end",
 	get_donation_page: "donation_page.get",
 	update_donation_page_blocks: "donation_page.update_blocks",
+	update_donation_page_content: "donation_page.update_content",
 	reset_donation_page: "donation_page.reset",
 	get_block_catalog: "blocks.catalog",
+	get_content_catalog: "content.catalog",
 	list_forms: "forms.list",
 	get_form: "forms.get",
 	create_form: "forms.create",

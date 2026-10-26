@@ -32,7 +32,7 @@ export type LiveHarnessOptions = {
 
 /**
  * Hello, exchange, the 13 minimum tools (create and record twice), the other
- * 9 as actions this deployment does not serve, then disconnect and one refused
+ * 12 as actions this deployment does not serve, then disconnect and one refused
  * call. The results file never receives arguments, response bodies, or the key.
  */
 export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
@@ -65,9 +65,9 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 
 		const mvp = ACTIONS.filter((spec) => MVP.has(spec.action));
 		const rest = ACTIONS.filter((spec) => !MVP.has(spec.action));
-		if (mvp.length !== 13 || rest.length !== 9) {
+		if (mvp.length !== 13 || rest.length !== 12) {
 			throw new Error(
-				"the connector does not list 13 minimum tools and 9 others",
+				"the connector does not list 13 minimum tools and 12 others",
 			);
 		}
 
@@ -191,6 +191,8 @@ function otherArgs(
 	switch (tool) {
 		case "update_campaign_blocks":
 			return { id: ids.campaign, blocks: [] };
+		case "update_campaign_content":
+			return { id: ids.campaign, heading: stamp };
 		case "update_campaign_settings":
 			return { id: ids.campaign, end_date: day };
 		case "publish_campaign":
@@ -199,6 +201,8 @@ function otherArgs(
 			return { id: ids.campaign };
 		case "update_donation_page_blocks":
 			return { blocks: [] };
+		case "update_donation_page_content":
+			return { heading: stamp };
 		case "reset_donation_page":
 			return { confirm: true };
 		case "create_form":

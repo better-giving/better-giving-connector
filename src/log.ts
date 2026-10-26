@@ -12,6 +12,7 @@ export type ToolOutcome =
 	| "moved"
 	| "needs_update"
 	| "rejected"
+	| "replaced"
 	| "unreachable"
 	| "server_error"
 	| "failed";

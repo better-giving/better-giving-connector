@@ -907,6 +907,7 @@ test("every action the fake deployment lists answers through call", async () => 
 		"campaigns.get": { id },
 		"campaigns.create": { title: "Second" },
 		"campaigns.update_blocks": { id, blocks },
+		"campaigns.update_content": { id, heading: "Warm coats" },
 		"campaigns.update_settings": {
 			id,
 			goal: usd("500.00"),
@@ -916,8 +917,10 @@ test("every action the fake deployment lists answers through call", async () => 
 		"campaigns.end": { id },
 		"donation_page.get": {},
 		"donation_page.update_blocks": { blocks },
+		"donation_page.update_content": { heading: "Give today" },
 		"donation_page.reset": { confirm: true },
 		"blocks.catalog": {},
+		"content.catalog": {},
 		"forms.list": {},
 		"forms.get": { id: formId },
 		"forms.create": { name: "Third" },
@@ -941,6 +944,11 @@ test("every action the fake deployment lists answers through call", async () => 
 		"campaigns.get": { ...project, id, public_url: url(`/campaigns/${id}`) },
 		"campaigns.create": { title: "Second", status: "draft" },
 		"campaigns.update_blocks": { id, blocks },
+		"campaigns.update_content": {
+			id,
+			layout: "card",
+			content: { heading: "Warm coats" },
+		},
 		"campaigns.update_settings": {
 			id,
 			settings: { goal: usd("500.00"), end_date: "2026-12-31" },
@@ -956,6 +964,7 @@ test("every action the fake deployment lists answers through call", async () => 
 			public_url: url("/donate"),
 		},
 		"donation_page.update_blocks": { blocks },
+		"donation_page.update_content": { content: { heading: "Give today" } },
 		"donation_page.reset": {
 			blocks: [
 				{ type: "hero" },
@@ -967,6 +976,12 @@ test("every action the fake deployment lists answers through call", async () => 
 			blocks: expect.arrayContaining([
 				expect.objectContaining({ type: "hero", schema: expect.any(Object) }),
 			]),
+		},
+		"content.catalog": {
+			content: expect.arrayContaining([
+				expect.objectContaining({ key: "tiers", schema: expect.any(Object) }),
+			]),
+			layout: { story_threshold: 320, feature_extras: 4 },
 		},
 		"forms.list": {
 			data: expect.arrayContaining([
