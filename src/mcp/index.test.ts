@@ -1,8 +1,8 @@
 import { beforeEach, expect, test } from "vitest";
 import {
+	ALL_ACTIONS,
 	type FakeDeployment,
 	fakeDeployment,
-	STANDALONE_ACTIONS,
 } from "../../test/fake-deployment";
 import { mcpRequest, rpc } from "../../test/harness";
 import { freshDb } from "../../test/support";
@@ -137,18 +137,18 @@ test("a connection with no stated actions offers every tool", async () => {
 	const names = await toolNames();
 
 	expect(names).toHaveLength(ACTIONS.length);
-	expect(names).toContain("unpublish_campaign");
 });
 
 test("tools/list offers only the tools whose action the deployment serves", async () => {
-	await reconnect([...STANDALONE_ACTIONS]);
+	const serves = ALL_ACTIONS.filter((a) => a !== "photos.upload_link");
+	await reconnect(serves);
 
 	const names = await toolNames();
 
-	expect(names).not.toContain("unpublish_campaign");
+	expect(names).not.toContain("create_photo_upload_link");
 	expect(names).toContain("publish_campaign");
 	expect(names).toContain("list_campaigns");
-	expect(names).toHaveLength(STANDALONE_ACTIONS.length);
+	expect(names).toHaveLength(serves.length);
 });
 
 test("a connection serving no actions offers no tools", async () => {

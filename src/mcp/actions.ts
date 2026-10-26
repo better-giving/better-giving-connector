@@ -37,12 +37,16 @@ const isIanaTimeZone = (zone: string) => {
 		return false;
 	}
 };
-const money = z.strictObject({
-	amount: z
-		.string()
-		.regex(/^\d+(\.\d{1,2})?$/, 'A decimal string such as "25.00".'),
-	currency: z.literal("USD"),
-});
+const money = z
+	.strictObject({
+		amount: z
+			.string()
+			.regex(/^\d+(\.\d{1,2})?$/, 'A decimal string such as "25.00".'),
+		currency: z.literal("USD"),
+	})
+	.describe(
+		'An object with a decimal-string amount and a currency, such as {"amount": "100.00", "currency": "USD"}. A plain number is refused.',
+	);
 const page = {
 	cursor: z
 		.string()
@@ -176,15 +180,6 @@ export const ACTIONS = toolSpecs([
 			id,
 			gifts_go_to: z.string().nullable().optional(),
 		}),
-		annotations: DESTRUCTIVE,
-		checkWith: "get_campaign",
-	},
-	{
-		tool: "unpublish_campaign",
-		action: "campaigns.unpublish",
-		title: "Unpublish a campaign",
-		description: `Takes a published campaign back to draft. Its public link stops taking gifts. ${CONFIRMED}`,
-		input: z.strictObject({ id }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
 	},

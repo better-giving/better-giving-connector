@@ -571,7 +571,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			}),
 		],
 		["publish_campaign", (i) => ({ id: i.campaign, gifts_go_to: null })],
-		["unpublish_campaign", (i) => ({ id: i.campaign })],
 		["end_campaign", (i) => ({ id: i.campaign })],
 		["get_donation_page", () => ({})],
 		[
@@ -635,7 +634,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		"update_campaign_blocks",
 		"update_campaign_settings",
 		"publish_campaign",
-		"unpublish_campaign",
 		"end_campaign",
 		"get_form",
 		"update_form",

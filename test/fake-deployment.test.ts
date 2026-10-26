@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import {
-	ALL_ACTIONS,
-	fakeDeployment,
-	MVP_ACTIONS,
-	STANDALONE_ACTIONS,
-} from "./fake-deployment";
+import { ALL_ACTIONS, fakeDeployment, MVP_ACTIONS } from "./fake-deployment";
 import { advance, MINUTE } from "./support";
 
 // The fake is the only `/connector/v1` the connector is checked against until
@@ -230,11 +225,9 @@ describe("record-gift method", () => {
 });
 
 describe("action presets", () => {
-	test("ALL, STANDALONE and MVP are the three releases", () => {
-		expect(ALL_ACTIONS).toHaveLength(23);
-		expect(new Set(ALL_ACTIONS).size).toBe(23);
-		expect(STANDALONE_ACTIONS).toHaveLength(22);
-		expect(STANDALONE_ACTIONS).not.toContain("campaigns.unpublish");
+	test("ALL and MVP are the two releases", () => {
+		expect(ALL_ACTIONS).toHaveLength(22);
+		expect(new Set(ALL_ACTIONS).size).toBe(22);
 		expect(MVP_ACTIONS).toEqual([
 			"campaigns.list",
 			"campaigns.get",

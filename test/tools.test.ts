@@ -15,7 +15,6 @@ import {
 	type FakeDeployment,
 	fakeDeployment,
 	fakeNetwork,
-	STANDALONE_ACTIONS,
 } from "./fake-deployment";
 import {
 	BASE,
@@ -126,7 +125,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			update_campaign_blocks: DESTRUCTIVE,
 			update_campaign_settings: SET,
 			publish_campaign: DESTRUCTIVE,
-			unpublish_campaign: DESTRUCTIVE,
 			end_campaign: DESTRUCTIVE,
 			get_donation_page: READ,
 			update_donation_page_blocks: DESTRUCTIVE,
@@ -160,9 +158,11 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	};
 
 	test("tools/list offers only the tools whose action the deployment serves", async () => {
-		const names = await connectWith(STANDALONE_ACTIONS);
+		const names = await connectWith(
+			ALL_ACTIONS.filter((a) => a !== "photos.upload_link"),
+		);
 
-		expect(names).not.toContain("unpublish_campaign");
+		expect(names).not.toContain("create_photo_upload_link");
 		expect(names).toContain("publish_campaign");
 		expect(names).toContain("list_campaigns");
 	});
@@ -170,15 +170,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	test("a deployment that serves every action offers every tool", async () => {
 		const names = await connectWith(ALL_ACTIONS);
 
-		expect(names).toContain("unpublish_campaign");
 		expect(new Set(names).size).toBe(ALL_ACTIONS.length);
 	});
 
 	test("the instructions name only the confirm tools the deployment serves", async () => {
 		deployment.setActions(
-			ALL_ACTIONS.filter(
-				(a) => a !== "campaigns.unpublish" && a !== "donation_page.reset",
-			),
+			ALL_ACTIONS.filter((a) => a !== "donation_page.reset"),
 		);
 		const token = (await connectFlow(call, deployment, BASE).connect())
 			.access_token;
@@ -197,10 +194,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		// one-name branch: the bare name, never "or".
 		deployment.setActions(
 			ALL_ACTIONS.filter(
-				(a) =>
-					a !== "campaigns.unpublish" &&
-					a !== "campaigns.end" &&
-					a !== "donation_page.reset",
+				(a) => a !== "campaigns.end" && a !== "donation_page.reset",
 			),
 		);
 		const token = (await connectFlow(call, deployment, BASE).connect())
@@ -216,7 +210,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(instructions).not.toContain(" or ");
 	});
 
-	test("publish, unpublish, end, reset, and whole-page block replacement are destructive", async () => {
+	test("publish, end, reset, and whole-page block replacement are destructive", async () => {
 		const tools: {
 			name: string;
 			annotations: { destructiveHint?: boolean; readOnlyHint?: boolean };
@@ -225,7 +219,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		for (const name of [
 			"publish_campaign",
-			"unpublish_campaign",
 			"end_campaign",
 			"reset_donation_page",
 			"update_campaign_blocks",
@@ -253,7 +246,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			update_campaign_blocks: ["blocks", "id"],
 			update_campaign_settings: ["id"],
 			publish_campaign: ["id"],
-			unpublish_campaign: ["id"],
 			end_campaign: ["id"],
 			get_donation_page: [],
 			update_donation_page_blocks: ["blocks"],
@@ -297,7 +289,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		expect(asking).toEqual([
 			"publish_campaign",
-			"unpublish_campaign",
 			"end_campaign",
 			"reset_donation_page",
 		]);
@@ -560,19 +551,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			});
 		},
 	);
-
-	test("unpublish_campaign runs its contract route on a published campaign", async () => {
-		const { campaignId } = await seed();
-		await tool("publish_campaign", { id: campaignId, gifts_go_to: null });
-
-		const result = await tool("unpublish_campaign", { id: campaignId });
-
-		expect(json(result)).toMatchObject({ id: campaignId, status: "draft" });
-		expect(deployment.calls.at(-1)).toMatchObject({
-			method: "POST",
-			path: `/connector/v1/campaigns/${campaignId}/unpublish`,
-		});
-	});
 
 	test("a tool answers with the deployment's JSON once, as text", async () => {
 		const answer = {
@@ -1194,7 +1172,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		)?.[1];
 
 		expect(waiting).toBe(
-			"publish_campaign, unpublish_campaign, end_campaign or reset_donation_page",
+			"publish_campaign, end_campaign or reset_donation_page",
 		);
 	});
 
@@ -1210,7 +1188,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			{ id: "cmp_1", end_date: "2026-12-31" },
 		],
 		["publish_campaign", "get_campaign", { id: "cmp_1" }],
-		["unpublish_campaign", "get_campaign", { id: "cmp_1" }],
 		["end_campaign", "get_campaign", { id: "cmp_1" }],
 		["update_donation_page_blocks", "get_donation_page", { blocks: [] }],
 		["reset_donation_page", "get_donation_page", { confirm: true }],
@@ -1451,34 +1428,6 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			path: `/connector/v1/campaigns/${campaignId}/publish`,
 			body: {},
 		});
-	});
-
-	test("a later publish omits gifts_go_to, and sending it again is refused", async () => {
-		const { campaignId } = await seed();
-		expect(
-			(await tool("publish_campaign", { id: campaignId, gifts_go_to: null }))
-				.isError,
-		).toBeUndefined();
-		expect(
-			(await tool("unpublish_campaign", { id: campaignId })).isError,
-		).toBeUndefined();
-
-		const again = await tool("publish_campaign", { id: campaignId });
-
-		expect(again.isError).toBeUndefined();
-		expect(deployment.calls.at(-1)?.body).toEqual({});
-
-		expect(
-			(await tool("unpublish_campaign", { id: campaignId })).isError,
-		).toBeUndefined();
-		const restated = await tool("publish_campaign", {
-			id: campaignId,
-			gifts_go_to: "prog_1",
-		});
-
-		expect(restated.isError).toBe(true);
-		expect(textOf(restated)).toContain("gifts_go_to");
-		expect(deployment.calls.at(-1)?.body).toEqual({ gifts_go_to: "prog_1" });
 	});
 
 	test("record_donation sends the note as note and list_donations returns it", async () => {
