@@ -18,7 +18,6 @@ export const ROUTES = {
 		path: "/campaigns/:id/settings",
 	},
 	"campaigns.publish": { method: "POST", path: "/campaigns/:id/publish" },
-	"campaigns.unpublish": { method: "POST", path: "/campaigns/:id/unpublish" },
 	"campaigns.end": { method: "POST", path: "/campaigns/:id/end" },
 	"donation_page.get": { method: "GET", path: "/donation-page" },
 	"donation_page.update_blocks": {

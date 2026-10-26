@@ -85,10 +85,10 @@ export function DocsPage() {
 					message and channels shown when it is shared.
 				</li>
 				<li>
-					Publish, unpublish, or end a campaign. These change what donors see.
-					Your AI assistant says what will change and waits for your explicit
-					yes. The first time a campaign is published, it asks where the gifts
-					go: a program, or the general fund.
+					Publish or end a campaign. These change what donors see. Your AI
+					assistant says what will change and waits for your explicit yes. The
+					first time a campaign is published, it asks where the gifts go: a
+					program, or the general fund.
 				</li>
 				<li>
 					Read and edit the main donation page, or put it back to the starting

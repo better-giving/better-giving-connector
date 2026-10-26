@@ -20,7 +20,6 @@ export const ALL_ACTIONS = [
 	"campaigns.update_blocks",
 	"campaigns.update_settings",
 	"campaigns.publish",
-	"campaigns.unpublish",
 	"campaigns.end",
 	"donation_page.get",
 	"donation_page.update_blocks",
@@ -38,11 +37,6 @@ export const ALL_ACTIONS = [
 	"donations.record",
 	"photos.upload_link",
 ] as const;
-
-/** Standalone's release: every action except unpublish. */
-export const STANDALONE_ACTIONS = ALL_ACTIONS.filter(
-	(action) => action !== "campaigns.unpublish",
-);
 
 /**
  * The thirteen tools a minimum deployment serves:
@@ -798,10 +792,6 @@ function deploymentApp(state: State) {
 		k.status = "published";
 		return c.json(campaignView(k));
 	});
-	v1.post(
-		"/campaigns/:id/unpublish",
-		...transition("campaigns.unpublish", ["published"], "draft"),
-	);
 	v1.post(
 		"/campaigns/:id/end",
 		...transition("campaigns.end", ["draft", "published"], "ended"),

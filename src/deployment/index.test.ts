@@ -913,7 +913,6 @@ test("every action the fake deployment lists answers through call", async () => 
 			end_date: "2026-12-31",
 		},
 		"campaigns.publish": { id, gifts_go_to: null },
-		"campaigns.unpublish": { id },
 		"campaigns.end": { id },
 		"donation_page.get": {},
 		"donation_page.update_blocks": { blocks },
@@ -947,7 +946,6 @@ test("every action the fake deployment lists answers through call", async () => 
 			settings: { goal: usd("500.00"), end_date: "2026-12-31" },
 		},
 		"campaigns.publish": { id, status: "published" },
-		"campaigns.unpublish": { id, status: "draft" },
 		"campaigns.end": { id, status: "ended" },
 		"donation_page.get": {
 			blocks: [
