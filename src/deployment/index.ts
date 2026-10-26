@@ -21,7 +21,12 @@ import {
 import { idempotencyKey, isKeyedAction } from "./idempotency";
 import { type Origin, parseOrigin } from "./origin";
 
-export { type ActionName, isActionName, knownActions } from "./contract";
+export {
+	type ActionName,
+	isActionName,
+	knownActions,
+	TOOL_ACTIONS,
+} from "./contract";
 export {
 	CodeInvalid,
 	DeploymentFailed,

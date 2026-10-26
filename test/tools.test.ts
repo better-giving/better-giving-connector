@@ -308,17 +308,34 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		["update_campaign_blocks", "get_campaign"],
 		["update_donation_page_blocks", "get_donation_page"],
 	])(
-		"%s describes a full block replacement using %s and the catalog",
+		"%s describes a content edit using %s and the catalog",
 		async (name, read) => {
 			const tools: { name: string; description: string }[] = await listTools();
 
 			const { description } = tools.find((t) => t.name === name) ?? {};
 
-			expect(description).toContain("A block left out is deleted");
+			expect(description).toContain("Edits the content");
 			expect(description).toContain(read);
 			expect(description).toContain("get_block_catalog");
 		},
 	);
+
+	test("no tool or field description frames a page edit as a block replacement or a design change", async () => {
+		const text = JSON.stringify(await listTools());
+
+		for (const phrase of [
+			"in order",
+			"replaces every block",
+			"A block left out is deleted",
+			"starting page",
+			"layout",
+			"palette",
+			"variant",
+			"background",
+		]) {
+			expect(text.toLowerCase()).not.toContain(phrase.toLowerCase());
+		}
+	});
 
 	const SECRET_FIELDS = [
 		"key",

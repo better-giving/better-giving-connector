@@ -97,6 +97,18 @@ test("get drops a stored action name this contract no longer carries", async () 
 	]);
 });
 
+test("get reads stored tool names as their actions, once each", async () => {
+	await insertUser1();
+	await db.execute(
+		`UPDATE connection SET actions = '["list_campaigns","campaigns.list","get_block_catalog","hello"]' WHERE user_id = 'user-1'`,
+	);
+
+	expect((await connections(db, SECRET).get("user-1"))?.actions).toEqual([
+		"campaigns.list",
+		"blocks.catalog",
+	]);
+});
+
 test("get reads a stored actions value that isn't JSON as null", async () => {
 	await insertUser1();
 	await db.execute(

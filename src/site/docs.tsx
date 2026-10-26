@@ -91,9 +91,9 @@ export function DocsPage() {
 					program, or the general fund.
 				</li>
 				<li>
-					Read and edit the main donation page, or put it back to the starting
-					page. Resetting discards the current blocks. Your AI assistant waits
-					for your explicit yes before it resets the page.
+					Read and edit the main donation page's content, or put it back to its
+					default content. Resetting discards what is there now. Your AI
+					assistant waits for your explicit yes before it resets the page.
 				</li>
 				<li>
 					List, read, create, and edit donation forms, including the donation

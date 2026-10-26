@@ -5,6 +5,7 @@ import {
 	fakeDeployment,
 } from "../../test/fake-deployment";
 import { mcpRequest, rpc } from "../../test/harness";
+import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
 import { freshDb } from "../../test/support";
 import { type Connections, connections, type Db } from "../db";
 import { type ActionName, deploymentClient } from "../deployment";
@@ -149,6 +150,20 @@ test("tools/list offers only the tools whose action the deployment serves", asyn
 	expect(names).toContain("publish_campaign");
 	expect(names).toContain("list_campaigns");
 	expect(names).toHaveLength(serves.length);
+});
+
+test("tools/list offers a Platform deployment's tools from the tool names its hello lists", async () => {
+	deployment.intercept((req) =>
+		new URL(req.url).pathname === "/connector/v1/hello"
+			? Response.json(PLATFORM_HELLO)
+			: undefined,
+	);
+	const { actions } = await deploymentClient({
+		fetch: deployment.fetch,
+	}).hello(deployment.origin);
+	await reconnect(actions);
+
+	expect((await toolNames()).sort()).toEqual([...PLATFORM_TOOLS].sort());
 });
 
 test("a connection serving no actions offers no tools", async () => {
