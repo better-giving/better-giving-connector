@@ -74,15 +74,36 @@ export function DocsPage() {
 			</ol>
 
 			<h2>What it can do</h2>
+			<p>
+				Your AI assistant sees only the tools your Better Giving account
+				supports. Some aren't available on every account yet.
+			</p>
+
+			<h3>Available now</h3>
 			<ul>
 				<li>
-					List and read campaigns, and create a draft campaign. Donors cannot
-					see a draft until it is published. For the amount raised, use
-					fundraising results.
+					List and read campaigns and their content, and create a draft
+					campaign. Donors cannot see a draft until it is published. For the
+					amount raised, use fundraising results.
 				</li>
 				<li>
-					Edit a campaign's page, and set its goal, end date, time zone, or the
-					message and channels shown when it is shared.
+					Read the main donation page, donation forms, donors, gifts, monthly
+					gifts, and fundraising results. Monthly gifts cannot be changed from
+					here.
+				</li>
+			</ul>
+
+			<h3>Coming to more accounts</h3>
+			<ul>
+				<li>
+					Edit the content of campaign pages and the donation page, or put the
+					donation page back to its default content. Resetting discards what is
+					there now. Your AI assistant waits for your explicit yes before it
+					resets the page.
+				</li>
+				<li>
+					Change a campaign's goal, end date, time zone, or the message and
+					channels shown when it is shared.
 				</li>
 				<li>
 					Publish or end a campaign. These change what donors see. Your AI
@@ -91,18 +112,9 @@ export function DocsPage() {
 					program, or the general fund.
 				</li>
 				<li>
-					Read and edit the main donation page's content, or put it back to its
-					default content. Resetting discards what is there now. Your AI
-					assistant waits for your explicit yes before it resets the page.
-				</li>
-				<li>
-					List, read, create, and edit donation forms, including the donation
-					page's form and each campaign's form. On a live form, a change donors
-					would see waits for your yes.
-				</li>
-				<li>
-					Read fundraising totals, donations, donors, and monthly gifts. Monthly
-					gifts cannot be changed from here.
+					Create and edit donation forms, including the donation page's form and
+					each campaign's form. On a live form, a change donors would see waits
+					for your yes.
 				</li>
 				<li>
 					Record a donation already received in cash or by check. It is not tied
@@ -123,7 +135,7 @@ export function DocsPage() {
 				<li>Show me my published campaigns.</li>
 				<li>How much have we raised this month?</li>
 				<li>Create a draft campaign called Spring Food Drive.</li>
-				<li>Record a 100 dollar check from Maria Lopez, dated today.</li>
+				<li>Show me the gifts we received last week.</li>
 				<li>List our donors and how much each has given.</li>
 			</ul>
 

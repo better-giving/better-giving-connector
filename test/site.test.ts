@@ -233,6 +233,11 @@ test("docs and support describe the connector and name the support address", asy
 	expect(docs).toContain("including the donation");
 	expect(docs).toContain("<h2>Example prompts</h2>");
 	expect(docs).toContain("<h2>Troubleshooting</h2>");
+	expect(docs).toContain("<h3>Available now</h3>");
+	expect(docs).toContain("<h3>Coming to more accounts</h3>");
+	expect(docs).toContain("Some aren&#39;t available on every account yet.");
+	expect(docs).not.toMatch(/Record a 100 dollar check/);
+	expect(docs).not.toMatch(/Platform|Standalone|alpha/);
 	expect(docs).not.toContain("leaves out a form");
 	expect(support).toContain("in cash or by check");
 	expect(privacy).toContain("your AI assistant");
