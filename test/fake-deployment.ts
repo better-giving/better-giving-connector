@@ -2,6 +2,7 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type { Origin } from "../src/deployment/origin";
+import { PLATFORM_ACTION_OF } from "./platform-hello";
 
 /** Standalone's `MAX_NOTE`: the longest note a gift keeps. */
 const MAX_NOTE = 2_000;
@@ -17,6 +18,13 @@ const MAX_NOTE = 2_000;
 // as blocks; one serving `CONTENT_ACTIONS` alone is Standalone's content
 // release: it edits a page's content, picks the layout from it, and answers
 // each retired block action 422 `replaced`.
+//
+// With `platform: true` it is Platform instead
+// (better-giving/better-giving-platform, apps/platform/.server/connector/):
+// hello lists tool names, and its writes keep Platform's rules: a campaign's
+// `version` and 409 `stale_read`, 409 `campaign_ended`, a live form's 409
+// `confirm_required`, create_form's optional Idempotency-Key, and photo links
+// for a campaign's hero alone.
 
 export const ALL_ACTIONS = [
 	"campaigns.list",
@@ -123,6 +131,22 @@ export type FakeDeployment = {
 	intercept(handler: Interceptor | null): void;
 	/** The deployment itself, behind the network; `fakeNetwork` calls it. */
 	handle(req: Request): Promise<Response>;
+	/** The next `count` requests run, and then their answers are lost. */
+	loseAnswers(count: number): void;
+	/**
+	 * Platform: the next `count` keyed form creates find an earlier try under
+	 * their key still running and answer `idempotency_in_progress`; the try
+	 * after that finds it finished and gets its replay.
+	 */
+	stallCreates(count?: number): void;
+	/** Platform: the Retry-After an in-progress create answers with, in seconds. */
+	setRetryAfter(seconds: string): void;
+	/**
+	 * Platform: the operator uploads a photo through a link, which becomes its
+	 * campaign's hero. The stored photo's address, or null for a link that is
+	 * spent, expired or unknown.
+	 */
+	uploadPhoto(link: string): string | null;
 };
 
 /** An interceptor that never answers, rejecting only when the request is aborted. */
@@ -177,17 +201,26 @@ export function fakeNetwork(...deployments: FakeDeployment[]): typeof fetch {
 }
 
 export function fakeDeployment(
-	opts: { host?: string; name?: string } = {},
+	opts: { host?: string; name?: string; platform?: boolean } = {},
 ): FakeDeployment {
 	const host = opts.host ?? "give.example.org";
-	const state = newState(host, opts.name ?? "Give Example");
+	const state = newState(
+		host,
+		opts.name ?? "Give Example",
+		opts.platform ?? false,
+	);
 	const calls: RecordedCall[] = [];
 	let interceptor: Interceptor | null = null;
 	const app = deploymentApp(state);
 
 	async function handle(req: Request): Promise<Response> {
 		calls.push(await record(req));
-		return (await interceptor?.(req)) ?? (await app.fetch(req));
+		const res = (await interceptor?.(req)) ?? (await app.fetch(req));
+		if (state.lose > 0) {
+			state.lose--;
+			throw new TypeError("fetch failed");
+		}
+		return res;
 	}
 
 	const fake: FakeDeployment = {
@@ -211,6 +244,16 @@ export function fakeDeployment(
 			interceptor = handler;
 		},
 		handle,
+		loseAnswers: (count) => {
+			state.lose = count;
+		},
+		stallCreates: (count = Number.POSITIVE_INFINITY) => {
+			state.stall = count;
+		},
+		setRetryAfter: (seconds) => {
+			state.retryAfter = seconds;
+		},
+		uploadPhoto: (link) => uploadPhoto(state, link),
 	};
 	return fake;
 }
@@ -255,6 +298,13 @@ type Campaign = {
 		sharing: { message: string | null; channels: string[] | null };
 	};
 	created_at: string;
+	/** Platform's: bumped on every write, shown as a string. */
+	version: number;
+	story: string;
+	hero: string | null;
+	/** Platform: the photos uploaded through this campaign's links. */
+	uploads: string[];
+	giftsGoTo?: string | null;
 };
 type Form = { id: string; campaign_id: string | null } & Record<
 	string,
@@ -281,14 +331,17 @@ type Recurring = {
 
 type State = ReturnType<typeof newState>;
 
-function newState(host: string, name: string) {
+function newState(host: string, name: string, platform: boolean) {
 	const formId = "frm_1";
 	return {
 		host,
 		name,
 		exchangeName: name,
-		release: "1.0.0",
-		actions: new Set<string>(ALL_ACTIONS),
+		platform,
+		release: platform ? "0f3c2a1" : "1.0.0",
+		actions: new Set<string>(
+			platform ? Object.values(PLATFORM_ACTION_OF) : ALL_ACTIONS,
+		),
 		keys: new Set<string>(),
 		issued: [] as string[],
 		// Allow codes not yet redeemed, with when each lapses
@@ -305,6 +358,10 @@ function newState(host: string, name: string) {
 					currency: "USD",
 					allow_recurring: true,
 					campaign_id: null,
+					...(platform && {
+						status: "live",
+						updated_at: "2026-10-01T00:00:00.000Z",
+					}),
 				},
 			],
 		]),
@@ -316,7 +373,38 @@ function newState(host: string, name: string) {
 		donations: new Map<string, Donation>(),
 		recurring: [] as Recurring[],
 		idempotency: new Map<string, { fingerprint: string; body: unknown }>(),
+		// Platform's create_form claims: pending while an attempt runs.
+		formClaims: new Map<
+			string,
+			{ fingerprint: string; pending: boolean; body: unknown }
+		>(),
+		photoLinks: new Map<
+			string,
+			{ campaignId: string; expiresAt: number; used: boolean }
+		>(),
+		lose: 0,
+		stall: 0,
+		retryAfter: "5",
 	};
+}
+
+/** Platform's `PHOTO_LINK_TTL_MS`. */
+const PHOTO_LINK_TTL_MS = 15 * 60_000;
+/** Where Platform's blob store keeps an uploaded photo. */
+const PHOTO_STORE = "https://store.example.com/u";
+
+function uploadPhoto(state: State, link: string): string | null {
+	const token = new URL(link).pathname.split("/").at(-1) ?? "";
+	const found = state.photoLinks.get(token);
+	if (!found || found.used || Date.now() >= found.expiresAt) return null;
+	found.used = true;
+	const k = state.campaigns.get(found.campaignId);
+	if (!k || k.status === "ended") return null;
+	const url = `${PHOTO_STORE}/${crypto.randomUUID()}.jpg`;
+	k.uploads.push(url);
+	k.hero = url;
+	k.version++;
+	return url;
 }
 
 const CODE_TTL_MS = 10 * 60_000;
@@ -616,6 +704,7 @@ function problem(
 	code: string,
 	detail: string,
 	errors?: { path: string; message: string }[],
+	headers: Record<string, string> = {},
 ) {
 	const body = {
 		type: `https://better.giving/connector/problems/${code}`,
@@ -627,6 +716,7 @@ function problem(
 	};
 	return c.body(JSON.stringify(body), status, {
 		"content-type": "application/problem+json",
+		...headers,
 	});
 }
 
@@ -696,6 +786,10 @@ function deploymentApp(state: State) {
 		if (state.actions.has("campaigns.update_content")) {
 			view.layout = layoutOf(content);
 			view.content = content;
+		}
+		if (state.platform) {
+			view.blocks = platformBlocks(k);
+			view.version = String(k.version);
 		}
 		if (contentRelease()) {
 			view.settings = {
@@ -831,7 +925,16 @@ function deploymentApp(state: State) {
 			contract: 1,
 			release: state.release,
 			name: state.name,
-			actions: [...state.actions],
+			actions: state.platform
+				? [
+						"hello",
+						"exchange",
+						"disconnect",
+						...Object.keys(PLATFORM_ACTION_OF).filter((tool) =>
+							state.actions.has(PLATFORM_ACTION_OF[tool] as string),
+						),
+					]
+				: [...state.actions],
 		}),
 	);
 	v1.use("/exchange", async (c, next) => {
@@ -878,6 +981,8 @@ function deploymentApp(state: State) {
 		state.keys.delete(key ?? "");
 		return c.body(null, 204);
 	});
+
+	if (state.platform) platformWrites(v1, state, { action, campaignView });
 
 	v1.get("/campaigns", action("campaigns.list"), (c) => {
 		const status = c.req.query("status");
@@ -934,6 +1039,10 @@ function deploymentApp(state: State) {
 				sharing: { message: null, channels: null },
 			},
 			created_at: new Date().toISOString(),
+			version: 1,
+			story: "",
+			hero: null,
+			uploads: [],
 		};
 		state.campaigns.set(id, k);
 		const view = campaignView(k);
@@ -1328,4 +1437,503 @@ function deploymentApp(state: State) {
 			: c.text("Not Found", 404),
 	);
 	return app;
+}
+
+/** A Platform campaign's page: its four blocks, in the order get_campaign shows them. */
+function platformBlocks(k: Campaign): Block[] {
+	return [
+		{ type: "title", text: k.title },
+		{ type: "story", text: k.story },
+		{ type: "hero", image_url: k.hero },
+		{ type: "goal-bar", goal: k.settings.goal },
+	];
+}
+
+const PLATFORM_BLOCKS = ["title", "story", "hero", "goal-bar"] as const;
+const PLATFORM_BLOCK_FIELD: Record<string, string> = {
+	title: "text",
+	story: "text",
+	hero: "image_url",
+	"goal-bar": "goal",
+};
+const HERO_MSG =
+	"is null, or the link to a photo uploaded through create_photo_upload_link for this campaign";
+const AMOUNT = /^\d+(\.\d{1,2})?$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** Platform's form fields, beside what get_form shows but this action can't move. */
+const FORM_WRITABLE = [
+	"name",
+	"status",
+	"suggested_amounts",
+	"frequencies",
+	"donate_methods",
+	"gifts_go_to",
+];
+const FORM_ECHOES = [
+	"id",
+	"campaign_id",
+	"updated_at",
+	"minimum",
+	"maximum",
+	"allowed_origins",
+];
+
+type Issue = { path: string; message: string };
+
+const sameJson = (a: unknown, b: unknown) =>
+	JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
+const sorted = (value: unknown): unknown =>
+	Array.isArray(value)
+		? value.map(sorted)
+		: value !== null && typeof value === "object"
+			? Object.fromEntries(
+					Object.entries(value)
+						.sort(([a], [b]) => (a < b ? -1 : 1))
+						.map(([k, v]) => [k, sorted(v)]),
+				)
+			: value;
+
+const isMoney = (value: unknown) => {
+	if (value === null || typeof value !== "object" || Array.isArray(value))
+		return false;
+	const { amount, currency, ...rest } = value as Record<string, unknown>;
+	return (
+		Object.keys(rest).length === 0 &&
+		typeof amount === "string" &&
+		AMOUNT.test(amount) &&
+		Number(amount) > 0 &&
+		currency === "USD"
+	);
+};
+
+function platformWrites(
+	v1: Hono,
+	state: State,
+	deps: {
+		action: (name: string) => MiddlewareHandler;
+		campaignView: (k: Campaign) => Record<string, unknown>;
+	},
+) {
+	const { action, campaignView } = deps;
+	const invalid = (c: Context, errors: Issue[]) =>
+		problem(c, 422, "invalid", "The request is invalid.", errors);
+	const missing = (c: Context, what: string, id: string) =>
+		problem(
+			c,
+			404,
+			"not_found",
+			`${what} ${id} does not exist for this nonprofit.`,
+		);
+	const ended = (c: Context) =>
+		problem(
+			c,
+			409,
+			"campaign_ended",
+			"This campaign has ended, and an ended campaign stays ended.",
+		);
+	const stale = (c: Context) =>
+		problem(
+			c,
+			409,
+			"stale_read",
+			"This campaign changed after it was read. Read it again with get_campaign, then send the change against that version.",
+		);
+	const unknownKeys = (
+		body: Record<string, unknown>,
+		allowed: readonly string[],
+		issues: Issue[],
+	) => {
+		for (const key of Object.keys(body)) {
+			if (!allowed.includes(key))
+				issues.push({ path: key, message: "is not a field on this action" });
+		}
+	};
+	// The body as an object; with `allowEmpty`, no body at all reads as `{}`.
+	const readBody = async (
+		c: Context,
+		allowEmpty = false,
+	): Promise<Record<string, unknown> | Response> => {
+		const text = await c.req.text();
+		let parsed: unknown;
+		try {
+			parsed = allowEmpty && text.trim() === "" ? {} : JSON.parse(text);
+		} catch {
+			parsed = undefined;
+		}
+		if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+			return invalid(c, [{ path: "", message: "is a JSON object" }]);
+		return parsed as Record<string, unknown>;
+	};
+	// undefined when left out, null when malformed (with the issue pushed).
+	const readVersion = (body: Record<string, unknown>, issues: Issue[]) => {
+		if (!Object.hasOwn(body, "expected_version")) return undefined;
+		const v = body.expected_version;
+		if (typeof v === "string" && /^\d{1,19}$/.test(v)) return v;
+		issues.push({
+			path: "expected_version",
+			message: "is the version get_campaign returned, or left out",
+		});
+		return null;
+	};
+	const campaignOf = (c: Context) =>
+		state.campaigns.get(c.req.param("id") ?? "") ??
+		missing(c, "Campaign", c.req.param("id") ?? "");
+
+	v1.patch(
+		"/campaigns/:id/settings",
+		action("campaigns.update_settings"),
+		async (c) => {
+			const k = campaignOf(c);
+			if (k instanceof Response) return k;
+			const body = await readBody(c);
+			if (body instanceof Response) return body;
+			const issues: Issue[] = [];
+			unknownKeys(
+				body,
+				["goal", "end_date", "time_zone", "sharing", "expected_version"],
+				issues,
+			);
+			const expected = readVersion(body, issues);
+			for (const key of ["time_zone", "sharing"] as const) {
+				if (Object.hasOwn(body, key) && !sameJson(body[key], k.settings[key]))
+					issues.push({
+						path: key,
+						message: "is not supported on Better Giving",
+					});
+			}
+			if (
+				Object.hasOwn(body, "goal") &&
+				body.goal !== null &&
+				!isMoney(body.goal)
+			) {
+				issues.push({
+					path: "goal",
+					message: 'is {amount, currency: "USD"}, or null for no goal',
+				});
+			}
+			const end = body.end_date;
+			if (
+				end !== undefined &&
+				end !== null &&
+				!(typeof end === "string" && DAY.test(end))
+			) {
+				issues.push({
+					path: "end_date",
+					message: "is a day written YYYY-MM-DD, today or later, or null",
+				});
+			}
+			if (issues.length > 0) return invalid(c, issues);
+			if (k.status === "ended") return ended(c);
+			if (expected !== undefined && expected !== String(k.version))
+				return stale(c);
+			const before = JSON.stringify(k.settings);
+			if (Object.hasOwn(body, "goal"))
+				k.settings.goal = body.goal as Money | null;
+			if (end !== undefined) k.settings.end_date = end as string | null;
+			if (JSON.stringify(k.settings) !== before) k.version++;
+			return c.json(campaignView(k));
+		},
+	);
+
+	v1.patch(
+		"/campaigns/:id/blocks",
+		action("campaigns.update_blocks"),
+		async (c) => {
+			const k = campaignOf(c);
+			if (k instanceof Response) return k;
+			const body = await readBody(c);
+			if (body instanceof Response) return body;
+			const issues: Issue[] = [];
+			unknownKeys(body, ["blocks", "expected_version"], issues);
+			const expected = readVersion(body, issues);
+			const sent = body.blocks;
+			const next = {
+				title: k.title,
+				story: k.story,
+				hero: k.hero,
+				goal: k.settings.goal,
+			};
+			if (!Array.isArray(sent) || sent.length !== PLATFORM_BLOCKS.length) {
+				issues.push({
+					path: "blocks",
+					message: `is the campaign's ${PLATFORM_BLOCKS.length} blocks, ${PLATFORM_BLOCKS.join(", ")}, in the order get_campaign returns them`,
+				});
+			} else {
+				sent.forEach((raw: unknown, i) => {
+					const want = PLATFORM_BLOCKS[i] as string;
+					const block = (raw ?? {}) as Record<string, unknown>;
+					const field = PLATFORM_BLOCK_FIELD[want] as string;
+					const path = `blocks[${i}].${field}`;
+					if (block.type !== want) {
+						issues.push({ path: `blocks[${i}].type`, message: `is "${want}"` });
+						return;
+					}
+					const value = block[field];
+					if (want === "title") {
+						const title = typeof value === "string" ? value.trim() : "";
+						if (title.length < 1 || title.length > 200)
+							issues.push({
+								path,
+								message: "is the campaign's name, 1 to 200 characters",
+							});
+						else next.title = title;
+					} else if (want === "story") {
+						if (typeof value !== "string")
+							issues.push({ path, message: "is plain text" });
+						else next.story = value;
+					} else if (want === "hero") {
+						if (
+							value === null ||
+							value === k.hero ||
+							(typeof value === "string" && k.uploads.includes(value))
+						)
+							next.hero = value as string | null;
+						else issues.push({ path, message: HERO_MSG });
+					} else if (value === null || isMoney(value)) {
+						next.goal = value as Money | null;
+					} else {
+						issues.push({
+							path,
+							message: 'is {amount, currency: "USD"}, or null for no goal',
+						});
+					}
+				});
+			}
+			if (issues.length > 0) return invalid(c, issues);
+			if (k.status === "ended") return ended(c);
+			if (expected !== undefined && expected !== String(k.version))
+				return stale(c);
+			const changed =
+				next.title !== k.title ||
+				next.story !== k.story ||
+				next.hero !== k.hero ||
+				!sameJson(next.goal, k.settings.goal);
+			k.title = next.title;
+			k.story = next.story;
+			k.hero = next.hero;
+			k.settings.goal = next.goal;
+			if (changed) k.version++;
+			return c.json(campaignView(k));
+		},
+	);
+
+	v1.post("/campaigns/:id/publish", action("campaigns.publish"), async (c) => {
+		const k = campaignOf(c);
+		if (k instanceof Response) return k;
+		const body = await readBody(c, true);
+		if (body instanceof Response) return body;
+		const issues: Issue[] = [];
+		unknownKeys(body, ["gifts_go_to"], issues);
+		const sent = Object.hasOwn(body, "gifts_go_to");
+		const to = body.gifts_go_to;
+		if (sent && to !== null && typeof to !== "string")
+			issues.push({
+				path: "gifts_go_to",
+				message:
+					"is a program id of this nonprofit, or null for the general fund",
+			});
+		if (issues.length > 0) return invalid(c, issues);
+		if (k.status === "ended") return ended(c);
+		if (k.everPublished) {
+			if (!sent || to === k.giftsGoTo) return c.json(campaignView(k));
+			return problem(
+				c,
+				409,
+				"already_published",
+				"This campaign is live. Change where its gifts go in the Better Giving dashboard.",
+			);
+		}
+		if (!sent)
+			return invalid(c, [
+				{
+					path: "gifts_go_to",
+					message:
+						"is required on the first publish: a program id, or null for the general fund",
+				},
+			]);
+		k.everPublished = true;
+		k.status = "published";
+		k.giftsGoTo = to as string | null;
+		k.version++;
+		return c.json(campaignView(k));
+	});
+
+	v1.post("/campaigns/:id/end", action("campaigns.end"), async (c) => {
+		const k = campaignOf(c);
+		if (k instanceof Response) return k;
+		const body = await readBody(c, true);
+		if (body instanceof Response) return body;
+		const issues: Issue[] = [];
+		unknownKeys(body, [], issues);
+		if (issues.length > 0) return invalid(c, issues);
+		if (k.status !== "ended") {
+			k.status = "ended";
+			k.version++;
+		}
+		return c.json(campaignView(k));
+	});
+
+	const formFields = (body: Record<string, unknown>, issues: Issue[]) => {
+		if (Object.hasOwn(body, "name")) {
+			const name = typeof body.name === "string" ? body.name.trim() : "";
+			if (name.length < 1 || name.length > 200)
+				issues.push({
+					path: "name",
+					message: "is the form's label, 1 to 200 characters",
+				});
+		}
+		if (
+			Object.hasOwn(body, "status") &&
+			body.status !== "live" &&
+			body.status !== "draft"
+		)
+			issues.push({ path: "status", message: 'is "live" or "draft"' });
+		if (
+			Object.hasOwn(body, "suggested_amounts") &&
+			!(
+				Array.isArray(body.suggested_amounts) &&
+				body.suggested_amounts.every(isMoney)
+			)
+		)
+			issues.push({
+				path: "suggested_amounts",
+				message: "is a list of amounts",
+			});
+	};
+	const stamp = (prev: unknown) =>
+		new Date(
+			Math.max(
+				Date.now(),
+				(typeof prev === "string" ? Date.parse(prev) : 0) + 1,
+			),
+		).toISOString();
+
+	const stillRunning = (c: Context) =>
+		problem(
+			c,
+			409,
+			"idempotency_in_progress",
+			"A request with this Idempotency-Key is still running. Retry the same request, with the same Idempotency-Key and the same body, after a few seconds.",
+			undefined,
+			{ "retry-after": state.retryAfter },
+		);
+
+	v1.post("/forms", action("forms.create"), async (c) => {
+		const body = await readBody(c);
+		if (body instanceof Response) return body;
+		const key = c.req.header("idempotency-key")?.trim() ?? "";
+		const fingerprint = JSON.stringify(sorted(body));
+		const claim = key ? state.formClaims.get(key) : undefined;
+		if (claim) {
+			if (claim.fingerprint !== fingerprint)
+				return problem(
+					c,
+					409,
+					"idempotency_conflict",
+					"This Idempotency-Key was already used for a different request. Send a new key for a new request.",
+				);
+			if (claim.pending && state.stall > 0) {
+				state.stall--;
+				return stillRunning(c);
+			}
+			// a replay is 200, even though the create was 201
+			if (!claim.pending) return c.json(claim.body, 200);
+		}
+		const issues: Issue[] = [];
+		unknownKeys(body, FORM_WRITABLE, issues);
+		if (!Object.hasOwn(body, "name"))
+			issues.push({
+				path: "name",
+				message: "is the form's label, 1 to 200 characters",
+			});
+		formFields(body, issues);
+		if (issues.length > 0) return invalid(c, issues);
+		if (key && state.stall > 0 && !claim) {
+			state.stall--;
+			state.formClaims.set(key, { fingerprint, pending: true, body: null });
+			return stillRunning(c);
+		}
+		const f: Form = {
+			id: `frm_${crypto.randomUUID()}`,
+			campaign_id: null,
+			status: "live",
+			suggested_amounts: [],
+			...body,
+			name: (body.name as string).trim(),
+			updated_at: stamp(null),
+		};
+		state.forms.set(f.id, f);
+		if (key)
+			state.formClaims.set(key, { fingerprint, pending: false, body: f });
+		// the earlier try finishing: this answer is its replay
+		return c.json(f, claim ? 200 : 201);
+	});
+
+	v1.patch("/forms/:id", action("forms.update"), async (c) => {
+		const id = c.req.param("id");
+		const f = state.forms.get(id);
+		if (!f) return missing(c, "Form", id);
+		const body = await readBody(c);
+		if (body instanceof Response) return body;
+		const issues: Issue[] = [];
+		unknownKeys(body, [...FORM_WRITABLE, ...FORM_ECHOES, "confirm"], issues);
+		if (Object.hasOwn(body, "confirm") && body.confirm !== true)
+			issues.push({ path: "confirm", message: "is true, or left out" });
+		formFields(body, issues);
+		if (issues.length > 0) return invalid(c, issues);
+		if (typeof body.updated_at === "string" && body.updated_at !== f.updated_at)
+			return problem(
+				c,
+				409,
+				"stale_read",
+				"This form changed after it was read. Read it again with get_form, then send the change against what it shows now.",
+			);
+		const changed = FORM_WRITABLE.filter(
+			(key) => Object.hasOwn(body, key) && !sameJson(body[key], f[key]),
+		);
+		if (changed.length === 0) return c.json(f);
+		const held = changed.filter((key) => key !== "name");
+		if (f.status === "live" && held.length > 0 && body.confirm !== true)
+			return problem(
+				c,
+				409,
+				"confirm_required",
+				`This form is live, so donors would see the change to ${held.join(", ")}. Send confirm: true to apply it.`,
+			);
+		for (const key of changed) f[key] = body[key];
+		f.updated_at = stamp(f.updated_at);
+		return c.json(f);
+	});
+
+	v1.post("/photos/upload-link", action("photos.upload_link"), async (c) => {
+		const body = await readBody(c);
+		if (body instanceof Response) return body;
+		const issues: Issue[] = [];
+		unknownKeys(body, ["target", "slot"], issues);
+		const target = (body.target ?? {}) as Record<string, unknown>;
+		if (target.kind === "donation_page")
+			issues.push({
+				path: "target.kind",
+				message:
+					"is not supported on Better Giving; only a campaign's photo can be uploaded",
+			});
+		else if (target.kind !== "campaign" || typeof target.id !== "string")
+			issues.push({ path: "target", message: 'is {kind: "campaign", id}' });
+		if (Object.hasOwn(body, "slot") && body.slot !== "hero")
+			issues.push({ path: "slot", message: 'is "hero", or left out' });
+		if (issues.length > 0) return invalid(c, issues);
+		const k = state.campaigns.get(target.id as string);
+		if (!k) return missing(c, "Campaign", target.id as string);
+		if (k.status === "ended") return ended(c);
+		const token = crypto.randomUUID();
+		const expiresAt = Date.now() + PHOTO_LINK_TTL_MS;
+		state.photoLinks.set(token, { campaignId: k.id, expiresAt, used: false });
+		return c.json(
+			{
+				url: `https://${state.host}/photo-upload/${token}`,
+				expires_at: new Date(expiresAt).toISOString(),
+			},
+			201,
+		);
+	});
 }

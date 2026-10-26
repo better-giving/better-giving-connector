@@ -27,6 +27,16 @@ const id = z
 	.min(1)
 	.regex(/^(?!\.\.?$)[^/]+$/, "An id is never '.', '..' or contains '/'.");
 const date = z.iso.date();
+// A campaign's version as get_campaign returns it, on sites that return one.
+// It is passed through, never filled in: a version read just before the write
+// would match whatever the page holds, and so guard nothing the chat read.
+const expectedVersion = z
+	.string()
+	.regex(/^\d{1,19}$/, "The version get_campaign returned.")
+	.optional()
+	.describe(
+		"The version get_campaign returned with the campaign this change is based on. Send it whenever get_campaign returns one: if the campaign changed since, nothing is saved, and the campaign is read again before retrying.",
+	);
 /** The longest note Standalone keeps on a gift (its `MAX_NOTE`); a longer one is refused there. */
 export const MAX_NOTE = 2_000;
 const isIanaTimeZone = (zone: string) => {
@@ -217,8 +227,8 @@ export const ACTIONS = toolSpecs([
 		tool: "update_campaign_blocks",
 		action: "campaigns.update_blocks",
 		title: "Edit a campaign's page",
-		description: `Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. ${editsContent("get_campaign")}`,
-		input: z.strictObject({ id, blocks }),
+		description: `Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. ${editsContent("get_campaign")} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null.`,
+		input: z.strictObject({ id, blocks, expected_version: expectedVersion }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
 	},
@@ -247,6 +257,7 @@ export const ACTIONS = toolSpecs([
 			'Sets a campaign\'s goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {"message": null}. Page content goes through update_campaign_content or update_campaign_blocks.',
 		input: z.strictObject({
 			id,
+			expected_version: expectedVersion,
 			goal: money.nullable().optional(),
 			end_date: date.nullable().optional(),
 			time_zone: z
@@ -371,7 +382,7 @@ export const ACTIONS = toolSpecs([
 		action: "forms.create",
 		title: "Create a donation form",
 		description:
-			"Creates a donation form. The name is required. Other fields match the shape get_form returns.",
+			"Creates a donation form. The name is required. Other fields match the shape get_form returns. Each call makes a new form, so after an unclear answer check with list_forms before calling again.",
 		input: z.looseObject({ name: z.string().trim().min(1) }),
 		annotations: ADD,
 		checkWith: "list_forms",
@@ -381,7 +392,7 @@ export const ACTIONS = toolSpecs([
 		action: "forms.update",
 		title: "Edit a donation form",
 		description:
-			"Changes a donation form. Only the fields sent are changed, in the shape get_form returns. On a live form, a change donors would see needs confirm set to true, and only after the operator agrees.",
+			"Changes a donation form. Only the fields sent are changed, in the shape get_form returns; send the updated_at get_form returned, where it returns one, so a change made since is refused rather than overwritten. On a live form, a change donors would see needs confirm set to true, and only after the operator agrees.",
 		input: z.looseObject({
 			id,
 			name: z.string().trim().min(1).optional(),
@@ -466,7 +477,7 @@ export const ACTIONS = toolSpecs([
 		tool: "create_photo_upload_link",
 		action: "photos.upload_link",
 		title: "Make a photo upload link",
-		description: `Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page ${BLOCK_SITES}. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most ${PHOTOS_MAX} photos beside it; when all ${PHOTOS_MAX} are taken, ask the operator which one the new photo replaces.`,
+		description: `Returns a short-lived, single-use link for adding a photo to a campaign, or on some sites to the donation page. The operator opens the link and chooses the photo; expires_at says when the link stops working. This connector does not upload the file. An ended campaign takes no new photo. On sites with get_block_catalog, the photo is a JPEG, PNG or WebP of at most 4 MB, the link lasts 15 minutes, and the uploaded photo becomes the campaign's hero: read the campaign again with get_campaign before editing its blocks. On sites with get_content_catalog, a campaign holds a cover photo and at most ${PHOTOS_MAX} photos beside it; when all ${PHOTOS_MAX} are taken, ask the operator which one the new photo replaces.`,
 		input: z.strictObject({
 			target: z.discriminatedUnion("kind", [
 				z.strictObject({ kind: z.literal("campaign"), id }),
@@ -476,7 +487,7 @@ export const ACTIONS = toolSpecs([
 				.string()
 				.optional()
 				.describe(
-					`Where the photo goes. On sites with get_content_catalog: "cover" for the cover, "new" to add it after the other photos, or the position of a photo beside the cover to replace it ("0" is the first). Left out, or a position with no photo, it becomes the cover when there is none and otherwise goes after the other photos. On sites with get_block_catalog: the id of the photo block it fills; left out, the first empty one.`,
+					`Where the photo goes. On sites with get_content_catalog: "cover" for the cover, "new" to add it after the other photos, or the position of a photo beside the cover to replace it ("0" is the first). Left out, or a position with no photo, it becomes the cover when there is none and otherwise goes after the other photos. On sites with get_block_catalog: "hero", or left out.`,
 				),
 		}),
 		annotations: ADD,

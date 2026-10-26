@@ -1177,3 +1177,135 @@ describe("response size cap", () => {
 		);
 	});
 });
+
+describe("a per-call keyed write", () => {
+	async function platform(isPlatform = true) {
+		const dep = fakeDeployment({ platform: isPlatform });
+		const waits: number[] = [];
+		const client = deploymentClient({
+			fetch: dep.fetch,
+			sleep: async (ms) => {
+				waits.push(ms);
+			},
+		});
+		const exchanged = await client.exchange(dep.origin, dep.mintCode());
+		dep.calls.length = 0;
+		const conn = { origin: dep.origin, key: exchanged.key, userId: "user_1" };
+		return { dep, client, conn, waits };
+	}
+	const formsListed = async (
+		client: ReturnType<typeof deploymentClient>,
+		conn: Parameters<ReturnType<typeof deploymentClient>["call"]>[0],
+	) =>
+		((await client.call(conn, "forms.list", {})).body as { data: unknown[] })
+			.data.length;
+
+	test("sends a fresh Idempotency-Key with each create_form call", async () => {
+		const { dep, client, conn } = await platform();
+
+		await client.call(conn, "forms.create", { name: "Gala" });
+		await client.call(conn, "forms.create", { name: "Gala" });
+
+		const [first, second] = dep.calls.map((c) => c.idempotencyKey);
+		expect(first).toMatch(/^[0-9a-f-]{36}$/);
+		expect(second).toMatch(/^[0-9a-f-]{36}$/);
+		expect(second).not.toBe(first);
+		expect(await formsListed(client, conn)).toBe(3);
+	});
+
+	test.each([
+		["Standalone", false],
+		["Platform", true],
+	])("tries once when the answer is lost, on %s", async (_, isPlatform) => {
+		const { dep, client, conn } = await platform(isPlatform);
+		dep.loseAnswers(1);
+
+		await expect(
+			client.call(conn, "forms.create", { name: "Gala" }),
+		).rejects.toBeInstanceOf(Unreachable);
+		expect(dep.calls).toHaveLength(1);
+	});
+
+	test("retries an in-progress create under the same key and gets the form it made", async () => {
+		const { dep, client, conn, waits } = await platform();
+		dep.stallCreates(1);
+		dep.setRetryAfter("2");
+
+		const made = await client.call(conn, "forms.create", { name: "Gala" });
+
+		expect(dep.calls).toHaveLength(2);
+		expect(dep.calls[1]?.idempotencyKey).toBe(dep.calls[0]?.idempotencyKey);
+		expect(waits).toEqual([2_000]);
+		// the replay of the earlier try
+		expect(made.status).toBe(200);
+		expect(made.body).toMatchObject({ name: "Gala" });
+		expect(await formsListed(client, conn)).toBe(2);
+	});
+
+	test("stops after three tries while the create stays in progress", async () => {
+		const { dep, client, conn, waits } = await platform();
+		dep.stallCreates();
+		dep.setRetryAfter("1");
+
+		const failed = await client
+			.call(conn, "forms.create", { name: "Gala" })
+			.catch((error: unknown) => error);
+
+		expect(dep.calls).toHaveLength(3);
+		expect(new Set(dep.calls.map((c) => c.idempotencyKey)).size).toBe(1);
+		expect(waits).toEqual([1_000, 1_000]);
+		expect(failed).toBeInstanceOf(DeploymentRejected);
+		expect(failed).toMatchObject({
+			status: 409,
+			problem: { code: "idempotency_in_progress" },
+		});
+	});
+
+	test.each([
+		["60", 5_000],
+		["", 5_000],
+		["soon", 5_000],
+		["-1", 5_000],
+	])(
+		"waits at most five seconds, and the most when Retry-After is %j",
+		async (header, wait) => {
+			const { dep, client, conn, waits } = await platform();
+			dep.stallCreates(1);
+			dep.setRetryAfter(header);
+
+			await client.call(conn, "forms.create", { name: "Gala" });
+
+			expect(waits).toEqual([wait]);
+		},
+	);
+
+	test("a key used for another body is an idempotency conflict, not retried", async () => {
+		const { dep, client, conn } = await platform();
+		dep.intercept(
+			() =>
+				new Response(JSON.stringify({ code: "idempotency_conflict" }), {
+					status: 409,
+					headers: { "content-type": "application/problem+json" },
+				}),
+		);
+
+		await expect(
+			client.call(conn, "forms.create", { name: "Gala" }),
+		).rejects.toMatchObject({
+			status: 409,
+			problem: { code: "idempotency_conflict" },
+		});
+		expect(dep.calls).toHaveLength(1);
+	});
+
+	test("any other write whose answer is lost is tried once", async () => {
+		const { dep, client, conn } = await platform();
+		dep.loseAnswers(1);
+
+		await expect(
+			client.call(conn, "forms.update", { id: "frm_1", name: "Main" }),
+		).rejects.toBeInstanceOf(Unreachable);
+		expect(dep.calls).toHaveLength(1);
+		expect(dep.calls[0]?.idempotencyKey).toBeNull();
+	});
+});

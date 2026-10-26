@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Secret } from "../secret";
 import {
 	type ActionName,
@@ -18,7 +19,7 @@ import {
 	NeedsUpdate,
 	Unreachable,
 } from "./errors";
-import { idempotencyKey, isKeyedAction } from "./idempotency";
+import { idempotencyKey, isKeyedAction, isPerCallKeyed } from "./idempotency";
 import { type Origin, parseOrigin } from "./origin";
 
 export {
@@ -37,7 +38,11 @@ export {
 	NeedsUpdate,
 	Unreachable,
 } from "./errors";
-export { idempotencyKey, isKeyedAction } from "./idempotency";
+export {
+	idempotencyKey,
+	isKeyedAction,
+	isPerCallKeyed,
+} from "./idempotency";
 
 export type Hello = {
 	/** Where hello answered: the typed origin, or the one it moved to. */
@@ -61,6 +66,9 @@ export type DeploymentClient = {
 	/**
 	 * Runs one contract action with the connection's key. Path params (`:id`)
 	 * are taken from `input`; the rest goes as query on GET, JSON body otherwise.
+	 * A per-call keyed write is tried up to three times under one key: again
+	 * only when the site answers that an earlier try under that key is still
+	 * running, after the wait it names. A lost answer is not retried.
 	 */
 	call(
 		conn: DeploymentTarget,
@@ -86,6 +94,9 @@ export type DeploymentTarget = {
 const TIMEOUT_MS = 15_000;
 // disconnect runs while a connection is dropped, inside a tool call or the sweep.
 const DISCONNECT_TIMEOUT_MS = 5_000;
+// The tries one per-call keyed write gets, and the longest wait between two.
+const KEYED_TRIES = 3;
+const MAX_RETRY_WAIT_MS = 5_000;
 // hello runs before sign-in against any address typed, so an unbounded read
 // would let anyone stream the function out of memory.
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -96,11 +107,18 @@ type Answer = {
 	body: unknown;
 	location: string | null;
 	contentType: string | null;
+	retryAfter: string | null;
 };
 
 export function deploymentClient(deps: {
 	fetch: typeof fetch;
+	/** Waits between keyed tries; tests pass one that records the wait instead. */
+	sleep?: (ms: number) => Promise<void>;
 }): DeploymentClient {
+	const sleep =
+		deps.sleep ??
+		((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
+
 	// Any throw from fetch or the body read — refused redirect, DNS, reset, the
 	// timeout's abort, a body over the cap — is Unreachable; the original error
 	// is dropped, not chained, because its message can carry the URL and so a
@@ -124,6 +142,7 @@ export function deploymentClient(deps: {
 				body: parseJson(await readBody(res)),
 				location: res.headers.get("location"),
 				contentType: res.headers.get("content-type"),
+				retryAfter: res.headers.get("retry-after"),
 			};
 		} catch {
 			abort.abort();
@@ -187,57 +206,16 @@ export function deploymentClient(deps: {
 		},
 
 		async call(conn, action, input) {
-			const { method, path } = ROUTES[action];
-			const rest = { ...input };
-			// Encoded, so an id can't add a path segment, let alone change the host.
-			const filled = path.replace(/:(\w+)/g, (_, name: string) => {
-				const value = rest[name];
-				delete rest[name];
-				return encodeURIComponent(String(value));
-			});
-			const url = new URL(`${conn.origin}${BASE_PATH}${filled}`);
-			const headers: Record<string, string> = {
-				authorization: `Bearer ${conn.key.reveal()}`,
-				accept: "application/json",
-			};
-			// Derived from the validated input, and only for the two writes that
-			// replay. The value is a header, never a log field.
-			if (isKeyedAction(action) && conn.userId !== undefined) {
-				headers["idempotency-key"] = idempotencyKey(conn.userId, action, input);
+			if (!isPerCallKeyed(action)) {
+				return succeeded(await attempt(conn, action, input));
 			}
-			let body: string | undefined;
-			if (method === "GET") {
-				for (const [name, value] of Object.entries(rest)) {
-					if (value !== undefined && value !== null)
-						url.searchParams.set(name, String(value));
-				}
-			} else {
-				headers["content-type"] = "application/json";
-				body = JSON.stringify(rest);
+			const key = randomUUID();
+			for (let tries = 1; ; tries++) {
+				const answer = await attempt(conn, action, input, key);
+				if (tries === KEYED_TRIES || !inProgress(answer))
+					return succeeded(answer);
+				await sleep(retryWait(answer));
 			}
-			// Not followed, so the key never travels to wherever the site now points.
-			const answer = await send(url.href, { method, headers, body }, "manual");
-			if (isRedirect(answer.status)) {
-				const target = redirectTarget(answer, url.href);
-				// Dropping a connection is permanent, so a hop alone never proves a
-				// move: a temporary redirect, a maintenance page or a CDN hiccup
-				// would otherwise end every user's connection to the site. Moved
-				// needs a permanent status and hello (keyless) answering at the
-				// same new origin; anything less is Unreachable, which a retry may pass.
-				if (
-					!target ||
-					target === conn.origin ||
-					!isPermanentRedirect(answer.status)
-				) {
-					throw new Unreachable();
-				}
-				const confirmed = await client.hello(conn.origin).then(
-					(hello) => hello.origin === target,
-					() => false,
-				);
-				throw confirmed ? new Moved() : new Unreachable();
-			}
-			return succeeded(answer);
 		},
 
 		async disconnect(conn) {
@@ -263,6 +241,69 @@ export function deploymentClient(deps: {
 			}
 		},
 	};
+
+	// One request for `action`; a 3xx ends here, any other answer is the caller's.
+	async function attempt(
+		conn: DeploymentTarget,
+		action: ActionName,
+		input: Record<string, unknown>,
+		perCallKey?: string,
+	): Promise<Answer> {
+		const { method, path } = ROUTES[action];
+		const rest = { ...input };
+		// Encoded, so an id can't add a path segment, let alone change the host.
+		const filled = path.replace(/:(\w+)/g, (_, name: string) => {
+			const value = rest[name];
+			delete rest[name];
+			return encodeURIComponent(String(value));
+		});
+		const url = new URL(`${conn.origin}${BASE_PATH}${filled}`);
+		const headers: Record<string, string> = {
+			authorization: `Bearer ${conn.key.reveal()}`,
+			accept: "application/json",
+		};
+		// Derived from the validated input for the two writes that replay, or
+		// the call's own for a per-call keyed write. The value is a header,
+		// never a log field.
+		if (isKeyedAction(action) && conn.userId !== undefined) {
+			headers["idempotency-key"] = idempotencyKey(conn.userId, action, input);
+		}
+		if (perCallKey !== undefined) headers["idempotency-key"] = perCallKey;
+		let body: string | undefined;
+		if (method === "GET") {
+			for (const [name, value] of Object.entries(rest)) {
+				if (value !== undefined && value !== null)
+					url.searchParams.set(name, String(value));
+			}
+		} else {
+			headers["content-type"] = "application/json";
+			body = JSON.stringify(rest);
+		}
+		// Not followed, so the key never travels to wherever the site now points.
+		const answer = await send(url.href, { method, headers, body }, "manual");
+		if (isRedirect(answer.status)) {
+			const target = redirectTarget(answer, url.href);
+			// Dropping a connection is permanent, so a hop alone never proves a
+			// move: a temporary redirect, a maintenance page or a CDN hiccup
+			// would otherwise end every user's connection to the site. Moved
+			// needs a permanent status and hello (keyless) answering at the
+			// same new origin; anything less is Unreachable, which a retry may pass.
+			if (
+				!target ||
+				target === conn.origin ||
+				!isPermanentRedirect(answer.status)
+			) {
+				throw new Unreachable();
+			}
+			const confirmed = await client.hello(conn.origin).then(
+				(hello) => hello.origin === target,
+				() => false,
+			);
+			throw confirmed ? new Moved() : new Unreachable();
+		}
+		return answer;
+	}
+
 	return client;
 }
 
@@ -311,6 +352,18 @@ const isPermanentRedirect = (status: number) =>
 	status === 301 || status === 308;
 
 const codeOf = (body: unknown) => problemOf(body)?.code;
+
+// The site still runs an earlier try under the same key.
+const inProgress = (answer: Answer) =>
+	answer.status === 409 && codeOf(answer.body) === "idempotency_in_progress";
+
+// Retry-After in seconds, held to the longest wait; no usable header waits the most.
+function retryWait({ retryAfter }: Answer): number {
+	const seconds = Number(retryAfter ?? Number.NaN);
+	return retryAfter !== null && retryAfter.trim() !== "" && seconds >= 0
+		? Math.min(seconds * 1000, MAX_RETRY_WAIT_MS)
+		: MAX_RETRY_WAIT_MS;
+}
 
 async function readBody(res: Response): Promise<string> {
 	if (Number(res.headers.get("content-length")) > MAX_BODY_BYTES) {

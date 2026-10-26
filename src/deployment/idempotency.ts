@@ -5,6 +5,13 @@ const KEYED = new Set<ActionName>(["campaigns.create", "donations.record"]);
 
 export const isKeyedAction = (action: ActionName): boolean => KEYED.has(action);
 
+// A form may rightly be made twice with the same fields, so its key is fresh
+// for each tool call and shared only by the in-progress retries inside that call.
+const PER_CALL = new Set<ActionName>(["forms.create"]);
+
+export const isPerCallKeyed = (action: ActionName): boolean =>
+	PER_CALL.has(action);
+
 /**
  * JSON with object keys sorted at every level. Arrays keep their order.
  * A key whose value is `undefined` is left out, as `JSON.stringify` leaves it out.
