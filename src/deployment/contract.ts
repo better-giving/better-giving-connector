@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-// Mirror of `/connector/v1` as the public Standalone connector surface serves
-// it: https://github.com/better-giving/better-giving
-// packages/app/src/lib/server/connector/ (surface.ts and the action routes).
-// When that surface moves, this file moves.
+// Mirror of `/connector/v1` as Better Giving deployments serve it: Standalone
+// (better-giving/better-giving, packages/app/src/lib/server/connector/) and
+// Platform (better-giving/better-giving-platform,
+// apps/platform/.server/connector/). When that surface moves, this file moves.
 
 export const BASE_PATH = "/connector/v1";
 export const ALLOW_PATH = "/admin/connector/allow";
@@ -48,16 +48,58 @@ export const isActionName = (name: string): name is ActionName =>
 	Object.hasOwn(ROUTES, name);
 
 /**
+ * Each action's tool name, the other spelling hello's `actions` arrives in:
+ * Standalone lists contract names, Platform lists tool names. src/mcp/actions.ts
+ * names the same pairs, and src/mcp/actions.test.ts holds the two equal.
+ */
+export const TOOL_ACTIONS = {
+	list_campaigns: "campaigns.list",
+	get_campaign: "campaigns.get",
+	create_campaign: "campaigns.create",
+	update_campaign_blocks: "campaigns.update_blocks",
+	update_campaign_settings: "campaigns.update_settings",
+	publish_campaign: "campaigns.publish",
+	end_campaign: "campaigns.end",
+	get_donation_page: "donation_page.get",
+	update_donation_page_blocks: "donation_page.update_blocks",
+	reset_donation_page: "donation_page.reset",
+	get_block_catalog: "blocks.catalog",
+	list_forms: "forms.list",
+	get_form: "forms.get",
+	create_form: "forms.create",
+	update_form: "forms.update",
+	get_results: "results.summary",
+	list_donations: "donations.list",
+	list_donors: "donors.list",
+	get_donor: "donors.get",
+	list_recurring_gifts: "recurring.list",
+	record_donation: "donations.record",
+	create_photo_upload_link: "photos.upload_link",
+} as const satisfies Record<string, ActionName>;
+
+const actionOf = (name: string): ActionName | null =>
+	isActionName(name)
+		? name
+		: Object.hasOwn(TOOL_ACTIONS, name)
+			? TOOL_ACTIONS[name as keyof typeof TOOL_ACTIONS]
+			: null;
+
+/**
  * The known action names in `value`, or null when it is not an array. A name
- * this contract doesn't carry is dropped, so hello's `actions` and a stored
- * `actions` column read the same way: unknown names are absent, not stated.
+ * may be a contract name or its tool name; one that is neither is dropped, and
+ * each action appears once. So hello's `actions` and a stored `actions` column
+ * read the same way: unknown names are absent, not stated.
  */
 export const knownActions = (value: unknown): ActionName[] | null =>
 	Array.isArray(value)
-		? value.filter(
-				(name): name is ActionName =>
-					typeof name === "string" && isActionName(name),
-			)
+		? [
+				...new Set(
+					value.flatMap((name) => {
+						const action = typeof name === "string" ? actionOf(name) : null;
+						return action === null ? [] : [action];
+					}),
+				),
+			]
 		: null;
 
 const ORG_NAME_MAX = 100;

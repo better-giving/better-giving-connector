@@ -57,7 +57,7 @@ const page = {
 const blocks = z
 	.array(z.record(z.string(), z.unknown()))
 	.describe(
-		"The whole block list, in order. Each block's shape is in get_block_catalog.",
+		"The page's content as blocks. Each block's schema is in get_block_catalog.",
 	);
 
 // openWorldHint is false: every tool talks only to the one connected site.
@@ -100,8 +100,8 @@ const DESTRUCTIVE = {
 
 const CONFIRMED =
 	"Donors see this immediately, so the operator confirms it in the chat first.";
-const replacesBlocks = (read: string) =>
-	`A block left out is deleted. Each block follows a schema from get_block_catalog. ${read} returns the blocks that are there now.`;
+const editsContent = (read: string) =>
+	`Each block follows a schema from get_block_catalog. ${read} returns the current content; send every block the page should keep.`;
 
 /** One tool per `/connector/v1` action; a server registers the ones its connection's deployment serves. */
 export const ACTIONS = toolSpecs([
@@ -131,7 +131,7 @@ export const ACTIONS = toolSpecs([
 		action: "campaigns.create",
 		title: "Create a campaign",
 		description:
-			"Creates a draft campaign from the starting page. Donors cannot see a draft until it is published.",
+			"Creates a new draft campaign with the given title. Donors cannot see it until it is published.",
 		input: z.strictObject({ title: z.string().trim().min(1) }),
 		annotations: REPLAYS,
 		checkWith: "list_campaigns",
@@ -140,7 +140,7 @@ export const ACTIONS = toolSpecs([
 		tool: "update_campaign_blocks",
 		action: "campaigns.update_blocks",
 		title: "Edit a campaign's page",
-		description: `Replaces every block on a campaign's page (heading, story, photos, goal meter, donation form), in order. ${replacesBlocks("get_campaign")}`,
+		description: `Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. ${editsContent("get_campaign")}`,
 		input: z.strictObject({ id, blocks }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
@@ -205,7 +205,7 @@ export const ACTIONS = toolSpecs([
 		tool: "update_donation_page_blocks",
 		action: "donation_page.update_blocks",
 		title: "Edit the donation page",
-		description: `Replaces every block on the site's main donation page, in order. ${replacesBlocks("get_donation_page")}`,
+		description: `Edits the content of the site's main donation page, such as its title, story, and hero photo. ${editsContent("get_donation_page")}`,
 		input: z.strictObject({ blocks }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_donation_page",
@@ -214,7 +214,7 @@ export const ACTIONS = toolSpecs([
 		tool: "reset_donation_page",
 		action: "donation_page.reset",
 		title: "Reset the donation page",
-		description: `Puts the main donation page back to the starting page and discards its current blocks. ${CONFIRMED}`,
+		description: `Puts the main donation page back to its default content, discarding what is there now. ${CONFIRMED}`,
 		input: z.strictObject({ confirm: z.literal(true) }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_donation_page",
