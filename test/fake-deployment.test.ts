@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ALL_ACTIONS, fakeDeployment, MVP_ACTIONS } from "./fake-deployment";
+import {
+	ALL_ACTIONS,
+	CONTENT_ACTIONS,
+	fakeDeployment,
+	MVP_ACTIONS,
+} from "./fake-deployment";
 import { advance, MINUTE } from "./support";
 
 // The fake is the only `/connector/v1` the connector is checked against until
@@ -226,8 +231,8 @@ describe("record-gift method", () => {
 
 describe("action presets", () => {
 	test("ALL and MVP are the two releases", () => {
-		expect(ALL_ACTIONS).toHaveLength(22);
-		expect(new Set(ALL_ACTIONS).size).toBe(22);
+		expect(ALL_ACTIONS).toHaveLength(25);
+		expect(new Set(ALL_ACTIONS).size).toBe(25);
 		expect(MVP_ACTIONS).toEqual([
 			"campaigns.list",
 			"campaigns.get",
@@ -388,5 +393,161 @@ describe("publish and reset", () => {
 			code: "invalid",
 			errors: [{ path: "confirm" }],
 		});
+	});
+});
+
+describe("Standalone's content release", () => {
+	// A content-release fake, a key for it, and one campaign on it.
+	async function contentRelease() {
+		const dep = fakeDeployment();
+		dep.setActions(CONTENT_ACTIONS);
+		const exchanged = await dep.fetch(`${dep.origin}${V1}/exchange`, {
+			method: "POST",
+			body: JSON.stringify({ code: dep.mintCode() }),
+		});
+		const { key } = (await exchanged.json()) as { key: string };
+		const send = (method: string, path: string, body?: unknown) =>
+			dep.fetch(`${dep.origin}${V1}${path}`, {
+				method,
+				headers: { authorization: `Bearer ${key}` },
+				body: body === undefined ? undefined : JSON.stringify(body),
+			});
+		const created = await send("POST", "/campaigns", { title: "Coats" });
+		const { id } = (await created.json()) as { id: string };
+		return { send, id };
+	}
+
+	test("hello lists the content actions and none of the block ones", async () => {
+		const { send } = await contentRelease();
+
+		const { actions } = (await (await send("GET", "/hello")).json()) as {
+			actions: string[];
+		};
+
+		expect(actions).toEqual(
+			expect.arrayContaining([
+				"campaigns.update_content",
+				"donation_page.update_content",
+				"content.catalog",
+			]),
+		);
+		for (const gone of [
+			"campaigns.update_blocks",
+			"donation_page.update_blocks",
+			"blocks.catalog",
+		]) {
+			expect(actions).not.toContain(gone);
+		}
+	});
+
+	test.each([
+		["/campaigns/:id/blocks", "PATCH", "campaigns.update_content"],
+		["/donation-page/blocks", "PATCH", "donation_page.update_content"],
+		["/blocks/catalog", "GET", "content.catalog"],
+	])(
+		"answers the retired %s as replaced, naming %s",
+		async (path, method, replacement) => {
+			const { send, id } = await contentRelease();
+
+			const res = await send(
+				method,
+				path.replace(":id", id),
+				method === "PATCH" ? { blocks: [] } : undefined,
+			);
+
+			expect(res.status).toBe(422);
+			const problem = (await res.json()) as { code: string; detail: string };
+			expect(problem.code).toBe("replaced");
+			expect(problem.detail).toContain(`Use ${replacement} instead`);
+		},
+	);
+
+	test.each([
+		["layout", { layout: "feature" }],
+		["palette", { palette: "warm" }],
+		["look", { look: "warm" }],
+		["blocks", { blocks: [] }],
+		["shareChannels", { shareChannels: ["email"] }],
+	])(
+		"refuses a campaign content edit naming %s, and writes nothing",
+		async (path, extra) => {
+			const { send, id } = await contentRelease();
+
+			const res = await send("PATCH", `/campaigns/${id}/content`, {
+				heading: "Changed",
+				...extra,
+			});
+
+			expect(res.status).toBe(422);
+			const problem = (await res.json()) as {
+				detail: string;
+				errors: { path: string }[];
+			};
+			expect(problem).toMatchObject({ code: "invalid", errors: [{ path }] });
+			expect(problem.detail).toContain(
+				"picks its whole layout from its content",
+			);
+			const read = await (await send("GET", `/campaigns/${id}`)).json();
+			expect(read).toMatchObject({ content: { heading: "" } });
+		},
+	);
+
+	test.each([
+		["campaign", (id: string) => `/campaigns/${id}/content`],
+		["donation page", () => "/donation-page/content"],
+	])("refuses an empty %s content edit", async (_, path) => {
+		const { send, id } = await contentRelease();
+
+		const res = await send("PATCH", path(id), {});
+
+		expect(res.status).toBe(422);
+		expect(((await res.json()) as { detail: string }).detail).toContain(
+			"send at least one content key",
+		);
+	});
+
+	test("refuses a campaign-only key on the donation page", async () => {
+		const { send } = await contentRelease();
+
+		const res = await send("PATCH", "/donation-page/content", {
+			heading: "Give",
+			lede: "A sentence",
+		});
+
+		expect(res.status).toBe(422);
+		expect(await res.json()).toMatchObject({ errors: [{ path: "lede" }] });
+	});
+
+	test.each([
+		["layout", { layout: "feature" }],
+		["look", { look: "warm" }],
+		["sharing", { sharing: null }],
+		["sharing.channels", { sharing: { message: "Hi", channels: ["email"] } }],
+		["sharing.tone", { sharing: { message: "Hi", tone: "warm" } }],
+	])("refuses a settings body naming %s", async (path, extra) => {
+		const { send, id } = await contentRelease();
+
+		const res = await send("PATCH", `/campaigns/${id}/settings`, {
+			goal: { amount: "100.00", currency: "USD" },
+			...extra,
+		});
+
+		expect(res.status).toBe(422);
+		expect(await res.json()).toMatchObject({
+			code: "invalid",
+			errors: [{ path }],
+		});
+	});
+
+	test("reads a campaign as its layout and content, with no blocks", async () => {
+		const { send, id } = await contentRelease();
+
+		const read = (await (await send("GET", `/campaigns/${id}`)).json()) as {
+			settings: { sharing: unknown };
+		};
+
+		expect(read).toMatchObject({ layout: "card", content: { heading: "" } });
+		expect(read).not.toHaveProperty("blocks");
+		expect(read.settings.sharing).toEqual({ message: null });
 	});
 });

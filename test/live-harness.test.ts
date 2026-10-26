@@ -68,7 +68,7 @@ test("the harness runs the minimum tools against the fake and records no secrets
 			.map((row) => row.outcome),
 	).toEqual(["ok", "replay"]);
 	const unknown = rows.filter((row) => row.outcome === "unknown_action");
-	expect(unknown).toHaveLength(9);
+	expect(unknown).toHaveLength(12);
 	expect(rows.at(-1)).toMatchObject({
 		tool: "list_campaigns",
 		outcome: "key_refused",

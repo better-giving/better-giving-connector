@@ -96,14 +96,16 @@ export function DocsPage() {
 			<h3>Coming to more accounts</h3>
 			<ul>
 				<li>
-					Edit the content of campaign pages and the donation page, or put the
-					donation page back to its default content. Resetting discards what is
-					there now. Your AI assistant waits for your explicit yes before it
-					resets the page.
+					Edit a campaign page's title, story, photos, gift tiers, and
+					questions, and the donation page's heading, or put the donation page
+					back to its default content. The site arranges each page from its
+					content, so your AI assistant does not set the design. Resetting
+					discards what is there now. Your AI assistant waits for your explicit
+					yes before it resets the page.
 				</li>
 				<li>
-					Change a campaign's goal, end date, time zone, or the message and
-					channels shown when it is shared.
+					Change a campaign's goal, end date, time zone, or the message shown
+					when it is shared.
 				</li>
 				<li>
 					Publish or end a campaign. These change what donors see. Your AI

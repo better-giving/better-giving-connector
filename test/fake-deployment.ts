@@ -12,19 +12,27 @@ const MAX_NOTE = 2_000;
 // packages/app/src/lib/server/connector/). Routes are transcribed from that
 // surface, not from src/deployment/contract.ts, so the two copies check each
 // other.
+//
+// It serves both page models. A release serving the block actions edits a page
+// as blocks; one serving `CONTENT_ACTIONS` alone is Standalone's content
+// release: it edits a page's content, picks the layout from it, and answers
+// each retired block action 422 `replaced`.
 
 export const ALL_ACTIONS = [
 	"campaigns.list",
 	"campaigns.get",
 	"campaigns.create",
 	"campaigns.update_blocks",
+	"campaigns.update_content",
 	"campaigns.update_settings",
 	"campaigns.publish",
 	"campaigns.end",
 	"donation_page.get",
 	"donation_page.update_blocks",
+	"donation_page.update_content",
 	"donation_page.reset",
 	"blocks.catalog",
+	"content.catalog",
 	"forms.list",
 	"forms.get",
 	"forms.create",
@@ -37,6 +45,23 @@ export const ALL_ACTIONS = [
 	"donations.record",
 	"photos.upload_link",
 ] as const;
+
+/** Each block action the content release retired, and the action in its place. */
+const REPLACED_BY: Record<string, string> = {
+	"campaigns.update_blocks": "campaigns.update_content",
+	"donation_page.update_blocks": "donation_page.update_content",
+	"blocks.catalog": "content.catalog",
+};
+
+/** What Standalone's content release serves: every action but the block ones. */
+export const CONTENT_ACTIONS = ALL_ACTIONS.filter(
+	(action) => !Object.hasOwn(REPLACED_BY, action),
+);
+
+/** What Standalone served before its content release: the block actions, no content ones. */
+export const BLOCK_ACTIONS = ALL_ACTIONS.filter(
+	(action) => !Object.values(REPLACED_BY).includes(action),
+);
 
 /**
  * The thirteen tools a minimum deployment serves:
@@ -215,11 +240,13 @@ async function record(req: Request): Promise<RecordedCall> {
 type Money = { amount: string; currency: "USD" };
 type CampaignStatus = "draft" | "published" | "ended";
 type Block = { type: string } & Record<string, unknown>;
+type Content = Record<string, unknown>;
 type Campaign = {
 	id: string;
 	title: string;
 	status: CampaignStatus;
 	blocks: Block[];
+	content: Content;
 	everPublished: boolean;
 	settings: {
 		goal: Money | null;
@@ -281,7 +308,10 @@ function newState(host: string, name: string) {
 				},
 			],
 		]),
-		donationPage: { blocks: startingBlocks(formId) },
+		donationPage: {
+			blocks: startingBlocks(formId),
+			content: { heading: "" } as Content,
+		},
 		donors: new Map<string, Donor>(),
 		donations: new Map<string, Donation>(),
 		recurring: [] as Recurring[],
@@ -352,6 +382,182 @@ const CATALOG = [
 	},
 ];
 const BLOCK_TYPES = new Set(CATALOG.map((b) => b.type));
+
+// Standalone's content rules (packages/app/src/lib/page/catalog.ts and
+// shape.ts): a campaign holds every key, the donation page its heading alone.
+const PHOTOS_MAX = 8;
+const STORY_THRESHOLD = 320;
+const FEATURE_EXTRAS = 4;
+const richText = z.record(z.string(), z.unknown());
+const photo = z.strictObject({
+	imageId: z.uuid(),
+	alt: z.string().nullable(),
+});
+const CONTENT_RULES = {
+	heading: z.string(),
+	lede: z.string(),
+	story: richText,
+	hero: photo,
+	photos: z.array(photo).max(PHOTOS_MAX),
+	tiers: z
+		.array(
+			z.strictObject({ amountMinor: z.int().positive(), buys: z.string() }),
+		)
+		.max(6),
+	faq: z
+		.array(z.strictObject({ question: z.string(), answer: richText }))
+		.max(10),
+} as const;
+const CONTENT_KEYS = Object.keys(CONTENT_RULES);
+const CONTENT_DESCRIPTIONS: Record<string, string> = {
+	heading: "The page's title.",
+	lede: "A sentence or two under the title; a campaign only.",
+	story: "The story behind the appeal, in rich text; a campaign only.",
+	hero: "The cover photo; a campaign only.",
+	photos: "Photos beside the cover; a campaign only.",
+	tiers: "Up to six gift amounts, each with what it buys; a campaign only.",
+	faq: "Up to ten questions donors ask, each with its answer; a campaign only.",
+};
+const CONTENT_CATALOG = {
+	content: CONTENT_KEYS.map((key) => ({
+		key,
+		description: CONTENT_DESCRIPTIONS[key],
+		schema: z.toJSONSchema(CONTENT_RULES[key as keyof typeof CONTENT_RULES], {
+			io: "input",
+		}),
+	})),
+	layout: {
+		description: `A campaign is drawn in one of three layouts, picked from its content and never set: the card for a story of at most ${STORY_THRESHOLD} characters and nothing else; the letter for a longer story, or one to ${FEATURE_EXTRAS - 1} tiers, questions and photos beside the cover counted together; the feature for ${FEATURE_EXTRAS} or more. The donation page has one fixed layout.`,
+		story_threshold: STORY_THRESHOLD,
+		feature_extras: FEATURE_EXTRAS,
+	},
+};
+const NOT_CONTENT =
+	"the page picks its whole layout from its content: a short story with nothing else is a card; a longer story, or one to three tiers, questions and photos, is a letter; four or more is a feature. no layout, look, colour, block, order or share button is set, so send content keys only";
+const SETTINGS_KEYS = ["goal", "end_date", "time_zone", "sharing"];
+
+const textLength = (node: unknown): number => {
+	if (typeof node !== "object" || node === null) return 0;
+	const { text, content } = node as { text?: unknown; content?: unknown };
+	return (
+		(typeof text === "string" ? text.length : 0) +
+		(Array.isArray(content)
+			? content.reduce((n: number, child) => n + textLength(child), 0)
+			: 0)
+	);
+};
+
+/** The layout Standalone picks for a campaign's content. */
+function layoutOf(content: Content): "card" | "letter" | "feature" {
+	const count = (key: string) =>
+		Array.isArray(content[key]) ? (content[key] as unknown[]).length : 0;
+	const extras = count("tiers") + count("faq") + count("photos");
+	if (extras >= FEATURE_EXTRAS) return "feature";
+	if (extras > 0 || textLength(content.story) > STORY_THRESHOLD)
+		return "letter";
+	return "card";
+}
+
+type Refusal = { path: string; message: string };
+
+/** A content body's refusal, as Standalone's `contentEdit` words it, or null. */
+function contentRefusal(
+	body: unknown,
+	keys: readonly string[],
+): Refusal | null {
+	if (typeof body !== "object" || body === null || Array.isArray(body)) {
+		return {
+			path: "",
+			message: `the body is a JSON object of content keys: ${keys.join(", ")}`,
+		};
+	}
+	const unknown = Object.keys(body).find((key) => !keys.includes(key));
+	if (unknown !== undefined) {
+		return {
+			path: unknown,
+			message: CONTENT_KEYS.includes(unknown)
+				? `the donation page holds no ${unknown}; it draws one fixed layout and its content is its heading alone`
+				: `${JSON.stringify(unknown)} is not content; ${NOT_CONTENT}`,
+		};
+	}
+	if (Object.keys(body).length === 0) {
+		return {
+			path: "",
+			message: `send at least one content key: ${keys.join(", ")}; a key left out is left alone`,
+		};
+	}
+	for (const [key, value] of Object.entries(body)) {
+		if (value === null) continue;
+		const checked =
+			CONTENT_RULES[key as keyof typeof CONTENT_RULES].safeParse(value);
+		const issue = checked.error?.issues[0];
+		if (issue) {
+			return { path: [key, ...issue.path].join("."), message: issue.message };
+		}
+	}
+	return null;
+}
+
+/** `content` with each key `body` names written over it; null clears one. */
+function withContent(content: Content, body: Record<string, unknown>) {
+	const next = { ...content };
+	for (const [key, value] of Object.entries(body)) {
+		if (value !== null) next[key] = value;
+		else if (key === "heading") next.heading = "";
+		else delete next[key];
+	}
+	return next;
+}
+
+/** A photo link's slot, as Standalone's `parseSlot` reads it. */
+const SLOT = /^(cover|new|0|[1-9][0-9]?)$/;
+
+/** Whether a photo for `slot` would add one more beside the cover. */
+function addsPhoto(content: Content, slot: string | undefined): boolean {
+	const photos = Array.isArray(content.photos) ? content.photos.length : 0;
+	if (slot === "cover") return false;
+	if (slot === "new") return true;
+	if (slot !== undefined && Number(slot) < photos) return false;
+	return content.hero !== undefined;
+}
+
+/** A settings body's refusal on the content release, or null. */
+function settingsRefusal(body: unknown): Refusal | null {
+	if (typeof body !== "object" || body === null || Array.isArray(body)) {
+		return {
+			path: "",
+			message: `the body is a JSON object of ${SETTINGS_KEYS.join(", ")}`,
+		};
+	}
+	const unset = Object.keys(body).find((key) => !SETTINGS_KEYS.includes(key));
+	if (unset !== undefined) {
+		return {
+			path: unset,
+			message: `${JSON.stringify(unset)} is not a setting; the settings are ${SETTINGS_KEYS.join(", ")}, content goes through campaigns.update_content, and the page picks its layout from its content, so no layout, look, colour or block is set`,
+		};
+	}
+	const { sharing } = body as { sharing?: unknown };
+	if (sharing === undefined) return null;
+	if (typeof sharing !== "object" || sharing === null || Array.isArray(sharing))
+		return {
+			path: "sharing",
+			message:
+				'sharing is { "message": "<what a share says>" }, or { "message": null } for none',
+		};
+	const other = Object.keys(sharing).find((key) => key !== "message");
+	if (other === "channels")
+		return {
+			path: "sharing.channels",
+			message:
+				"every page offers the same share buttons, Copy link, Email, Facebook and WhatsApp, and none is chosen; send sharing.message only",
+		};
+	if (other !== undefined)
+		return {
+			path: `sharing.${other}`,
+			message: "sharing holds message alone; send sharing.message only",
+		};
+	return null;
+}
 
 const money = z.object({
 	amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
@@ -424,6 +630,10 @@ function problem(
 	});
 }
 
+/** Standalone's `invalid`: a 422 naming the one field it refuses. */
+const invalid = (c: Context, { path, message }: Refusal) =>
+	problem(c, 422, "invalid", message, [{ path, message }]);
+
 async function parse<T extends z.ZodType>(
 	c: Context,
 	schema: T,
@@ -470,10 +680,31 @@ const sum = (ds: Donation[]) =>
 function deploymentApp(state: State) {
 	const nextId = (prefix: string) => `${prefix}_${state.seq++}`;
 	const publicUrl = (path: string) => `https://${state.host}${path}`;
-	const campaignView = (k: Campaign) => ({
-		...k,
-		public_url: publicUrl(`/campaigns/${k.id}`),
-	});
+	// The content release: no block action served, and their replacements are.
+	const contentRelease = () =>
+		Object.entries(REPLACED_BY).every(
+			([retired, replacement]) =>
+				!state.actions.has(retired) && state.actions.has(replacement),
+		);
+	const campaignView = (k: Campaign) => {
+		const { blocks, content, ...rest } = k;
+		const view: Record<string, unknown> = {
+			...rest,
+			public_url: publicUrl(`/campaigns/${k.id}`),
+		};
+		if (!contentRelease()) view.blocks = blocks;
+		if (state.actions.has("campaigns.update_content")) {
+			view.layout = layoutOf(content);
+			view.content = content;
+		}
+		if (contentRelease()) {
+			view.settings = {
+				...k.settings,
+				sharing: { message: k.settings.sharing.message },
+			};
+		}
+		return view;
+	};
 	const idempotencySlot = (c: Context) => {
 		const key = c.req.header("idempotency-key");
 		return key ? `${new URL(c.req.url).pathname}\n${key}` : null;
@@ -514,6 +745,19 @@ function deploymentApp(state: State) {
 	const action =
 		(name: string): MiddlewareHandler =>
 		async (c, next) => {
+			const replacement = REPLACED_BY[name];
+			if (
+				!state.actions.has(name) &&
+				replacement !== undefined &&
+				contentRelease()
+			) {
+				return problem(
+					c,
+					422,
+					"replaced",
+					`${name} is no longer served: the page now picks its layout from its content. Use ${replacement} instead.`,
+				);
+			}
 			if (!state.actions.has(name)) {
 				return problem(
 					c,
@@ -682,6 +926,7 @@ function deploymentApp(state: State) {
 			status: "draft",
 			everPublished: false,
 			blocks: startingBlocks(form.id),
+			content: { heading: "" },
 			settings: {
 				goal: null,
 				end_date: null,
@@ -712,11 +957,32 @@ function deploymentApp(state: State) {
 		},
 	);
 	v1.patch(
+		"/campaigns/:id/content",
+		action("campaigns.update_content"),
+		async (c) => {
+			const k = findCampaign(c);
+			if (k instanceof Response) return k;
+			const raw: unknown = await c.req.json().catch(() => undefined);
+			const refused = contentRefusal(raw, CONTENT_KEYS);
+			if (refused) return invalid(c, refused);
+			k.content = withContent(k.content, raw as Record<string, unknown>);
+			return c.json(campaignView(k));
+		},
+	);
+	v1.patch(
 		"/campaigns/:id/settings",
 		action("campaigns.update_settings"),
 		async (c) => {
 			const k = findCampaign(c);
 			if (k instanceof Response) return k;
+			if (contentRelease()) {
+				const raw: unknown = await c.req.raw
+					.clone()
+					.json()
+					.catch(() => undefined);
+				const refused = settingsRefusal(raw);
+				if (refused) return invalid(c, refused);
+			}
 			const body = await parse(c, bodies.settings);
 			if (!body.ok) return body.res;
 			const { goal, end_date, time_zone, sharing } = body.data;
@@ -797,10 +1063,14 @@ function deploymentApp(state: State) {
 		...transition("campaigns.end", ["draft", "published"], "ended"),
 	);
 
-	const pageView = () => ({
-		...state.donationPage,
-		public_url: publicUrl("/donate"),
-	});
+	const pageView = () => {
+		const { blocks, content } = state.donationPage;
+		return {
+			...(contentRelease() ? {} : { blocks }),
+			...(state.actions.has("donation_page.update_content") ? { content } : {}),
+			public_url: publicUrl("/donate"),
+		};
+	};
 	v1.get("/donation-page", action("donation_page.get"), (c) =>
 		c.json(pageView()),
 	);
@@ -811,6 +1081,20 @@ function deploymentApp(state: State) {
 			const body = await parse(c, blocks);
 			if (!body.ok) return body.res;
 			state.donationPage.blocks = body.data.blocks;
+			return c.json(pageView());
+		},
+	);
+	v1.patch(
+		"/donation-page/content",
+		action("donation_page.update_content"),
+		async (c) => {
+			const raw: unknown = await c.req.json().catch(() => undefined);
+			const refused = contentRefusal(raw, ["heading"]);
+			if (refused) return invalid(c, refused);
+			state.donationPage.content = withContent(
+				state.donationPage.content,
+				raw as Record<string, unknown>,
+			);
 			return c.json(pageView());
 		},
 	);
@@ -830,10 +1114,14 @@ function deploymentApp(state: State) {
 			);
 		}
 		state.donationPage.blocks = startingBlocks("frm_1");
+		state.donationPage.content = { heading: "" };
 		return c.json(pageView());
 	});
 	v1.get("/blocks/catalog", action("blocks.catalog"), (c) =>
 		c.json({ blocks: CATALOG }),
+	);
+	v1.get("/content/catalog", action("content.catalog"), (c) =>
+		c.json(CONTENT_CATALOG),
 	);
 
 	const findForm = (c: Context) =>
@@ -993,9 +1281,37 @@ function deploymentApp(state: State) {
 	v1.post("/photos/upload-link", action("photos.upload_link"), async (c) => {
 		const body = await parse(c, bodies.uploadLink);
 		if (!body.ok) return body.res;
-		const { target } = body.data;
+		const { target, slot } = body.data;
 		if (target.kind === "campaign" && !state.campaigns.has(target.id)) {
 			return problem(c, 404, "not_found", "No campaign has that id.");
+		}
+		if (contentRelease()) {
+			if (target.kind === "donation_page") {
+				return problem(
+					c,
+					422,
+					"invalid",
+					"The donation page holds no photos: it draws one fixed layout. A photo goes on a campaign, as its cover or beside it.",
+				);
+			}
+			if (slot !== undefined && !SLOT.test(slot)) {
+				return problem(
+					c,
+					422,
+					"invalid",
+					'slot is "cover" for the cover photo, "new" for a photo after the rest, or the place of a photo beside the cover to replace, "0" for the first; leave it out to fill the cover where there is none, or add a photo after the rest.',
+				);
+			}
+			const { content } = state.campaigns.get(target.id) as Campaign;
+			const photos = Array.isArray(content.photos) ? content.photos.length : 0;
+			if (addsPhoto(content, slot) && photos >= PHOTOS_MAX) {
+				return problem(
+					c,
+					422,
+					"invalid",
+					`This campaign already holds ${PHOTOS_MAX} photos beside its cover, the most it can, so a new photo has no place. Ask the operator which photo it replaces, and make the link with that slot: "cover", or the place of a photo beside it, "0" for the first.`,
+				);
+			}
 		}
 		// Assumption pending the contract: it says "short-lived", not how short.
 		return c.json({

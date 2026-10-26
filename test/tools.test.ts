@@ -12,6 +12,8 @@ import type { Db } from "../src/db";
 import { MAX_NOTE } from "../src/mcp/actions";
 import {
 	ALL_ACTIONS,
+	BLOCK_ACTIONS,
+	CONTENT_ACTIONS,
 	type FakeDeployment,
 	fakeDeployment,
 	fakeNetwork,
@@ -123,13 +125,16 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			get_campaign: READ,
 			create_campaign: { ...ADD, idempotentHint: true },
 			update_campaign_blocks: DESTRUCTIVE,
+			update_campaign_content: SET,
 			update_campaign_settings: SET,
 			publish_campaign: DESTRUCTIVE,
 			end_campaign: DESTRUCTIVE,
 			get_donation_page: READ,
 			update_donation_page_blocks: DESTRUCTIVE,
+			update_donation_page_content: SET,
 			reset_donation_page: DESTRUCTIVE,
 			get_block_catalog: READ,
+			get_content_catalog: READ,
 			list_forms: READ,
 			get_form: READ,
 			create_form: ADD,
@@ -244,13 +249,16 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			get_campaign: ["id"],
 			create_campaign: ["title"],
 			update_campaign_blocks: ["blocks", "id"],
+			update_campaign_content: ["id"],
 			update_campaign_settings: ["id"],
 			publish_campaign: ["id"],
 			end_campaign: ["id"],
 			get_donation_page: [],
 			update_donation_page_blocks: ["blocks"],
+			update_donation_page_content: ["heading"],
 			reset_donation_page: ["confirm"],
 			get_block_catalog: [],
+			get_content_catalog: [],
 			list_forms: [],
 			get_form: ["id"],
 			create_form: ["name"],
@@ -482,6 +490,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			(i) => `/campaigns/${i.campaignId}/blocks`,
 		],
 		[
+			"update_campaign_content",
+			(i) => ({ id: i.campaignId, heading: "Warm coats" }),
+			"PATCH",
+			(i) => `/campaigns/${i.campaignId}/content`,
+		],
+		[
 			"update_campaign_settings",
 			(i) => ({
 				id: i.campaignId,
@@ -511,12 +525,19 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			() => "/donation-page/blocks",
 		],
 		[
+			"update_donation_page_content",
+			() => ({ heading: "Give today" }),
+			"PATCH",
+			() => "/donation-page/content",
+		],
+		[
 			"reset_donation_page",
 			() => ({ confirm: true }),
 			"POST",
 			() => "/donation-page/reset",
 		],
 		["get_block_catalog", () => ({}), "GET", () => "/blocks/catalog"],
+		["get_content_catalog", () => ({}), "GET", () => "/content/catalog"],
 		["list_forms", () => ({}), "GET", () => "/forms"],
 		["get_form", () => ({ id: "frm_1" }), "GET", () => "/forms/frm_1"],
 		[
@@ -626,6 +647,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		reset_donation_page: { confirm: true },
 		create_campaign: { title: "Spring drive" },
 		update_campaign_settings: { id: "cmp_1", end_date: "2026-12-31" },
+		update_campaign_content: { id: "cmp_1", heading: "Warm coats" },
+		update_donation_page_content: { heading: null },
 		record_donation: GIFT,
 		create_photo_upload_link: { target: { kind: "donation_page" } },
 	};
@@ -849,6 +872,71 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			"Unrecognized key",
 		],
 		["reset_donation_page", "confirm left out", {}, "confirm"],
+		[
+			"update_campaign_content",
+			"no content key",
+			{ id: "cmp_1" },
+			"Send at least one content key",
+		],
+		...(
+			[
+				["a layout", { layout: "feature" }],
+				["a palette", { palette: "warm" }],
+				["a look", { look: "warm" }],
+				["blocks", { blocks: [] }],
+				["share channels", { shareChannels: ["email"] }],
+			] as const
+		).map(
+			([what, extra]): [string, string, Record<string, unknown>, string] => [
+				"update_campaign_content",
+				what,
+				{ id: "cmp_1", heading: "Warm coats", ...extra },
+				"Unrecognized key",
+			],
+		),
+		[
+			"update_campaign_content",
+			"a tier of no amount",
+			{ id: "cmp_1", tiers: [{ amountMinor: 0, buys: "nothing" }] },
+			"tiers",
+		],
+		[
+			"update_campaign_content",
+			"a photo past the most a campaign holds",
+			{
+				id: "cmp_1",
+				photos: Array.from({ length: 9 }, (_, at) => ({
+					imageId: `00000000-0000-4000-8000-00000000000${at}`,
+					alt: null,
+				})),
+			},
+			"photos",
+		],
+		[
+			"update_campaign_content",
+			"a cover given as an address",
+			{ id: "cmp_1", hero: "https://example.org/cover.png" },
+			"hero",
+		],
+		[
+			"update_campaign_content",
+			"a photo whose imageId is not an upload's id",
+			{ id: "cmp_1", hero: { imageId: "img_cover", alt: null } },
+			"hero.imageId",
+		],
+		["update_donation_page_content", "no heading", {}, "heading"],
+		[
+			"update_donation_page_content",
+			"a story",
+			{ heading: "Give", story: { type: "doc", content: [] } },
+			"Unrecognized key",
+		],
+		[
+			"update_donation_page_content",
+			"a layout",
+			{ heading: "Give", layout: "feature" },
+			"Unrecognized key",
+		],
 	];
 
 	test.each(REFUSED)(
@@ -1200,6 +1288,11 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		["create_campaign", "list_campaigns", { title: "Spring drive" }],
 		["update_campaign_blocks", "get_campaign", { id: "cmp_1", blocks: [] }],
 		[
+			"update_campaign_content",
+			"get_campaign",
+			{ id: "cmp_1", heading: "Warm coats" },
+		],
+		[
 			"update_campaign_settings",
 			"get_campaign",
 			{ id: "cmp_1", end_date: "2026-12-31" },
@@ -1207,6 +1300,11 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		["publish_campaign", "get_campaign", { id: "cmp_1" }],
 		["end_campaign", "get_campaign", { id: "cmp_1" }],
 		["update_donation_page_blocks", "get_donation_page", { blocks: [] }],
+		[
+			"update_donation_page_content",
+			"get_donation_page",
+			{ heading: "Give today" },
+		],
 		["reset_donation_page", "get_donation_page", { confirm: true }],
 		["create_form", "list_forms", { name: "Gala" }],
 		["update_form", "get_form", { id: "frm_1", name: "Main form" }],
@@ -1522,5 +1620,311 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		});
 		expect(long.isError).toBe(true);
 		expect(deployment.calls.length).toBe(before);
+	});
+
+	describe("on Standalone's content release", () => {
+		// A fresh connection after the deployment's served actions are set;
+		// tool calls then go through it.
+		const connectAs = async (actions: readonly string[]) => {
+			deployment.setActions(actions);
+			bearer = `Bearer ${(await connectFlow(call, deployment, BASE).connect()).access_token}`;
+		};
+
+		const names = async () =>
+			(await listTools()).map((t: { name: string }) => t.name);
+
+		test("offers the content tools and none of the block ones", async () => {
+			await connectAs(CONTENT_ACTIONS);
+
+			const listed = await names();
+
+			expect(listed).toEqual(
+				expect.arrayContaining([
+					"update_campaign_content",
+					"update_donation_page_content",
+					"get_content_catalog",
+				]),
+			);
+			for (const gone of [
+				"update_campaign_blocks",
+				"update_donation_page_blocks",
+				"get_block_catalog",
+			]) {
+				expect(listed).not.toContain(gone);
+			}
+		});
+
+		test.each([
+			["update_campaign_content", "get_campaign"],
+			["update_donation_page_content", "get_donation_page"],
+		])(
+			"%s describes a content edit read back with %s that sets no design",
+			async (name, read) => {
+				await connectAs(CONTENT_ACTIONS);
+				const tools: { name: string; description: string }[] =
+					await listTools();
+
+				const { description = "" } = tools.find((t) => t.name === name) ?? {};
+
+				expect(description).toContain("Edits the");
+				expect(description).toContain(read);
+				expect(description).toContain(
+					"sets no design, colors, blocks, or share buttons",
+				);
+			},
+		);
+
+		test("no tool offered promises to set a layout, palette or blocks", async () => {
+			await connectAs(CONTENT_ACTIONS);
+			const tools: { description: string }[] = await listTools();
+
+			for (const { description } of tools) {
+				expect(description).not.toMatch(
+					/\b(sets?|changes?|edits?|picks?|chooses?) (its |the |a )?(layout|palette|blocks?)\b/i,
+				);
+			}
+		});
+
+		test("update_campaign_content writes the keys it names and answers the layout picked", async () => {
+			await connectAs(CONTENT_ACTIONS);
+			const { id } = json(
+				await tool("create_campaign", { title: "Winter coats" }),
+			);
+			const story = {
+				type: "doc",
+				content: [
+					{
+						type: "paragraph",
+						content: [{ type: "text", text: "Every coat is a warm night." }],
+					},
+				],
+			};
+
+			const written = await tool("update_campaign_content", {
+				id,
+				heading: "Warm coats for winter",
+				story,
+				tiers: [{ amountMinor: 2500, buys: "a coat for one child" }],
+			});
+
+			expect(written.isError).toBeUndefined();
+			expect(deployment.calls.at(-1)).toMatchObject({
+				method: "PATCH",
+				path: `/connector/v1/campaigns/${id}/content`,
+				body: {
+					heading: "Warm coats for winter",
+					story,
+					tiers: [{ amountMinor: 2500, buys: "a coat for one child" }],
+				},
+			});
+			expect(json(written)).toMatchObject({
+				layout: "letter",
+				content: { heading: "Warm coats for winter", story },
+			});
+			expect(json(written)).not.toHaveProperty("blocks");
+
+			const cleared = json(
+				await tool("update_campaign_content", { id, tiers: null }),
+			);
+			expect(cleared.content).not.toHaveProperty("tiers");
+			expect(cleared.layout).toBe("card");
+			expect(json(await tool("get_campaign", { id }))).toMatchObject({
+				layout: "card",
+				content: { heading: "Warm coats for winter" },
+			});
+		});
+
+		test("update_donation_page_content sets the heading, and null puts the default back", async () => {
+			await connectAs(CONTENT_ACTIONS);
+
+			const set = await tool("update_donation_page_content", {
+				heading: "Give to the Riverbank",
+			});
+			expect(json(set)).toMatchObject({
+				content: { heading: "Give to the Riverbank" },
+			});
+			expect(json(set)).not.toHaveProperty("blocks");
+			expect(deployment.calls.at(-1)).toMatchObject({
+				method: "PATCH",
+				path: "/connector/v1/donation-page/content",
+				body: { heading: "Give to the Riverbank" },
+			});
+
+			await tool("update_donation_page_content", { heading: null });
+			expect(json(await tool("get_donation_page"))).toMatchObject({
+				content: { heading: "" },
+			});
+		});
+
+		test("get_content_catalog lists every content key and how the layout is picked", async () => {
+			await connectAs(CONTENT_ACTIONS);
+
+			const catalog = json(await tool("get_content_catalog"));
+
+			expect(deployment.calls.at(-1)?.path).toBe(
+				"/connector/v1/content/catalog",
+			);
+			expect(catalog.content.map((c: { key: string }) => c.key)).toEqual([
+				"heading",
+				"lede",
+				"story",
+				"hero",
+				"photos",
+				"tiers",
+				"faq",
+			]);
+			expect(catalog.layout).toMatchObject({
+				story_threshold: 320,
+				feature_extras: 4,
+			});
+		});
+
+		test("a content edit naming no key, or one that is not content, never reaches the site", async () => {
+			await connectAs(CONTENT_ACTIONS);
+			const { id } = json(
+				await tool("create_campaign", { title: "Winter coats" }),
+			);
+			const before = deployment.calls.length;
+
+			const empty = await tool("update_campaign_content", { id });
+			const layout = await tool("update_campaign_content", {
+				id,
+				heading: "Changed",
+				layout: "feature",
+			});
+
+			expect(empty.isError).toBe(true);
+			expect(textOf(empty)).toContain("Send at least one content key");
+			expect(layout.isError).toBe(true);
+			expect(deployment.calls.length).toBe(before);
+			expect(json(await tool("get_campaign", { id })).content).toEqual({
+				heading: "",
+			});
+		});
+
+		test("settings that pick share channels answer with the site's refusal", async () => {
+			await connectAs(CONTENT_ACTIONS);
+			const { id } = json(
+				await tool("create_campaign", { title: "Winter coats" }),
+			);
+
+			const channels = await tool("update_campaign_settings", {
+				id,
+				sharing: { message: "Hello", channels: ["email"] },
+			});
+			const message = await tool("update_campaign_settings", {
+				id,
+				sharing: { message: "Hello" },
+			});
+
+			expect(channels.isError).toBe(true);
+			expect(JSON.parse(textOf(channels))).toMatchObject({
+				code: "invalid",
+				errors: [{ path: "sharing.channels" }],
+			});
+			expect(message.isError).toBeUndefined();
+			expect(json(message).settings.sharing).toEqual({ message: "Hello" });
+		});
+
+		test("a photo link names a slot, and a full campaign or the donation page is refused", async () => {
+			await connectAs(CONTENT_ACTIONS);
+			const { id } = json(
+				await tool("create_campaign", { title: "Winter coats" }),
+			);
+
+			const cover = await tool("create_photo_upload_link", {
+				target: { kind: "campaign", id },
+				slot: "cover",
+			});
+			const block = await tool("create_photo_upload_link", {
+				target: { kind: "campaign", id },
+				slot: "photo-1",
+			});
+			const page = await tool("create_photo_upload_link", {
+				target: { kind: "donation_page" },
+			});
+			await tool("update_campaign_content", {
+				id,
+				hero: { imageId: "00000000-0000-4000-8000-0000000000c0", alt: null },
+				photos: Array.from({ length: 8 }, (_, at) => ({
+					imageId: `00000000-0000-4000-8000-00000000000${at}`,
+					alt: null,
+				})),
+			});
+			const full = await tool("create_photo_upload_link", {
+				target: { kind: "campaign", id },
+			});
+			const replacing = await tool("create_photo_upload_link", {
+				target: { kind: "campaign", id },
+				slot: "0",
+			});
+
+			expect(cover.isError).toBeUndefined();
+			expect(textOf(block)).toContain('slot is \\"cover\\"');
+			expect(textOf(page)).toContain("The donation page holds no photos");
+			expect(textOf(full)).toContain("already holds 8 photos");
+			expect(replacing.isError).toBeUndefined();
+		});
+
+		test.each([
+			[
+				"update_campaign_blocks",
+				"update_campaign_content",
+				(id: string) => ({ id, blocks: [] }),
+			],
+			[
+				"update_donation_page_blocks",
+				"update_donation_page_content",
+				() => ({ blocks: [] }),
+			],
+			["get_block_catalog", "get_content_catalog", () => ({})],
+		])(
+			"%s on a connection made before the update says to use %s after reconnecting",
+			async (name, replacement, args) => {
+				// Connected while the site served blocks; it has since updated.
+				await connectAs(BLOCK_ACTIONS);
+				const { id } = json(
+					await tool("create_campaign", { title: "Winter coats" }),
+				);
+				deployment.setActions(CONTENT_ACTIONS);
+				const connections = await connectionCount();
+
+				const result = await tool(name, args(id));
+
+				expect(result.isError).toBe(true);
+				expect(textOf(result)).toBe(
+					`Better Giving at Hope Shelter no longer serves ${name}. It now edits a page's content and arranges the page from it. Use ${replacement} instead. If ${replacement} isn't offered yet, reconnect Better Giving in your AI assistant's connector settings to get it.`,
+				);
+				expect(await connectionCount()).toBe(connections);
+			},
+		);
+
+		test("a replaced tool on a connection that already offers its replacement just names it", async () => {
+			deployment.setActions(CONTENT_ACTIONS);
+
+			const result = await tool("update_campaign_blocks", {
+				id: "cmp_1",
+				blocks: [],
+			});
+
+			expect(result.isError).toBe(true);
+			expect(textOf(result)).toBe(
+				"Better Giving at Hope Shelter no longer serves update_campaign_blocks. It now edits a page's content and arranges the page from it. Use update_campaign_content instead.",
+			);
+		});
+
+		test("a replaced answer is logged as replaced, with no argument in it", async () => {
+			deployment.setActions(CONTENT_ACTIONS);
+			const out = vi.spyOn(console, "log").mockImplementation(() => {});
+
+			await tool("get_block_catalog");
+
+			expect(out.mock.calls.map(([line]) => JSON.parse(line))).toContainEqual({
+				kind: "tool",
+				tool: "blocks.catalog",
+				outcome: "replaced",
+				ms: expect.any(Number),
+			});
+		});
 	});
 });

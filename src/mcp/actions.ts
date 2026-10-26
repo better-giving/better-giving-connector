@@ -60,6 +60,77 @@ const blocks = z
 		"The page's content as blocks. Each block's schema is in get_block_catalog.",
 	);
 
+// A page's content as Standalone holds it (its content.catalog): each key's
+// value in the page rule's shape, null to clear it. The deployment's rule is
+// the full check; these shapes refuse what it never takes before any request.
+const richText = z
+	.record(z.string(), z.unknown())
+	.describe(
+		'A rich-text document as Tiptap JSON, such as {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Every coat is a warm night."}]}]}.',
+	);
+const photo = z
+	.strictObject({
+		imageId: z.uuid({
+			error: "The id a stored photo was given on upload, never an address.",
+		}),
+		alt: z.string().nullable().describe("What the photo shows, or null."),
+	})
+	.describe(
+		"A photo already on the site, named by the imageId get_campaign returns. A new photo comes in through create_photo_upload_link.",
+	);
+/** The most photos Standalone keeps beside a campaign's cover (its `PHOTOS_MAX`). */
+const PHOTOS_MAX = 8;
+const campaignContent = {
+	heading: z
+		.string()
+		.nullable()
+		.optional()
+		.describe("The page's title. Empty or null shows the campaign's name."),
+	lede: z
+		.string()
+		.nullable()
+		.optional()
+		.describe("A sentence or two under the title."),
+	story: richText
+		.nullable()
+		.optional()
+		.describe("The story behind the appeal, as a rich-text document."),
+	hero: photo.nullable().optional().describe("The cover photo."),
+	photos: z
+		.array(photo)
+		.max(PHOTOS_MAX)
+		.nullable()
+		.optional()
+		.describe(
+			`Photos beside the cover, at most ${PHOTOS_MAX}. Sent whole: the list replaces the current one.`,
+		),
+	tiers: z
+		.array(
+			z.strictObject({
+				amountMinor: z
+					.int()
+					.positive()
+					.describe("The gift in cents, such as 2500 for $25.00."),
+				buys: z.string().describe("What that gift buys."),
+			}),
+		)
+		.max(6)
+		.nullable()
+		.optional()
+		.describe(
+			"Up to six gift amounts, each with what it buys. Sent whole: the list replaces the current one.",
+		),
+	faq: z
+		.array(z.strictObject({ question: z.string(), answer: richText }))
+		.max(10)
+		.nullable()
+		.optional()
+		.describe(
+			"Up to ten questions donors ask, each with its answer. Sent whole: the list replaces the current one.",
+		),
+};
+const CONTENT_KEYS = Object.keys(campaignContent);
+
 // openWorldHint is false: every tool talks only to the one connected site.
 // destructiveHint false on a read matches the directory packet; the spec
 // treats it as meaningful only when readOnlyHint is false.
@@ -101,7 +172,14 @@ const DESTRUCTIVE = {
 const CONFIRMED =
 	"Donors see this immediately, so the operator confirms it in the chat first.";
 const editsContent = (read: string) =>
-	`Each block follows a schema from get_block_catalog. ${read} returns the current content; send every block the page should keep.`;
+	`Each block follows a schema from get_block_catalog. ${read} returns the current content; send every block the page should keep. For sites that edit pages as blocks.`;
+// Standalone picks how a page is drawn from its content, so a content edit
+// sets none of it; the deployment refuses a key that tries.
+const DRAWN_FROM_CONTENT =
+	"The site arranges the page from its content, so this tool sets no design, colors, blocks, or share buttons.";
+// Two page models: a site serves either the block tools or the content ones.
+const CONTENT_SITES = "on sites with get_content_catalog";
+const BLOCK_SITES = "on sites with get_block_catalog";
 
 /** One tool per `/connector/v1` action; a server registers the ones its connection's deployment serves. */
 export const ACTIONS = toolSpecs([
@@ -121,8 +199,7 @@ export const ACTIONS = toolSpecs([
 		tool: "get_campaign",
 		action: "campaigns.get",
 		title: "Get a campaign",
-		description:
-			"Reads one campaign: settings, page blocks, status, and public link. For the amount raised, use get_results.",
+		description: `Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it ${CONTENT_SITES}, or its blocks ${BLOCK_SITES}. For the amount raised, use get_results.`,
 		input: z.strictObject({ id }),
 		annotations: READ,
 	},
@@ -146,11 +223,28 @@ export const ACTIONS = toolSpecs([
 		checkWith: "get_campaign",
 	},
 	{
+		tool: "update_campaign_content",
+		action: "campaigns.update_content",
+		title: "Edit a campaign's page",
+		description: `Edits the content of a campaign's page: its heading, lede, story, cover photo (hero), photos beside the cover, gift tiers, and questions (faq). Send only the keys to change: a key left out stays as it is, and null clears it. Each key's shape is in get_content_catalog, and get_campaign returns the current content. Donors see the change once the campaign is published. ${DRAWN_FROM_CONTENT}`,
+		input: z
+			.strictObject({ id, ...campaignContent })
+			.refine(
+				(input) =>
+					CONTENT_KEYS.some(
+						(key) => input[key as keyof typeof input] !== undefined,
+					),
+				`Send at least one content key: ${CONTENT_KEYS.join(", ")}.`,
+			),
+		annotations: SET,
+		checkWith: "get_campaign",
+	},
+	{
 		tool: "update_campaign_settings",
 		action: "campaigns.update_settings",
 		title: "Change a campaign's settings",
 		description:
-			"Sets a campaign's goal, end date, time zone, or the message and channels shown when it is shared. A field left out stays as it is. Null clears a field.",
+			'Sets a campaign\'s goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {"message": null}. Page content goes through update_campaign_content or update_campaign_blocks.',
 		input: z.strictObject({
 			id,
 			goal: money.nullable().optional(),
@@ -163,9 +257,14 @@ export const ACTIONS = toolSpecs([
 			sharing: z
 				.strictObject({
 					message: z.string().nullable().optional(),
-					channels: z.array(z.string()).nullable().optional(),
+					channels: z
+						.array(z.string())
+						.nullable()
+						.optional()
+						.describe(
+							`Share channels, ${BLOCK_SITES} only. Sites with get_content_catalog offer the same share buttons on every page and refuse this.`,
+						),
 				})
-				.nullable()
 				.optional(),
 		}),
 		annotations: SET,
@@ -196,8 +295,7 @@ export const ACTIONS = toolSpecs([
 		tool: "get_donation_page",
 		action: "donation_page.get",
 		title: "Get the donation page",
-		description:
-			"Reads the site's main donation page: its blocks and public link.",
+		description: `Reads the site's main donation page and its public link. The page is its content ${CONTENT_SITES}, where only its heading can be edited, or its blocks ${BLOCK_SITES}.`,
 		input: z.strictObject({}),
 		annotations: READ,
 	},
@@ -208,6 +306,20 @@ export const ACTIONS = toolSpecs([
 		description: `Edits the content of the site's main donation page, such as its title, story, and hero photo. ${editsContent("get_donation_page")}`,
 		input: z.strictObject({ blocks }),
 		annotations: DESTRUCTIVE,
+		checkWith: "get_donation_page",
+	},
+	{
+		tool: "update_donation_page_content",
+		action: "donation_page.update_content",
+		title: "Edit the donation page",
+		description: `Edits the heading of the site's main donation page, the only content it holds; the rest of the page is the same on every site. An empty heading, or null, shows "Donate to" and the organization's name. get_donation_page returns the current heading. The edit goes to the page's draft: donors see it once the operator publishes the donation page in the Better Giving dashboard, and no tool here publishes it. ${DRAWN_FROM_CONTENT}`,
+		input: z.strictObject({
+			heading: z
+				.string()
+				.nullable()
+				.describe("The page's title, or null for the default."),
+		}),
+		annotations: SET,
 		checkWith: "get_donation_page",
 	},
 	{
@@ -224,7 +336,16 @@ export const ACTIONS = toolSpecs([
 		action: "blocks.catalog",
 		title: "Get the block catalog",
 		description:
-			"Lists every block type a page can hold, with what it is for and its JSON Schema.",
+			"Lists every block type a page can hold, with what it is for and its JSON Schema. For sites that edit pages as blocks.",
+		input: z.strictObject({}),
+		annotations: READ,
+	},
+	{
+		tool: "get_content_catalog",
+		action: "content.catalog",
+		title: "Get the content catalog",
+		description:
+			"Lists every content key a page can hold (heading, lede, story, hero, photos, tiers, faq) with what each shows donors and its JSON Schema, and says how the site arranges a campaign from its content. A campaign holds every key; the donation page holds its heading alone.",
 		input: z.strictObject({}),
 		annotations: READ,
 	},
@@ -345,14 +466,18 @@ export const ACTIONS = toolSpecs([
 		tool: "create_photo_upload_link",
 		action: "photos.upload_link",
 		title: "Make a photo upload link",
-		description:
-			"Returns a short-lived, single-use link for adding a photo to a campaign or the donation page. The operator opens the link and chooses the photo. This connector does not upload the file.",
+		description: `Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page ${BLOCK_SITES}. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most ${PHOTOS_MAX} photos beside it; when all ${PHOTOS_MAX} are taken, ask the operator which one the new photo replaces.`,
 		input: z.strictObject({
 			target: z.discriminatedUnion("kind", [
 				z.strictObject({ kind: z.literal("campaign"), id }),
 				z.strictObject({ kind: z.literal("donation_page") }),
 			]),
-			slot: z.string().optional(),
+			slot: z
+				.string()
+				.optional()
+				.describe(
+					`Where the photo goes. On sites with get_content_catalog: "cover" for the cover, "new" to add it after the other photos, or the position of a photo beside the cover to replace it ("0" is the first). Left out, or a position with no photo, it becomes the cover when there is none and otherwise goes after the other photos. On sites with get_block_catalog: the id of the photo block it fills; left out, the first empty one.`,
+				),
 		}),
 		annotations: ADD,
 	},

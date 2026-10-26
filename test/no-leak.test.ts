@@ -558,6 +558,14 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			}),
 		],
 		[
+			"update_campaign_content",
+			(i) => ({
+				id: i.campaign,
+				heading: arg("content-heading"),
+				tiers: [{ amountMinor: 2500, buys: arg("tier-buys") }],
+			}),
+		],
+		[
 			"update_campaign_settings",
 			(i) => ({
 				id: i.campaign,
@@ -577,8 +585,10 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			"update_donation_page_blocks",
 			() => ({ blocks: [{ type: "hero", heading: arg("hero-heading") }] }),
 		],
+		["update_donation_page_content", () => ({ heading: arg("page-heading") })],
 		["reset_donation_page", () => ({ confirm: true })],
 		["get_block_catalog", () => ({})],
+		["get_content_catalog", () => ({})],
 		["list_forms", () => ({ cursor: arg("forms-cursor"), limit: 3 })],
 		["get_form", (i) => ({ id: i.form })],
 		[
@@ -632,6 +642,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	const NAME_A_RECORD = [
 		"get_campaign",
 		"update_campaign_blocks",
+		"update_campaign_content",
 		"update_campaign_settings",
 		"publish_campaign",
 		"end_campaign",

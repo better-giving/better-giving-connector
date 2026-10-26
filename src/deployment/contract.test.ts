@@ -26,6 +26,20 @@ describe("knownActions", () => {
 		]);
 	});
 
+	test("reads the content tools' names as Standalone's content actions", () => {
+		expect(
+			knownActions([
+				"update_campaign_content",
+				"update_donation_page_content",
+				"get_content_catalog",
+			]),
+		).toEqual([
+			"campaigns.update_content",
+			"donation_page.update_content",
+			"content.catalog",
+		]);
+	});
+
 	test("reads a mixed list once per action", () => {
 		expect(
 			knownActions([
