@@ -10,6 +10,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { Hono } from "hono";
 import type { AuthFacade } from "../auth";
+import { OFFLINE_ACCESS_SCOPE } from "../auth/scopes";
 import {
 	type Connection,
 	ConnectionKeyUnreadable,
@@ -35,7 +36,9 @@ export function mcpRoute(deps: McpDeps): Hono {
 	const signIn = () =>
 		bearerAuthChallengeResponse(
 			new OAuthError(OAuthErrorCode.InvalidToken, "Sign in to Better Giving"),
-			{ resourceMetadataUrl },
+			// a client given no scope here requests all of `scopes_supported`,
+			// read_only among them
+			{ resourceMetadataUrl, requiredScopes: [OFFLINE_ACCESS_SCOPE] },
 		);
 
 	// A missing row or an undecryptable key can never be used again, so the
@@ -71,7 +74,7 @@ export function mcpRoute(deps: McpDeps): Hono {
 		// authenticateMcp doesn't return.
 		const handler = createMcpHandler(
 			() =>
-				connectionServer(session, {
+				connectionServer(session, who.readOnly, {
 					client: deps.client,
 					dropConnection: deps.auth.dropConnection,
 				}),
@@ -138,20 +141,22 @@ function sessionDetector(client: Pick<DeploymentClient, "hello">) {
 
 function connectionServer(
 	connection: ToolConnection,
+	readOnly: boolean,
 	ctx: RunToolContext,
 ): McpServer {
 	// null `actions` (a connection made before this was stored, or a hello that
 	// didn't state them) keeps every tool; otherwise only the actions the
 	// deployment serves, so the chat is never offered one that can only fail.
-	const specs = actionsFor(connection.platform).filter(
+	const served = actionsFor(connection.platform).filter(
 		(spec) =>
 			connection.actions === null || connection.actions.includes(spec.action),
 	);
+	const specs = readOnly ? served.filter(isRead) : served;
 	const server = new McpServer(
 		{ name: "Better Giving", version: "1.0.0" },
 		{
 			capabilities: { tools: {} },
-			instructions: instructionsFor(connection.orgName, specs),
+			instructions: instructionsFor(connection.orgName, specs, readOnly),
 		},
 	);
 	for (const spec of specs) {
@@ -166,8 +171,54 @@ function connectionServer(
 			(input) => runTool(spec, connection, input, ctx),
 		);
 	}
+	if (readOnly)
+		refuseWrites(
+			server,
+			specs,
+			served.filter((s) => !isRead(s)),
+		);
 	return server;
 }
+
+const isRead = (spec: ActionSpec) => spec.annotations.readOnlyHint === true;
+
+// McpServer lists every tool it can call, and answers a call to one it doesn't
+// have with a bare "not found". So a read-only token's writes are registered,
+// each answering with why it can't run, and tools/list is answered from the
+// read tools alone, each listed as McpServer lists a registered tool.
+function refuseWrites(
+	server: McpServer,
+	reads: readonly ActionSpec[],
+	writes: readonly ActionSpec[],
+): void {
+	for (const spec of writes) {
+		// no inputSchema: the arguments are never read, so never logged
+		server.registerTool(spec.tool, { title: spec.title }, () => {
+			log({ kind: "tool", tool: spec.action, outcome: "read_only", ms: 0 });
+			return {
+				isError: true,
+				content: [{ type: "text", text: readOnlyRefusal(spec.tool) }],
+			};
+		});
+	}
+	server.server.setRequestHandler("tools/list", () => ({
+		tools: reads.map((spec) => ({
+			name: spec.tool,
+			title: spec.title,
+			description: spec.description,
+			inputSchema: {
+				type: "object" as const,
+				...spec.input["~standard"].jsonSchema.input({
+					target: "draft-2020-12",
+				}),
+			},
+			annotations: { ...spec.annotations, title: spec.title },
+		})),
+	}));
+}
+
+const readOnlyRefusal = (tool: string) =>
+	`This connection to Better Giving is read-only, so ${tool} can't be used. To make changes, reconnect Better Giving in your AI assistant's connector settings without read-only access.`;
 
 // The name only: the SDK's messages quote the request.
 const logError = (error: Error) =>
@@ -208,10 +259,16 @@ const WAITS_FOR_YES = "operator confirms it in the chat first";
 function instructionsFor(
 	orgName: string,
 	specs: readonly ActionSpec[],
+	readOnly: boolean,
 ): string {
 	const lines = [
 		`These tools act on ${JSON.stringify(orgName)}, the operator's live Better Giving donation site: what they change, donors see.`,
 	];
+	if (readOnly) {
+		lines.push(
+			"This connection is read-only: it can view the site but not change anything.",
+		);
+	}
 	const waiting = specs
 		.filter((spec) => spec.description.includes(WAITS_FOR_YES))
 		.map((spec) => spec.tool);

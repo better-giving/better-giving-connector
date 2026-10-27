@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { cimd } from "@better-auth/cimd";
 import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { mcp } from "@better-auth/mcp";
@@ -15,9 +14,10 @@ import type { Env } from "../env";
 import { log } from "../log";
 import type { Secret } from "../secret";
 import { isCimdClientIdAllowed } from "./cimd-hosts";
-import { connectionPlugin } from "./connection-plugin";
+import { connectionPlugin, storedToken } from "./connection-plugin";
 import { libsqlDialect } from "./libsql-dialect";
 import { isAllowedRedirectUri } from "./redirect-uris";
+import { isReadOnly, OFFLINE_ACCESS_SCOPE, READ_ONLY_SCOPE } from "./scopes";
 import {
 	ACCESS_TOKEN_EXPIRES_IN,
 	RATE_LIMIT_RETENTION,
@@ -42,9 +42,12 @@ export interface AuthFacade {
 	/**
 	 * Reads the authorization request better-auth signed into the `/connect`
 	 * URL it redirected to. Null when the signature fails or has expired
-	 * (10 minutes after the chat app opened the authorize URL).
+	 * (10 minutes after the chat app opened the authorize URL). `readOnly` is
+	 * whether the signed request's `scope` asks for `read_only`.
 	 */
-	readLoginRequest(url: URL): Promise<{ oauthQuery: string } | null>;
+	readLoginRequest(
+		url: URL,
+	): Promise<{ oauthQuery: string; readOnly: boolean } | null>;
 	/**
 	 * Makes the connection the deployment just allowed: a new user, its
 	 * connection row, then the authorize request resumed for that user. The
@@ -70,9 +73,13 @@ export interface AuthFacade {
 	/**
 	 * The user an `/mcp` request's access token was issued to, or null when
 	 * the token is missing, malformed, unknown, expired, revoked, issued for
-	 * another resource, or DPoP-bound without a matching proof.
+	 * another resource, or DPoP-bound without a matching proof. `readOnly` is
+	 * whether the token was granted `read_only`, read from the verified token,
+	 * never from the request.
 	 */
-	authenticateMcp(req: Request): Promise<{ userId: string } | null>;
+	authenticateMcp(
+		req: Request,
+	): Promise<{ userId: string; readOnly: boolean } | null>;
 	/**
 	 * Ends a connection: asks its deployment to revoke the key, then deletes
 	 * its row, then its user with every session, token and consent. The
@@ -129,10 +136,13 @@ export function buildAuth(
 		allowDynamicClientRegistration: true,
 		allowUnauthenticatedClientRegistration: true,
 		disableJwtPlugin: true,
-		// the only scope offered, so whatever a chat app picks from
-		// `scopes_supported` (or leaves to the default) yields a refresh token;
-		// no `openid`, as this server never issues an id_token
-		scopes: ["offline_access"],
+		// @better-auth/mcp strips offline_access from the protected-resource
+		// metadata, so that document lists read_only alone, and a client choosing
+		// from it would get a read-only connection with no refresh token. /mcp's 401
+		// challenge naming offline_access keeps the default full access, and an
+		// authorize naming no scope gets offline_access (connection-plugin.ts).
+		// No `openid`, as this server never issues an id_token.
+		scopes: [OFFLINE_ACCESS_SCOPE, READ_ONLY_SCOPE],
 		validateRedirectUri: (uri, _registered, matchesRegistered) =>
 			matchesRegistered && isAllowedRedirectUri(uri),
 		// a connection lasts while the chat app refreshes at least this often,
@@ -416,7 +426,9 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 			}),
 		async readLoginRequest(url) {
 			const oauthQuery = url.search.slice(1);
-			return (await verifies(oauthQuery)) ? { oauthQuery } : null;
+			if (!(await verifies(oauthQuery))) return null;
+			const scope = new URLSearchParams(oauthQuery).get("scope");
+			return { oauthQuery, readOnly: isReadOnly(scope) };
 		},
 		dropConnection,
 		async sweep() {
@@ -515,10 +527,6 @@ type AuthDb = Kysely<AuthTables>;
 
 const authTables = (db: Db): AuthDb =>
 	new Kysely<AuthTables>({ dialect: libsqlDialect(db) });
-
-// oauth-provider's default `storeTokens: "hashed"`
-const storedToken = (token: string) =>
-	createHash("sha256").update(token).digest("base64url");
 
 async function hasLiveRefreshToken(db: AuthDb, userId: string, now: Date) {
 	const live = await db

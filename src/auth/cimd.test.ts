@@ -27,6 +27,7 @@ import { deploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import { Secret } from "../secret";
 import { type AuthFacade, createAuth } from "./index";
+import { OFFLINE_ACCESS_SCOPE, READ_ONLY_SCOPE } from "./scopes";
 
 // Claude's custom-connector sign-in sends this URL as its client_id; the
 // document lives at the same URL.
@@ -137,8 +138,12 @@ test("authorization-server metadata advertises CIMD, the none auth method and S2
 async function cimdConnect(
 	clientId = CIMD_CLIENT_ID,
 	redirectUri = REDIRECT_URI,
+	scope?: string,
 ): Promise<{ a: Authorization; code: string }> {
-	const a = authorization(ep, clientId, { redirectUri });
+	const a = authorization(ep, clientId, {
+		redirectUri,
+		...(scope === undefined ? {} : { scope }),
+	});
 	const login = redirectTarget(await navigate(a), a.url);
 	if (login.pathname !== "/connect")
 		throw new Error("authorize did not reach /connect");
@@ -176,6 +181,29 @@ test("a URL client_id drives authorize, connect, code, a public-client token, an
 		mcpPost(INITIALIZE, `Bearer ${tokens.access_token}`),
 	);
 	expect((await store.get(who?.userId ?? ""))?.origin).toBe(ORIGIN);
+});
+
+test("a CIMD client stored before read_only existed connects asking for read_only while its document is still cached", async () => {
+	await cimdConnect();
+	await db.execute({
+		sql: 'UPDATE "oauthClient" SET "scopes" = ? WHERE "clientId" = ?',
+		args: [JSON.stringify([OFFLINE_ACCESS_SCOPE]), CIMD_CLIENT_ID],
+	});
+
+	const { a, code } = await cimdConnect(
+		CIMD_CLIENT_ID,
+		REDIRECT_URI,
+		`${OFFLINE_ACCESS_SCOPE} ${READ_ONLY_SCOPE}`,
+	);
+	const tokens = (await (
+		await exchangeCode(call, ep, a, code)
+	).json()) as Tokens;
+
+	expect(
+		await auth.authenticateMcp(
+			mcpPost(INITIALIZE, `Bearer ${tokens.access_token}`),
+		),
+	).toMatchObject({ readOnly: true });
 });
 
 test("the CIMD client is a public client stored from the document", async () => {

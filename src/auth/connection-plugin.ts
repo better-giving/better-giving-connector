@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
 	getIssuer,
 	getOAuthProviderApi,
@@ -21,6 +22,28 @@ import {
 } from "better-auth/oauth2";
 import { z } from "zod";
 import { isAllowedRedirectUri } from "./redirect-uris";
+import { isReadOnly, OFFLINE_ACCESS_SCOPE, READ_ONLY_SCOPE } from "./scopes";
+
+// oauth-provider's default `storeTokens: "hashed"`
+export const storedToken = (token: string) =>
+	createHash("sha256").update(token).digest("base64url");
+
+// Where oauth-provider's authorize reads its parameters: the form body of a
+// POST to /oauth2/authorize, else the query. Its resume after sign-in
+// dispatches with `authorizeSettings` set and reads the query whatever the
+// method (`getAuthorizationRequestParameters` in its dist).
+function authorizeParameters(ctx: {
+	method?: string;
+	request?: Request;
+}): "body" | "query" {
+	const { authorizeSettings } = ctx as {
+		authorizeSettings?: { isAuthorize?: boolean };
+	};
+	const isAuthorize =
+		authorizeSettings === undefined || authorizeSettings.isAuthorize === true;
+	const method = ctx.method ?? ctx.request?.method;
+	return method === "POST" && isAuthorize ? "body" : "query";
+}
 
 // Server-only endpoints: never on the HTTP router, callable only as
 // `auth.api.*` from this module's facade.
@@ -53,6 +76,69 @@ export const connectionPlugin = (opts: {
 						throw new APIError("BAD_REQUEST", {
 							error: "invalid_redirect_uri",
 							error_description: "redirect_uris must be an allowed callback",
+						});
+					}),
+				},
+				{
+					matcher: (ctx) => ctx.path === "/oauth2/authorize",
+					handler: createAuthMiddleware(async (ctx) => {
+						const where = authorizeParameters(ctx);
+						const params: Record<string, unknown> = ctx[where] ?? {};
+						const scope = params.scope;
+						// oauth-provider grants a client's whole capability set to an
+						// authorize without `scope`, and every registered client holds
+						// read_only; read_only is granted only when asked for
+						if (scope === undefined) {
+							return {
+								context: {
+									[where]: { ...params, scope: OFFLINE_ACCESS_SCOPE },
+								},
+							};
+						}
+						const clientId = params.client_id;
+						if (typeof scope !== "string" || !isReadOnly(scope)) return;
+						if (typeof clientId !== "string") return;
+						// a client stored before read_only was offered (a CIMD client
+						// until its document is fetched again) holds offline_access
+						// alone; widening its allowed set to read_only lets it connect
+						// asking for every advertised scope. The request is untouched.
+						const client = await ctx.context.adapter.findOne<{
+							scopes?: string[] | null;
+						}>({
+							model: "oauthClient",
+							where: [{ field: "clientId", value: clientId }],
+						});
+						if (!client?.scopes || client.scopes.includes(READ_ONLY_SCOPE)) {
+							return;
+						}
+						await ctx.context.adapter.update({
+							model: "oauthClient",
+							where: [{ field: "clientId", value: clientId }],
+							update: { scopes: [...client.scopes, READ_ONLY_SCOPE] },
+						});
+					}),
+				},
+				{
+					// oauth-provider lets a refresh narrow its scopes, and dropping
+					// read_only narrows the scope string while widening the token
+					matcher: (ctx) =>
+						ctx.path === "/oauth2/token" &&
+						ctx.body?.grant_type === "refresh_token" &&
+						typeof ctx.body.scope === "string" &&
+						!isReadOnly(ctx.body.scope),
+					handler: createAuthMiddleware(async (ctx) => {
+						const token: unknown = ctx.body?.refresh_token;
+						if (typeof token !== "string") return;
+						const row = await ctx.context.adapter.findOne<{
+							scopes: string[];
+						}>({
+							model: "oauthRefreshToken",
+							where: [{ field: "token", value: storedToken(token) }],
+						});
+						if (!row?.scopes.includes(READ_ONLY_SCOPE)) return;
+						throw new APIError("BAD_REQUEST", {
+							error: "invalid_scope",
+							error_description: `a refresh must keep ${READ_ONLY_SCOPE}`,
 						});
 					}),
 				},
@@ -158,7 +244,12 @@ export const connectionPlugin = (opts: {
 						if (!payload.sub || !forMcp) {
 							return ctx.json(null);
 						}
-						return ctx.json({ userId: payload.sub });
+						// RFC 7662 `scope`: the space-delimited scopes the token was granted
+						const { scope } = payload;
+						return ctx.json({
+							userId: payload.sub,
+							readOnly: isReadOnly(typeof scope === "string" ? scope : null),
+						});
 					} catch (error) {
 						if (isAPIError(error) || isDpopBindingError(error)) {
 							return ctx.json(null);

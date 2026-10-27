@@ -8,6 +8,7 @@ import { type ActionName, isActionName } from "./deployment";
 export type ToolOutcome =
 	| "ok"
 	| "invalid_input"
+	| "read_only"
 	| "key_refused"
 	| "moved"
 	| "needs_update"

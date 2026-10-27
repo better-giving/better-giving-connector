@@ -267,9 +267,9 @@ async function startWorld() {
 				}),
 			),
 		failOn: flaky.failOn,
-		/** Connects and returns the chat app's bearer, its tokens planted. */
-		async signIn(): Promise<string> {
-			const tokens = await flow.connect();
+		/** Connects as a chat app asking for `scope` and returns its bearer, its tokens planted. */
+		async signIn(scope?: string): Promise<string> {
+			const tokens = await connectFlow(call, dep, BASE, { scope }).connect();
 			plant("token:access", tokens.access_token, true);
 			plant("token:refresh", tokens.refresh_token, true);
 			const bearer = `Bearer ${tokens.access_token}`;
@@ -947,6 +947,35 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expectCleanScenario();
 	});
 
+	test("a read-only token's write is refused without its arguments reaching the deployment or a log line", async () => {
+		const bearer = await world.signIn("offline_access read_only");
+		const before = world.dep.calls.length;
+
+		const result = await callTool(bearer, "record_donation", {
+			...GIFT(),
+			note: arg("read-only-note"),
+		});
+
+		expect(result.isError).toBe(true);
+		expect(textOf(result)).toContain("read-only");
+		expect(
+			world.dep.calls.slice(before).map((c) => `${c.method} ${c.path}`),
+		).toEqual([]);
+		expectCleanScenario();
+	});
+
+	test("the same write with a full token does reach the deployment", async () => {
+		const bearer = await world.signIn();
+		const before = world.dep.calls.length;
+
+		await callTool(bearer, ...WRITE_CALL());
+
+		expect(
+			world.dep.calls.slice(before).map((c) => `${c.method} ${c.path}`),
+		).toEqual(["POST /connector/v1/donations"]);
+		expectCleanScenario();
+	});
+
 	test("a read and a write to a site that never answers time out", async () => {
 		const bearer = await world.signIn();
 		let reached = 0;
@@ -1088,6 +1117,7 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 		new Set([
 			"ok",
 			"invalid_input",
+			"read_only",
 			"key_refused",
 			"moved",
 			"needs_update",

@@ -24,6 +24,8 @@ let deployment: FakeDeployment;
 let key: Secret;
 let store: Connections;
 let signedInAs: string | null;
+// what the signed-in token was granted
+let readOnly: boolean;
 let dropped: string[];
 let route: ReturnType<typeof mcpRoute>;
 
@@ -54,11 +56,12 @@ beforeEach(async () => {
 		key,
 	});
 	signedInAs = USER;
+	readOnly = false;
 	dropped = [];
 	route = mcpRoute({
 		auth: {
 			authenticateMcp: async () =>
-				signedInAs === null ? null : { userId: signedInAs },
+				signedInAs === null ? null : { userId: signedInAs, readOnly },
 			dropConnection: async (userId) => {
 				dropped.push(userId);
 			},
@@ -128,6 +131,16 @@ test("no signed-in user is asked to sign in and nothing is dropped", async () =>
 	expect(dropped).toEqual([]);
 });
 
+test("the sign-in challenge names offline_access as the scope to request", async () => {
+	signedInAs = null;
+
+	const res = await send("tools/list");
+
+	expect(res.headers.get("www-authenticate")).toMatch(
+		/, scope="offline_access",/,
+	);
+});
+
 const toolNames = async (): Promise<string[]> =>
 	(await rpc(await send("tools/list"))).result.tools.map(
 		(t: { name: string }) => t.name,
@@ -165,6 +178,77 @@ test("tools/list offers a Platform deployment's tools from the tool names its he
 	await reconnect(actions);
 
 	expect((await toolNames()).sort()).toEqual([...PLATFORM_TOOLS].sort());
+});
+
+const READ_TOOLS: string[] = ACTIONS.filter(
+	(s) => s.annotations.readOnlyHint,
+).map((s) => s.tool);
+
+test("a read-only token is offered only the read tools", async () => {
+	await reconnect(null);
+	readOnly = true;
+
+	const names = await toolNames();
+
+	expect(names.sort()).toEqual([...READ_TOOLS].sort());
+	expect(names).toContain("list_campaigns");
+	expect(names).not.toContain("publish_campaign");
+});
+
+test("a read-only token's tools are listed as a full token lists them", async () => {
+	await reconnect(null);
+	const full = (await rpc(await send("tools/list"))).result.tools;
+	readOnly = true;
+
+	const { tools } = (await rpc(await send("tools/list"))).result;
+
+	expect(tools).toEqual(
+		full.filter((t: { name: string }) => READ_TOOLS.includes(t.name)),
+	);
+});
+
+test("a read-only token's write call is refused without reaching the deployment", async () => {
+	await reconnect(null);
+	readOnly = true;
+	const before = deployment.calls.length;
+
+	const { result } = await rpc(
+		await send("tools/call", {
+			name: "publish_campaign",
+			arguments: { id: "camp_1" },
+		}),
+	);
+
+	expect(result).toEqual({
+		isError: true,
+		content: [
+			{
+				type: "text",
+				text: "This connection to Better Giving is read-only, so publish_campaign can't be used. To make changes, reconnect Better Giving in your AI assistant's connector settings without read-only access.",
+			},
+		],
+	});
+	expect(deployment.calls.slice(before).map((c) => c.path)).toEqual([
+		"/connector/v1/hello",
+	]);
+});
+
+test("a full token's same write call reaches the deployment", async () => {
+	await reconnect(null);
+	const before = deployment.calls.length;
+
+	// the call runs as its answer is read
+	await rpc(
+		await send("tools/call", {
+			name: "publish_campaign",
+			arguments: { id: "camp_1" },
+		}),
+	);
+
+	expect(deployment.calls.slice(before).map((c) => c.path)).toEqual([
+		"/connector/v1/hello",
+		"/connector/v1/campaigns/camp_1/publish",
+	]);
 });
 
 type ListedTool = { title: string; annotations: { title?: string } };
@@ -229,6 +313,36 @@ test("a connection serving no actions has instructions with no confirm clause", 
 	expect(instructions).not.toContain("Before");
 });
 
+const instructions = async () =>
+	(
+		await rpc(
+			await send("initialize", {
+				protocolVersion: "2025-06-18",
+				capabilities: {},
+				clientInfo: { name: "chat-app", version: "1.0.0" },
+			}),
+		)
+	).result.instructions;
+
+const VIEW_ONLY =
+	"This connection is read-only: it can view the site but not change anything.";
+
+test("a read-only token's instructions say it can view but not change the site, with no confirm clause", async () => {
+	readOnly = true;
+
+	const text = await instructions();
+
+	expect(text).toContain(VIEW_ONLY);
+	expect(text).not.toContain("Before");
+});
+
+test("a full token's instructions don't call the connection read-only", async () => {
+	const text = await instructions();
+
+	expect(text).not.toContain(VIEW_ONLY);
+	expect(text).toContain("Before");
+});
+
 test("a Platform hello answered from another origin leaves the connection Standalone, and is asked again after five minutes", async () => {
 	onTestFinished(() => {
 		vi.useRealTimers();
@@ -237,7 +351,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 	let asked = 0;
 	const elsewhere = mcpRoute({
 		auth: {
-			authenticateMcp: async () => ({ userId: USER }),
+			authenticateMcp: async () => ({ userId: USER, readOnly: false }),
 			dropConnection: async () => {},
 		},
 		connections: store,

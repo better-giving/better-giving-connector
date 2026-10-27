@@ -171,6 +171,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 			<AddressPage
 				action={url.pathname + url.search}
 				cancel={cancelAction(login.oauthQuery)}
+				readOnly={login.readOnly}
 			/>,
 		);
 	});
@@ -193,6 +194,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 					cancel={cancelAction(login.oauthQuery)}
 					value={address}
 					error={error}
+					readOnly={login.readOnly}
 				/>,
 				status,
 			);

@@ -89,8 +89,10 @@ export function AddressPage(props: {
 	cancel: string;
 	value?: string;
 	error?: string;
+	/** Whether the verified login request asks for `read_only`. */
+	readOnly?: boolean;
 }) {
-	const { action, cancel, value, error } = props;
+	const { action, cancel, value, error, readOnly } = props;
 	const invalid = error !== undefined;
 	return (
 		<Page
@@ -102,6 +104,12 @@ export function AddressPage(props: {
 				Better Giving site's address instead, type that address. You'll sign in
 				and press Allow, then return to your AI assistant.
 			</p>
+			{readOnly && (
+				<p>
+					This connection is read-only: your AI assistant will be able to view
+					your Better Giving account and site but not change anything.
+				</p>
+			)}
 			<form id="address-form" method="post" action={action}>
 				<label for="address">Your Better Giving address</label>
 				<input

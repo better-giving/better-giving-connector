@@ -327,6 +327,11 @@ export function PrivacyPage() {
 					key.
 				</li>
 				<li>
+					<strong>Read-only access</strong>: an AI assistant can ask for
+					read-only access. A read-only connection can view your Better Giving
+					account and site but not change anything.
+				</li>
+				<li>
 					<strong>Request deletion or access</strong> by emailing
 					support@better.giving. We respond within 30 days (or as required by
 					law).
@@ -397,8 +402,9 @@ export function PrivacyPage() {
 			<ul>
 				<li>
 					Version {PRIVACY_VERSION.version}, effective{" "}
-					{PRIVACY_VERSION.effective}: first published version.
+					{PRIVACY_VERSION.effective}: adds read-only access.
 				</li>
+				<li>Version 1.0, effective 2026-10-25: first published version.</li>
 			</ul>
 		</Page>
 	);
