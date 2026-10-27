@@ -18,7 +18,7 @@ import {
 import type { DeploymentClient } from "../deployment";
 import { log } from "../log";
 import { type ActionSpec, actionsFor } from "./actions";
-import { type RunToolContext, runTool } from "./run-tool";
+import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 
 export type McpDeps = {
 	auth: Pick<AuthFacade, "authenticateMcp" | "dropConnection">;
@@ -52,6 +52,8 @@ export function mcpRoute(deps: McpDeps): Hono {
 		return null;
 	}
 
+	const isPlatform = platformDetector(deps.client);
+
 	// Chat apps call from their servers and send no Origin, which passes; a
 	// browser page on another site is refused before its bearer is read.
 	const ownHost = [deps.resource.hostname];
@@ -63,23 +65,68 @@ export function mcpRoute(deps: McpDeps): Hono {
 		if (!who) return signIn();
 		const connection = await connectionOf(who.userId);
 		if (!connection) return signIn();
+		const platform = await isPlatform(connection);
 		// Built per request, each bound to one caller's connection: the SDK's
 		// per-request channel, AuthInfo, needs a clientId and scopes that
 		// authenticateMcp doesn't return.
 		const handler = createMcpHandler(
 			() =>
-				connectionServer(connection, {
-					client: deps.client,
-					dropConnection: deps.auth.dropConnection,
-				}),
+				connectionServer(
+					{ ...connection, platform },
+					{
+						client: deps.client,
+						dropConnection: deps.auth.dropConnection,
+					},
+				),
 			{ onerror: logError },
 		);
 		return handler.fetch(c.req.raw);
 	});
 }
 
+// A failed hello stays Standalone this long before hello is asked again, so a
+// brief outage doesn't pin a Platform site to Standalone.
+const FAILED_HELLO_MS = 5 * 60 * 1000;
+const MAX_DETECTED = 1000;
+
+type Detected = { platform: Promise<boolean>; expiresAt: number };
+
+/**
+ * Whether a connection's deployment is Platform, asked of its hello (keyless)
+ * once per connection row this process sees; a reconnect writes a new row, with
+ * a new createdAt, and is asked afresh. Never throws: a hello that fails, or
+ * answers from another origin, is Standalone, and the real tool call meets
+ * whatever went wrong.
+ */
+function platformDetector(client: Pick<DeploymentClient, "hello">) {
+	const detected = new Map<string, Detected>();
+	return (connection: Connection): Promise<boolean> => {
+		const id = `${connection.userId}\n${connection.origin}\n${connection.createdAt.getTime()}`;
+		const now = Date.now();
+		const known = detected.get(id);
+		if (known && known.expiresAt > now) return known.platform;
+		const entry: Detected = {
+			expiresAt: Number.POSITIVE_INFINITY,
+			platform: client.hello(connection.origin).then(
+				(hello) => hello.platform && hello.origin === connection.origin,
+				() => {
+					entry.expiresAt = Date.now() + FAILED_HELLO_MS;
+					return false;
+				},
+			),
+		};
+		detected.delete(id);
+		detected.set(id, entry);
+		if (detected.size > MAX_DETECTED) {
+			const oldest = detected.keys().next().value;
+			if (oldest !== undefined) detected.delete(oldest);
+		}
+		return entry.platform;
+	};
+}
+
 function connectionServer(
-	connection: Connection,
+	connection: ToolConnection,
 	ctx: RunToolContext,
 ): McpServer {
 	// null `actions` (a connection made before this was stored, or a hello that

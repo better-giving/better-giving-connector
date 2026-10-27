@@ -1,10 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { Connection } from "../../src/db";
 import { deploymentClient } from "../../src/deployment";
 import { parseOrigin } from "../../src/deployment/origin";
 import { ACTIONS, type ActionSpec } from "../../src/mcp/actions";
-import { type RunToolContext, runTool } from "../../src/mcp/run-tool";
+import {
+	type RunToolContext,
+	runTool,
+	type ToolConnection,
+} from "../../src/mcp/run-tool";
 import { MVP_ACTIONS } from "../fake-deployment";
 
 const REPLAY =
@@ -43,7 +46,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		const client = deploymentClient({ fetch: opts.fetch });
 		const hello = await client.hello(origin);
 		const exchanged = await client.exchange(hello.origin, opts.code);
-		const connection: Connection = {
+		const connection: ToolConnection = {
 			userId: "live-harness",
 			origin: hello.origin,
 			orgName: hello.orgName,
@@ -220,7 +223,7 @@ function otherArgs(
 async function run(
 	rows: LiveRow[],
 	ctx: RunToolContext,
-	connection: Connection,
+	connection: ToolConnection,
 	tool: string,
 	args: Record<string, unknown>,
 ): Promise<string> {

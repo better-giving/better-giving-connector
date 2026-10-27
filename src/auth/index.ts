@@ -58,8 +58,6 @@ export interface AuthFacade {
 		origin: Origin;
 		orgName: string;
 		actions: ActionName[] | null;
-		/** Platform rather than Standalone, as hello showed. */
-		platform: boolean;
 		key: Secret;
 	}): Promise<Response>;
 	/**
@@ -472,7 +470,6 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 					origin: c.origin,
 					orgName: c.orgName,
 					actions: c.actions,
-					platform: c.platform,
 					key: c.key,
 				});
 				next = await signInAndResume(user.id, c.oauthQuery);

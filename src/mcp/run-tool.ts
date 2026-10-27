@@ -23,6 +23,9 @@ export type RunToolContext = {
 	dropConnection(userId: string): Promise<void>;
 };
 
+/** A stored connection, and whether its deployment is Platform. */
+export type ToolConnection = Connection & { platform: boolean };
+
 type Settled = { outcome: ToolOutcome; result: CallToolResult };
 
 /**
@@ -31,7 +34,7 @@ type Settled = { outcome: ToolOutcome; result: CallToolResult };
  */
 export async function runTool(
 	spec: ActionSpec,
-	connection: Connection,
+	connection: ToolConnection,
 	input: Record<string, unknown>,
 	ctx: RunToolContext,
 ): Promise<CallToolResult> {
@@ -62,7 +65,7 @@ function redactConnectionKey(
 
 async function settle(
 	spec: ActionSpec,
-	connection: Connection,
+	connection: ToolConnection,
 	input: Record<string, unknown>,
 	ctx: RunToolContext,
 ): Promise<Settled> {
@@ -84,7 +87,7 @@ async function settle(
 async function failure(
 	error: unknown,
 	spec: ActionSpec,
-	connection: Connection,
+	connection: ToolConnection,
 	ctx: RunToolContext,
 ): Promise<Settled> {
 	const org = connection.orgName;

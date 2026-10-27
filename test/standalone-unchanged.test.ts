@@ -49,6 +49,8 @@ test("tools/list and the instructions are as before, every description and input
 });
 
 test("create_form sends no Idempotency-Key and is tried once while the site says in progress", async () => {
+	// Hello is asked on the connection's first request; only the create is under test.
+	await send("tools/list");
 	deployment.calls.length = 0;
 	const problem = { code: "idempotency_in_progress" };
 	deployment.intercept(

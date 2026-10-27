@@ -351,16 +351,33 @@ describe("photos", () => {
 		});
 	});
 
-	test("the donation page takes no photo on Platform, and says so", async () => {
+	test("the donation page takes no photo on Platform: its schema refuses it before the site is asked", async () => {
 		const result = await tool("create_photo_upload_link", {
 			target: { kind: "donation_page" },
 		});
 
 		expect(result.isError).toBe(true);
-		expect(json(result)).toMatchObject({
-			code: "invalid",
-			errors: [{ path: "target.kind" }],
+		expect(
+			deployment.calls.filter(
+				(c) => c.path === "/connector/v1/photos/upload-link",
+			),
+		).toEqual([]);
+	});
+
+	test("a slot other than the hero is refused before the site is asked", async () => {
+		const k = await draft();
+
+		const result = await tool("create_photo_upload_link", {
+			target: { kind: "campaign", id: k.id },
+			slot: "cover",
 		});
+
+		expect(result.isError).toBe(true);
+		expect(
+			deployment.calls.filter(
+				(c) => c.path === "/connector/v1/photos/upload-link",
+			),
+		).toEqual([]);
 	});
 });
 
@@ -374,6 +391,8 @@ describe("create_form", () => {
 	});
 
 	test("a lost answer is not retried: one try, and the chat is told to check list_forms", async () => {
+		// Hello is asked on the connection's first request; only the create's answer is lost.
+		await send("tools/list");
 		deployment.loseAnswers(1);
 
 		const result = await tool("create_form", { name: "Gala" });

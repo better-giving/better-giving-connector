@@ -55,6 +55,9 @@ beforeEach(async () => {
 	call = async (req) => app.request(req);
 	await warmUp(call);
 	bearer = `Bearer ${(await connectFlow(call, deployment, BASE).connect()).access_token}`;
+	// A connection's first request asks its deployment's hello; settled here,
+	// a test's own requests are the ones that reach it.
+	await call(mcpRequest(MCP_VERSIONS[0], bearer, "tools/list"));
 	return () => db.close();
 });
 

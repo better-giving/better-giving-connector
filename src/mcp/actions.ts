@@ -526,9 +526,10 @@ const PLATFORM_CHANGES: Partial<Record<Tool, Partial<ActionSpec<Tool>>>> = {
 	create_photo_upload_link: {
 		description:
 			"Returns a single-use link, good for 15 minutes, for adding a campaign's hero photo. The operator opens the link and chooses a JPEG, PNG or WebP of at most 4 MB; expires_at says when the link stops working. This connector does not upload the file. An ended campaign takes no new photo. The uploaded photo becomes the campaign's hero: read the campaign again with get_campaign before editing its blocks.",
-		input: specOf("create_photo_upload_link").input.extend({
+		input: z.strictObject({
+			target: z.strictObject({ kind: z.literal("campaign"), id }),
 			slot: z
-				.string()
+				.literal("hero")
 				.optional()
 				.describe('Where the photo goes: "hero", or left out.'),
 		}),

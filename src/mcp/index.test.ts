@@ -9,6 +9,7 @@ import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
 import { freshDb } from "../../test/support";
 import { type Connections, connections, type Db } from "../db";
 import { type ActionName, deploymentClient } from "../deployment";
+import type { Origin } from "../deployment/origin";
 import type { Secret } from "../secret";
 import { ACTIONS } from "./actions";
 import { mcpRoute } from "./index";
@@ -35,7 +36,6 @@ async function reconnect(actions: ActionName[] | null) {
 		origin: deployment.origin,
 		orgName: "Give Example",
 		actions,
-		platform: false,
 		key,
 	});
 }
@@ -51,7 +51,6 @@ beforeEach(async () => {
 		origin: deployment.origin,
 		orgName: "Give Example",
 		actions: null,
-		platform: false,
 		key,
 	});
 	signedInAs = USER;
@@ -194,4 +193,40 @@ test("a connection serving no actions has instructions with no confirm clause", 
 		"the operator's live Better Giving donation site",
 	);
 	expect(instructions).not.toContain("Before");
+});
+
+test("a Platform hello answered from another origin leaves the connection Standalone", async () => {
+	const client = deploymentClient({ fetch: deployment.fetch });
+	const elsewhere = mcpRoute({
+		auth: {
+			authenticateMcp: async () => ({ userId: USER }),
+			dropConnection: async () => {},
+		},
+		connections: store,
+		client: {
+			...client,
+			hello: async (origin) => ({
+				...(await client.hello(origin)),
+				origin: "https://elsewhere.example.org" as Origin,
+				platform: true,
+			}),
+		},
+		resource: new URL("https://connect.example/mcp"),
+	});
+
+	const list = await rpc(
+		await elsewhere.request(
+			new Request(
+				"https://connect.example/",
+				mcpRequest("2025-06-18", "Bearer any", "tools/list"),
+			),
+		),
+	);
+
+	const photo = list.result.tools.find(
+		(t: { name: string }) => t.name === "create_photo_upload_link",
+	);
+	expect(photo.description).toBe(
+		ACTIONS.find((s) => s.tool === "create_photo_upload_link")?.description,
+	);
 });

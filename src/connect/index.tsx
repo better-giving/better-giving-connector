@@ -88,8 +88,6 @@ const handshake = z.object({
 		.array(z.string())
 		.nullish()
 		.transform((names) => (names == null ? null : names.filter(isActionName))),
-	// A cookie written before this field reads as Standalone.
-	platform: z.boolean().default(false),
 	oauthQuery: z.string(),
 });
 type Handshake = z.output<typeof handshake>;
@@ -218,7 +216,6 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 			origin: hello.origin,
 			orgName: hello.orgName,
 			actions: hello.actions,
-			platform: hello.platform,
 			oauthQuery: login.oauthQuery,
 		};
 		await setSignedCookie(
@@ -299,7 +296,6 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 				origin: state.origin,
 				orgName: exchanged.orgName || state.orgName,
 				actions: state.actions,
-				platform: state.platform,
 				key: exchanged.key,
 			});
 		} catch (error) {

@@ -271,7 +271,11 @@ async function startWorld() {
 			const tokens = await flow.connect();
 			plant("token:access", tokens.access_token, true);
 			plant("token:refresh", tokens.refresh_token, true);
-			return `Bearer ${tokens.access_token}`;
+			const bearer = `Bearer ${tokens.access_token}`;
+			// A connection's first request asks its deployment's hello; settled
+			// here, a scenario's own requests are the ones that reach it.
+			await sendAs(bearer, "tools/list");
+			return bearer;
 		},
 	};
 }
