@@ -118,10 +118,17 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		expect(
 			Object.fromEntries(
-				tools.map((t: { name: string; annotations: unknown }) => [
-					t.name,
-					t.annotations,
-				]),
+				tools.map(
+					(t: {
+						name: string;
+						title: string;
+						annotations: { title: string };
+					}) => {
+						const { title, ...hints } = t.annotations;
+						expect(title).toBe(t.title);
+						return [t.name, hints];
+					},
+				),
 			),
 		).toEqual({
 			list_campaigns: READ,

@@ -15,8 +15,9 @@ import { freshDb } from "./support";
 // Platform's writes change what Platform connections see and send; a
 // Standalone connection sees and sends what it did before them. The snapshot
 // is tools/list and the instructions as d1a35fb served them to a
-// Standalone connection serving every action. A deliberate Standalone change
-// edits the entry it changes; re-dumping the whole list would hide one that isn't.
+// Standalone connection serving every action, plus each tool's title in its
+// annotations. A deliberate Standalone change edits the entry it changes;
+// re-dumping the whole list would hide one that isn't.
 
 let db: Db;
 let deployment: FakeDeployment;

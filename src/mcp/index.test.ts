@@ -167,6 +167,40 @@ test("tools/list offers a Platform deployment's tools from the tool names its he
 	expect((await toolNames()).sort()).toEqual([...PLATFORM_TOOLS].sort());
 });
 
+type ListedTool = { title: string; annotations: { title?: string } };
+
+test("every Standalone tool carries its title in its annotations", async () => {
+	await reconnect(null);
+
+	const { tools } = (await rpc(await send("tools/list"))).result;
+
+	expect(tools).toHaveLength(ACTIONS.length);
+	for (const t of tools as ListedTool[]) {
+		expect(t.title).toMatch(/\S/);
+		expect(t.annotations.title).toBe(t.title);
+	}
+});
+
+test("every Platform tool carries its title in its annotations", async () => {
+	deployment.intercept((req) =>
+		new URL(req.url).pathname === "/connector/v1/hello"
+			? Response.json(PLATFORM_HELLO)
+			: undefined,
+	);
+	const { actions } = await deploymentClient({
+		fetch: deployment.fetch,
+	}).hello(deployment.origin);
+	await reconnect(actions);
+
+	const { tools } = (await rpc(await send("tools/list"))).result;
+
+	expect(tools).toHaveLength(PLATFORM_TOOLS.length);
+	for (const t of tools as ListedTool[]) {
+		expect(t.title).toMatch(/\S/);
+		expect(t.annotations.title).toBe(t.title);
+	}
+});
+
 test("a connection serving no actions offers no tools", async () => {
 	await reconnect([]);
 
