@@ -181,7 +181,7 @@ test("the address page asks for better.giving or your own site", async () => {
 });
 
 const READ_ONLY_LINE =
-	"<p>This connection is read-only: your AI assistant will be able to view your Better Giving site but not change anything.</p>";
+	"<p>This connection is read-only: your AI assistant will be able to view your Better Giving account and site but not change anything.</p>";
 
 const readOnlyLogin = async () =>
 	(

@@ -107,7 +107,7 @@ export function AddressPage(props: {
 			{readOnly && (
 				<p>
 					This connection is read-only: your AI assistant will be able to view
-					your Better Giving site but not change anything.
+					your Better Giving account and site but not change anything.
 				</p>
 			)}
 			<form id="address-form" method="post" action={action}>

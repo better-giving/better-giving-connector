@@ -138,7 +138,7 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"A consent record of which app was authorized, and which scopes, is deleted with the connection.",
 	);
 	expect(flat).toContain(
-		"<strong>Read-only access</strong>: an AI assistant can ask for read-only access. A read-only connection can view your Better Giving site but not change anything.",
+		"<strong>Read-only access</strong>: an AI assistant can ask for read-only access. A read-only connection can view your Better Giving account and site but not change anything.",
 	);
 	expect(flat).toContain(
 		"Authorization codes are single-use, stored as one-way (SHA-256) hashes, not the codes themselves, and expire within minutes. The row holds the authorization request details, not the code, until the code is used or it expires.",

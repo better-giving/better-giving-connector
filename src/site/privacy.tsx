@@ -329,7 +329,7 @@ export function PrivacyPage() {
 				<li>
 					<strong>Read-only access</strong>: an AI assistant can ask for
 					read-only access. A read-only connection can view your Better Giving
-					site but not change anything.
+					account and site but not change anything.
 				</li>
 				<li>
 					<strong>Request deletion or access</strong> by emailing
