@@ -351,6 +351,25 @@ describe("photos", () => {
 		});
 	});
 
+	test.each([
+		["with the hero slot", { slot: "hero" }],
+		["with no slot", {}],
+	])("a campaign's link is asked for %s, as sent", async (_, slot) => {
+		const k = await draft();
+
+		await tool("create_photo_upload_link", {
+			target: { kind: "campaign", id: k.id },
+			...slot,
+		});
+
+		const asked = deployment.calls.at(-1);
+		expect(asked?.path).toBe("/connector/v1/photos/upload-link");
+		expect(asked?.body).toEqual({
+			target: { kind: "campaign", id: k.id },
+			...slot,
+		});
+	});
+
 	test("the donation page takes no photo on Platform: its schema refuses it before the site is asked", async () => {
 		const result = await tool("create_photo_upload_link", {
 			target: { kind: "donation_page" },

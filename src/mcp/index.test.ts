@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import {
 	ALL_ACTIONS,
 	type FakeDeployment,
@@ -6,7 +6,7 @@ import {
 } from "../../test/fake-deployment";
 import { mcpRequest, rpc } from "../../test/harness";
 import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
-import { freshDb } from "../../test/support";
+import { advance, freshDb, MINUTE } from "../../test/support";
 import { type Connections, connections, type Db } from "../db";
 import { type ActionName, deploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
@@ -195,8 +195,12 @@ test("a connection serving no actions has instructions with no confirm clause", 
 	expect(instructions).not.toContain("Before");
 });
 
-test("a Platform hello answered from another origin leaves the connection Standalone", async () => {
+test("a Platform hello answered from another origin leaves the connection Standalone, and is asked again after five minutes", async () => {
+	onTestFinished(() => {
+		vi.useRealTimers();
+	});
 	const client = deploymentClient({ fetch: deployment.fetch });
+	let asked = 0;
 	const elsewhere = mcpRoute({
 		auth: {
 			authenticateMcp: async () => ({ userId: USER }),
@@ -205,23 +209,28 @@ test("a Platform hello answered from another origin leaves the connection Standa
 		connections: store,
 		client: {
 			...client,
-			hello: async (origin) => ({
-				...(await client.hello(origin)),
-				origin: "https://elsewhere.example.org" as Origin,
-				platform: true,
-			}),
+			hello: async (origin) => {
+				asked++;
+				return {
+					...(await client.hello(origin)),
+					origin: "https://elsewhere.example.org" as Origin,
+					platform: true,
+				};
+			},
 		},
 		resource: new URL("https://connect.example/mcp"),
 	});
 
-	const list = await rpc(
-		await elsewhere.request(
-			new Request(
-				"https://connect.example/",
-				mcpRequest("2025-06-18", "Bearer any", "tools/list"),
+	const listElsewhere = async () =>
+		rpc(
+			await elsewhere.request(
+				new Request(
+					"https://connect.example/",
+					mcpRequest("2025-06-18", "Bearer any", "tools/list"),
+				),
 			),
-		),
-	);
+		);
+	const list = await listElsewhere();
 
 	const photo = list.result.tools.find(
 		(t: { name: string }) => t.name === "create_photo_upload_link",
@@ -229,4 +238,11 @@ test("a Platform hello answered from another origin leaves the connection Standa
 	expect(photo.description).toBe(
 		ACTIONS.find((s) => s.tool === "create_photo_upload_link")?.description,
 	);
+
+	advance(4 * MINUTE);
+	await listElsewhere();
+	expect(asked).toBe(1);
+	advance(1 * MINUTE + 1);
+	await listElsewhere();
+	expect(asked).toBe(2);
 });

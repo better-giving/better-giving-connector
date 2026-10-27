@@ -80,6 +80,12 @@ test("create_form sends no Idempotency-Key and is tried once while the site says
 });
 
 describe("a refusal is the problem alone, with no Platform advice before it", () => {
+	// Hello is asked before the blanket intercept, so the connection is
+	// Standalone because the site is, not because its hello failed.
+	beforeEach(async () => {
+		await send("tools/list");
+	});
+
 	test.each([
 		{
 			name: "update_campaign_settings",

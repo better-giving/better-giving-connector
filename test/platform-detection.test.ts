@@ -172,3 +172,65 @@ test("a hello answered as Platform is not asked again after five minutes", async
 
 	expect(hellos()).toHaveLength(1);
 });
+
+// The actions a Platform row written before Platform's writes holds: its reads
+// and create_campaign, as its hello listed them then.
+const PLATFORM_READS = [
+	"campaigns.list",
+	"campaigns.get",
+	"campaigns.create",
+	"donation_page.get",
+	"blocks.catalog",
+	"forms.list",
+	"forms.get",
+	"results.summary",
+	"donations.list",
+	"donors.list",
+	"donors.get",
+	"recurring.list",
+];
+
+test("a Platform row stored with only the read actions is offered the writes its hello now lists", async () => {
+	await db.execute({
+		sql: "UPDATE connection SET actions = ?",
+		args: [JSON.stringify(PLATFORM_READS)],
+	});
+
+	const tools = await listTools();
+	const photo = tools.find((t) => t.name === "create_photo_upload_link");
+
+	expect(tools.map((t) => t.name).sort()).toEqual([...PLATFORM_TOOLS].sort());
+	expect(photo?.description).toContain("campaign's hero photo");
+	expect(photo?.inputSchema).toMatchObject({
+		properties: { slot: { const: "hero" } },
+	});
+	await tool("create_form", { name: "Gala" });
+	expect(formCreates().at(-1)?.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("a failed hello keeps the actions the row stored", async () => {
+	await db.execute({
+		sql: "UPDATE connection SET actions = ?",
+		args: [JSON.stringify(PLATFORM_READS)],
+	});
+	failHello(() => new Response("down", { status: 500 }));
+
+	const names = (await listTools()).map((t) => t.name);
+
+	expect(names).toContain("create_campaign");
+	expect(names).not.toContain("create_form");
+	expect(names).toHaveLength(PLATFORM_READS.length);
+});
+
+test("a reconnect, a new row, asks hello again", async () => {
+	await listTools();
+	const asked = hellos().length;
+	const tokens = await connectFlow(call, deployment, BASE).connect();
+	bearer = `Bearer ${tokens.access_token}`;
+	// the connect flow's own hello is not the one under test
+	deployment.calls.length = 0;
+
+	await listTools();
+
+	expect(asked + hellos().length).toBe(2);
+});

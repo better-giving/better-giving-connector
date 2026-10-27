@@ -506,7 +506,9 @@ const specOf = (tool: Tool) => {
 const PLATFORM_CHANGES: Partial<Record<Tool, Partial<ActionSpec<Tool>>>> = {
 	update_campaign_blocks: {
 		description: `${specOf("update_campaign_blocks").description} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null.`,
-		input: z.strictObject({ id, blocks, expected_version: expectedVersion }),
+		input: specOf("update_campaign_blocks").input.extend({
+			expected_version: expectedVersion,
+		}),
 	},
 	// Platform keeps no time zone or share message of its own, and refuses a change to either.
 	update_campaign_settings: {
@@ -536,8 +538,11 @@ const PLATFORM_CHANGES: Partial<Record<Tool, Partial<ActionSpec<Tool>>>> = {
 	},
 };
 
+const PLATFORM_ACTIONS: readonly ActionSpec[] = ACTIONS.map((spec) => ({
+	...spec,
+	...PLATFORM_CHANGES[spec.tool],
+}));
+
 /** The specs for a connection: Standalone's as above, or Platform's with its changes. */
 export const actionsFor = (platform: boolean): readonly ActionSpec[] =>
-	platform
-		? ACTIONS.map((spec) => ({ ...spec, ...PLATFORM_CHANGES[spec.tool] }))
-		: ACTIONS;
+	platform ? PLATFORM_ACTIONS : ACTIONS;
