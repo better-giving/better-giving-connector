@@ -45,8 +45,6 @@ const LONG_DESCRIPTION = [
 	"Connect your AI assistant to a Better Giving account.",
 	"Sign in at better.giving, or use your own Better Giving site's address.",
 	"List and edit campaigns, build donation forms, update the donation page, look up donations, donors and monthly gifts, and see fundraising results.",
-	"record_donation records a gift already received in cash or by check.",
-	"The same details again match the earlier gift and record nothing new; add a note to record a second gift.",
 	"It moves no money, charges no card, and cannot refund or pay out.",
 	"The connector acts only on the one account you connect.",
 ].join(" ");
@@ -57,7 +55,7 @@ export function pluginManifest() {
 		name: "better-giving",
 		version: "1.0.0",
 		description:
-			"Manage a Better Giving account: campaigns, forms, the donation page, donations and donors. Records gifts received in cash or by check and moves no money.",
+			"Manage a Better Giving account: campaigns, forms, the donation page, donations and donors. Moves no money.",
 		author: {
 			name: "Better Giving",
 			email: AUTHOR_EMAIL,
@@ -78,7 +76,7 @@ export function pluginManifest() {
 						"Manage campaigns",
 						"Manage donation forms",
 						"Review donations and donors",
-						"Record offline donations",
+						"See fundraising results",
 					],
 					websiteURL: "https://better.giving",
 					brandColor: BRAND_COLOR,
@@ -127,11 +125,12 @@ export function pluginManifest() {
 									"Creates a draft campaign named Spring Drive. Donors cannot see a draft until it is published.",
 							},
 							{
-								description: "Record an offline cash gift",
-								prompt: "Record a $50 cash donation from Jane Doe today",
-								tools_triggered: "record_donation",
+								description: "Set a campaign goal and end date",
+								prompt:
+									"Set the Spring Drive goal to $5,000 and the end date to Dec 31",
+								tools_triggered: "update_campaign_settings",
 								expected_behavior:
-									"Records a $50 cash gift from Jane Doe. Moves no money and charges nothing. The same details again record nothing new.",
+									"Updates the Spring Drive goal to $5,000 and its end date to Dec 31. Changes only those two fields.",
 							},
 						],
 						negative: [
@@ -157,7 +156,7 @@ export function pluginManifest() {
 					},
 					commerce: false,
 					commerce_description:
-						"Does not sell goods or process payments; record_donation logs an offline gift.",
+						"Does not sell goods, process payments, or move money.",
 				},
 				publication: {
 					countries: LISTING.countries,

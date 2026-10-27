@@ -38,8 +38,6 @@ test("plugin.json matches the packet's listing and the recommended listing value
 	expect(iface.shortDescription.length).toBeLessThanOrEqual(30);
 	expect(iface.longDescription.length).toBeLessThanOrEqual(4000);
 	expect(iface.longDescription).toMatch(/moves no money/i);
-	expect(iface.longDescription).toMatch(/cash or by check/i);
-	expect(iface.longDescription).toMatch(/record nothing new/i);
 	expect(iface.longDescription).toContain("better.giving");
 	expect(iface.longDescription).toContain(
 		"your own Better Giving site's address",
@@ -63,7 +61,10 @@ test("plugin.json matches the packet's listing and the recommended listing value
 	expect(review.commerce).toBe(false);
 	expect(review.test_cases.positive).toHaveLength(5);
 	expect(review.test_cases.negative).toHaveLength(3);
-	expect(review.commerce_description).toMatch(/record_donation/);
+	expect(review.commerce_description).toMatch(/move money/);
+	expect(JSON.stringify(pluginManifest())).not.toMatch(
+		/record_donation|cash or by check|offline/i,
+	);
 	expect(manifest.license).toBe("MIT");
 	expect(manifest.homepage).toBe("https://better.giving");
 	expect(iface.websiteURL).toBe("https://better.giving");
