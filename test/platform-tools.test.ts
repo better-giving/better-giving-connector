@@ -434,6 +434,7 @@ describe("create_form", () => {
 	);
 
 	test("a second lost answer is not retried: two tries, and the chat is told to check list_forms", async () => {
+		// Hello is asked on the connection's first request; only the create's answers are lost.
 		await send("tools/list");
 		deployment.loseAnswers(2);
 

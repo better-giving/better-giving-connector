@@ -100,7 +100,7 @@ const TIMEOUT_MS = 15_000;
 // disconnect runs while a connection is dropped, inside a tool call or the sweep.
 const DISCONNECT_TIMEOUT_MS = 5_000;
 // The tries one per-call keyed write gets, and the longest wait between two.
-// One of them at most is for a lost answer.
+// At most one retry follows a lost answer.
 const KEYED_TRIES = 3;
 const MAX_RETRY_WAIT_MS = 5_000;
 // hello runs before sign-in against any address typed, so an unbounded read
@@ -126,10 +126,10 @@ export function deploymentClient(deps: {
 		((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
 
 	// Any throw from fetch or the body read — refused redirect, DNS, reset, the
-	// timeout's abort, a body over the cap — is a lost answer, which is
-	// Unreachable (a per-call keyed write on Platform tries once more); the
-	// original error is dropped, not chained, because its message can carry
-	// the URL and so a tool input.
+	// timeout's abort, a body over the cap — is AnswerLost, an Unreachable that
+	// a per-call keyed write on Platform retries once; the original error is
+	// dropped, not chained, because its message can carry the URL and so a
+	// tool input.
 	async function send(
 		url: string,
 		init: RequestInit = {},

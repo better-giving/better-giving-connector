@@ -132,17 +132,18 @@ export type FakeDeployment = {
 	/** The deployment itself, behind the network; `fakeNetwork` calls it. */
 	handle(req: Request): Promise<Response>;
 	/**
-	 * The next `count` requests run, and then their answers are lost: the
-	 * connection drops, the answer never comes (so the caller's timeout ends
-	 * it), or a gateway in front answers 502.
+	 * The next `count` requests run, and then their answers are lost as `how`
+	 * names: the connection drops (the default), the answer never comes (so
+	 * the caller's timeout ends it), or a gateway in front answers 502.
 	 */
 	loseAnswers(count: number, how?: LostAnswer): void;
 	/**
-	 * Platform: the next keyed form create is still running when its
-	 * connection drops. The next `count` tries under its key answer
+	 * Platform: until `count` tries have answered `idempotency_in_progress`,
+	 * a keyed form create under a new key is still running when its
+	 * connection drops, and each later try under that key answers
 	 * `idempotency_in_progress`, as the site does while that first request
-	 * runs; the try after that finds it finished and gets its replay. A new
-	 * key is never in progress.
+	 * runs. The try after the last of them finds it finished and gets its
+	 * replay. A new key is never in progress.
 	 */
 	stallCreates(count?: number): void;
 	/** Platform: the Retry-After an in-progress create answers with, in seconds. */
