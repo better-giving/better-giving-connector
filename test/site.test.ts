@@ -239,6 +239,8 @@ test("docs and support describe the connector and name the support address", asy
 	expect(docs).not.toMatch(/Record a 100 dollar check/);
 	expect(docs).not.toMatch(/Platform|Standalone|alpha/);
 	expect(docs).not.toContain("leaves out a form");
+	// Every line under "Available now" holds on every site, so no one site's limits.
+	expect(docs).not.toMatch(/4 MB|15 minutes|version it read/);
 	expect(support).toContain("in cash or by check");
 	expect(privacy).toContain("your AI assistant");
 	expect(terms).toContain("better.giving");

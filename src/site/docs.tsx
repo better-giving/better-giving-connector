@@ -88,9 +88,7 @@ export function DocsPage() {
 				</li>
 				<li>
 					Edit a campaign page's title, story, and cover photo, and change its
-					goal or end date. When your AI assistant sends the version it read, a
-					change made since is never overwritten: nothing is saved, and it reads
-					the campaign again before retrying.
+					goal or end date.
 				</li>
 				<li>
 					Publish or end a campaign. These change what donors see. Your AI
@@ -104,9 +102,8 @@ export function DocsPage() {
 					for your yes.
 				</li>
 				<li>
-					Make a single-use link, good for 15 minutes, so you can add a
-					campaign's cover photo from your phone: a JPEG, PNG, or WebP up to 4
-					MB. The connector does not upload the file itself.
+					Make a short-lived, single-use link so you can add a campaign's cover
+					photo from your phone. The connector does not upload the file itself.
 				</li>
 				<li>
 					Read the main donation page, donation forms, donors, gifts, monthly
