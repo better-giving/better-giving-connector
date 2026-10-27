@@ -161,7 +161,7 @@ function connectionServer(
 				title: spec.title,
 				description: spec.description,
 				inputSchema: loggedInput(spec),
-				annotations: spec.annotations,
+				annotations: { ...spec.annotations, title: spec.title },
 			},
 			(input) => runTool(spec, connection, input, ctx),
 		);

@@ -26,6 +26,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "List campaigns",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -50,6 +51,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get a campaign",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -73,6 +75,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Create a campaign",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -108,6 +111,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Edit a campaign's page",
 				"readOnlyHint": false,
 				"destructiveHint": true,
 				"idempotentHint": true,
@@ -269,6 +273,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Edit a campaign's page",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -354,6 +359,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Change a campaign's settings",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -381,6 +387,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Publish a campaign",
 				"readOnlyHint": false,
 				"destructiveHint": true,
 				"idempotentHint": true,
@@ -405,6 +412,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "End a campaign",
 				"readOnlyHint": false,
 				"destructiveHint": true,
 				"idempotentHint": true,
@@ -422,6 +430,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get the donation page",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -452,6 +461,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Edit the donation page",
 				"readOnlyHint": false,
 				"destructiveHint": true,
 				"idempotentHint": true,
@@ -475,6 +485,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Edit the donation page",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -498,6 +509,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Reset the donation page",
 				"readOnlyHint": false,
 				"destructiveHint": true,
 				"idempotentHint": true,
@@ -515,6 +527,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get the block catalog",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -532,6 +545,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get the content catalog",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -559,6 +573,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "List donation forms",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -583,6 +598,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get a donation form",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -606,6 +622,7 @@
 				"additionalProperties": {}
 			},
 			"annotations": {
+				"title": "Create a donation form",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": false,
@@ -638,6 +655,7 @@
 				"additionalProperties": {}
 			},
 			"annotations": {
+				"title": "Edit a donation form",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -671,6 +689,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get fundraising results",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -713,6 +732,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "List donations",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -743,6 +763,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "List donors",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -776,6 +797,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Get a donor",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -803,6 +825,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "List monthly gifts",
 				"readOnlyHint": true,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -867,6 +890,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Record a donation",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": true,
@@ -921,6 +945,7 @@
 				"additionalProperties": false
 			},
 			"annotations": {
+				"title": "Make a photo upload link",
 				"readOnlyHint": false,
 				"destructiveHint": false,
 				"idempotentHint": false,
