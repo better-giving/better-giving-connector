@@ -79,6 +79,19 @@ test("create_form sends no Idempotency-Key and is tried once while the site says
 	]);
 });
 
+test("create_form whose answer is lost is tried once, with no Idempotency-Key", async () => {
+	await send("tools/list");
+	deployment.calls.length = 0;
+	deployment.loseAnswers(1);
+
+	const result = await tool("create_form", { name: "Gala" });
+
+	expect(deployment.calls).toMatchObject([
+		{ method: "POST", path: "/connector/v1/forms", idempotencyKey: null },
+	]);
+	expect(result.isError).toBe(true);
+});
+
 describe("a refusal is the problem alone, with no Platform advice before it", () => {
 	// Hello is asked before the blanket intercept, so the connection is
 	// Standalone because the site is, not because its hello failed.

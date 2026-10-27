@@ -409,35 +409,52 @@ describe("create_form", () => {
 		expect(deployment.calls.at(-1)?.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
 	});
 
-	test("a lost answer is not retried: one try, and the chat is told to check list_forms", async () => {
-		// Hello is asked on the connection's first request; only the create's answer is lost.
+	const creates = () =>
+		deployment.calls.filter(
+			(c) => c.method === "POST" && c.path === "/connector/v1/forms",
+		);
+
+	test.each(["dropped", "502"] as const)(
+		"an answer lost as %s is retried once under the same key: one form, shown as made",
+		async (how) => {
+			// Hello is asked on the connection's first request; only the create's answer is lost.
+			await send("tools/list");
+			deployment.loseAnswers(1, how);
+
+			const result = await tool("create_form", { name: "Gala" });
+			const forms = json(await tool("list_forms")).data;
+
+			expect(creates()).toHaveLength(2);
+			expect(creates()[1]?.idempotencyKey).toBe(creates()[0]?.idempotencyKey);
+			expect(result.isError).toBeUndefined();
+			const galas = forms.filter((f: { name: string }) => f.name === "Gala");
+			expect(galas).toHaveLength(1);
+			expect(json(result).id).toBe(galas[0].id);
+		},
+	);
+
+	test("a second lost answer is not retried: two tries, and the chat is told to check list_forms", async () => {
 		await send("tools/list");
-		deployment.loseAnswers(1);
+		deployment.loseAnswers(2);
 
 		const result = await tool("create_form", { name: "Gala" });
 
-		const creates = deployment.calls.filter(
-			(c) => c.method === "POST" && c.path === "/connector/v1/forms",
-		);
-		expect(creates).toHaveLength(1);
+		expect(creates()).toHaveLength(2);
 		expect(result.isError).toBe(true);
 		expect(textOf(result)).toContain(
 			"Check with list_forms before trying again.",
 		);
 	});
 
-	test("an in-progress create is retried under the same key: one form, shown as made", async () => {
+	test("a first try still running is retried under the same key: one form, shown as made", async () => {
 		deployment.stallCreates(1);
 		deployment.setRetryAfter("0");
 
 		const result = await tool("create_form", { name: "Gala" });
 		const forms = json(await tool("list_forms")).data;
 
-		const creates = deployment.calls.filter(
-			(c) => c.method === "POST" && c.path === "/connector/v1/forms",
-		);
-		expect(creates).toHaveLength(2);
-		expect(creates[1]?.idempotencyKey).toBe(creates[0]?.idempotencyKey);
+		expect(creates()).toHaveLength(3);
+		expect(new Set(creates().map((c) => c.idempotencyKey)).size).toBe(1);
 		expect(result.isError).toBeUndefined();
 		expect(textOf(result).startsWith("{")).toBe(true);
 		expect(json(result)).toMatchObject({ name: "Gala" });

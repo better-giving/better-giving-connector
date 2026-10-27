@@ -69,8 +69,9 @@ export type DeploymentClient = {
 	 * Runs one contract action with the connection's key. Path params (`:id`)
 	 * are taken from `input`; the rest goes as query on GET, JSON body otherwise.
 	 * On Platform, a per-call keyed write is tried up to three times under one
-	 * key: again only when the site answers that an earlier try under that key
-	 * is still running, after the wait it names. A lost answer is not retried.
+	 * key: once more when an answer is lost (no answer, or a 5xx), and again
+	 * whenever the site answers that an earlier try under that key is still
+	 * running, after its Retry-After held to five seconds.
 	 */
 	call(
 		conn: DeploymentTarget,
@@ -99,6 +100,7 @@ const TIMEOUT_MS = 15_000;
 // disconnect runs while a connection is dropped, inside a tool call or the sweep.
 const DISCONNECT_TIMEOUT_MS = 5_000;
 // The tries one per-call keyed write gets, and the longest wait between two.
+// One of them at most is for a lost answer.
 const KEYED_TRIES = 3;
 const MAX_RETRY_WAIT_MS = 5_000;
 // hello runs before sign-in against any address typed, so an unbounded read
@@ -124,9 +126,10 @@ export function deploymentClient(deps: {
 		((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
 
 	// Any throw from fetch or the body read — refused redirect, DNS, reset, the
-	// timeout's abort, a body over the cap — is Unreachable; the original error
-	// is dropped, not chained, because its message can carry the URL and so a
-	// tool input.
+	// timeout's abort, a body over the cap — is a lost answer, which is
+	// Unreachable (a per-call keyed write on Platform tries once more); the
+	// original error is dropped, not chained, because its message can carry
+	// the URL and so a tool input.
 	async function send(
 		url: string,
 		init: RequestInit = {},
@@ -150,7 +153,7 @@ export function deploymentClient(deps: {
 			};
 		} catch {
 			abort.abort();
-			throw new Unreachable();
+			throw new AnswerLost();
 		} finally {
 			clearTimeout(timer);
 		}
@@ -215,10 +218,26 @@ export function deploymentClient(deps: {
 				return succeeded(await attempt(conn, action, input));
 			}
 			const key = randomUUID();
+			let lostRetried = false;
 			for (let tries = 1; ; tries++) {
-				const answer = await attempt(conn, action, input, key);
-				if (tries === KEYED_TRIES || !inProgress(answer))
-					return succeeded(answer);
+				const final = tries === KEYED_TRIES;
+				const answer = await attempt(conn, action, input, key).catch(
+					(error: unknown) => {
+						if (error instanceof AnswerLost) return null;
+						throw error;
+					},
+				);
+				// The site may have made the form; the same key gets its replay.
+				if (
+					!final &&
+					!lostRetried &&
+					(answer === null || answer.status >= 500)
+				) {
+					lostRetried = true;
+					continue;
+				}
+				if (answer === null) throw new Unreachable();
+				if (final || !inProgress(answer)) return succeeded(answer);
 				await sleep(retryWait(answer));
 			}
 		},
@@ -311,6 +330,9 @@ export function deploymentClient(deps: {
 
 	return client;
 }
+
+// No answer reached us: the request may or may not have run.
+class AnswerLost extends Unreachable {}
 
 // The one status → error mapping for authenticated and exchange requests.
 function succeeded(answer: Answer): CallAnswer {

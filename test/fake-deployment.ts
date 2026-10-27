@@ -131,12 +131,18 @@ export type FakeDeployment = {
 	intercept(handler: Interceptor | null): void;
 	/** The deployment itself, behind the network; `fakeNetwork` calls it. */
 	handle(req: Request): Promise<Response>;
-	/** The next `count` requests run, and then their answers are lost. */
-	loseAnswers(count: number): void;
 	/**
-	 * Platform: the next `count` keyed form creates find an earlier try under
-	 * their key still running and answer `idempotency_in_progress`; the try
-	 * after that finds it finished and gets its replay.
+	 * The next `count` requests run, and then their answers are lost: the
+	 * connection drops, the answer never comes (so the caller's timeout ends
+	 * it), or a gateway in front answers 502.
+	 */
+	loseAnswers(count: number, how?: LostAnswer): void;
+	/**
+	 * Platform: the next keyed form create is still running when its
+	 * connection drops. The next `count` tries under its key answer
+	 * `idempotency_in_progress`, as the site does while that first request
+	 * runs; the try after that finds it finished and gets its replay. A new
+	 * key is never in progress.
 	 */
 	stallCreates(count?: number): void;
 	/** Platform: the Retry-After an in-progress create answers with, in seconds. */
@@ -148,6 +154,8 @@ export type FakeDeployment = {
 	 */
 	uploadPhoto(link: string): string | null;
 };
+
+export type LostAnswer = "dropped" | "timeout" | "502";
 
 /** An interceptor that never answers, rejecting only when the request is aborted. */
 export const hang: Interceptor = (req) =>
@@ -216,8 +224,17 @@ export function fakeDeployment(
 	async function handle(req: Request): Promise<Response> {
 		calls.push(await record(req));
 		const res = (await interceptor?.(req)) ?? (await app.fetch(req));
+		if (state.dropStalled) {
+			state.dropStalled = false;
+			throw new TypeError("fetch failed");
+		}
 		if (state.lose > 0) {
 			state.lose--;
+			if (state.loseHow === "502")
+				return new Response("Bad Gateway", { status: 502 });
+			if (state.loseHow === "timeout") {
+				await hang(req);
+			}
 			throw new TypeError("fetch failed");
 		}
 		return res;
@@ -244,8 +261,9 @@ export function fakeDeployment(
 			interceptor = handler;
 		},
 		handle,
-		loseAnswers: (count) => {
+		loseAnswers: (count, how = "dropped") => {
 			state.lose = count;
+			state.loseHow = how;
 		},
 		stallCreates: (count = Number.POSITIVE_INFINITY) => {
 			state.stall = count;
@@ -373,17 +391,21 @@ function newState(host: string, name: string, platform: boolean) {
 		donations: new Map<string, Donation>(),
 		recurring: [] as Recurring[],
 		idempotency: new Map<string, { fingerprint: string; body: unknown }>(),
-		// Platform's create_form claims: pending while an attempt runs.
+		// Platform's create_form claims, `running` while the first request
+		// under the key has not finished.
 		formClaims: new Map<
 			string,
-			{ fingerprint: string; pending: boolean; body: unknown }
+			{ fingerprint: string; form: Form; running: boolean }
 		>(),
 		photoLinks: new Map<
 			string,
 			{ campaignId: string; expiresAt: number; used: boolean }
 		>(),
 		lose: 0,
+		loseHow: "dropped" as LostAnswer,
 		stall: 0,
+		// A stalled create's connection drops before it answers.
+		dropStalled: false,
 		retryAfter: "5",
 	};
 }
@@ -1832,12 +1854,13 @@ function platformWrites(
 					"idempotency_conflict",
 					"This Idempotency-Key was already used for a different request. Send a new key for a new request.",
 				);
-			if (claim.pending && state.stall > 0) {
+			if (claim.running && state.stall > 0) {
 				state.stall--;
 				return stillRunning(c);
 			}
+			claim.running = false;
 			// a replay is 200, even though the create was 201
-			if (!claim.pending) return c.json(claim.body, 200);
+			return c.json(claim.form, 200);
 		}
 		const issues: Issue[] = [];
 		unknownKeys(body, FORM_WRITABLE, issues);
@@ -1848,11 +1871,6 @@ function platformWrites(
 			});
 		formFields(body, issues);
 		if (issues.length > 0) return invalid(c, issues);
-		if (key && state.stall > 0 && !claim) {
-			state.stall--;
-			state.formClaims.set(key, { fingerprint, pending: true, body: null });
-			return stillRunning(c);
-		}
 		const f: Form = {
 			id: `frm_${crypto.randomUUID()}`,
 			campaign_id: null,
@@ -1862,11 +1880,16 @@ function platformWrites(
 			name: (body.name as string).trim(),
 			updated_at: stamp(null),
 		};
+		// A stalled first request finishes on its own, so its form is listed
+		// even when no try under its key is answered with it.
 		state.forms.set(f.id, f);
-		if (key)
-			state.formClaims.set(key, { fingerprint, pending: false, body: f });
-		// the earlier try finishing: this answer is its replay
-		return c.json(f, claim ? 200 : 201);
+		const running = key !== "" && state.stall > 0;
+		if (key) state.formClaims.set(key, { fingerprint, form: f, running });
+		if (running) {
+			state.dropStalled = true;
+			return c.body(null, 202);
+		}
+		return c.json(f, 201);
 	});
 
 	v1.patch("/forms/:id", action("forms.update"), async (c) => {
