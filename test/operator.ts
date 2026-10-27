@@ -75,17 +75,21 @@ export const cookieFrom = (res: Response) =>
 
 export type ConnectFlow = ReturnType<typeof connectFlow>;
 
-/** `call` is this service; `deployment` answers the Allow screen. */
+/**
+ * `call` is this service; `deployment` answers the Allow screen. `scope` is
+ * what the chat app asks for at authorize; left out when undefined.
+ */
 export function connectFlow(
 	call: Call,
 	deployment: FakeDeployment,
 	base: string,
+	{ scope }: { scope?: string } = {},
 ) {
 	// `redirectUri` is the chat app's callback; Claude's unless told otherwise.
 	async function startSignIn(redirectUri?: string): Promise<ChatApp> {
 		const ep = await discover(call, base);
 		const client = await registerClient(call, ep, redirectUri);
-		const a = authorization(ep, client.client_id, { redirectUri });
+		const a = authorization(ep, client.client_id, { redirectUri, scope });
 		return { ep, a, login: await openAuthorization(call, a) };
 	}
 

@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
 	type FakeDeployment,
@@ -44,7 +43,9 @@ import {
 } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import { Secret } from "../secret";
+import { storedToken } from "./connection-plugin";
 import { type AuthFacade, createAuth, LoginRequestRefused } from "./index";
+import { OFFLINE_ACCESS_SCOPE, READ_ONLY_SCOPE } from "./scopes";
 import {
 	ACCESS_TOKEN_EXPIRES_IN,
 	RATE_LIMIT_RETENTION,
@@ -99,7 +100,7 @@ test("serves metadata naming /mcp as the resource and an open registration endpo
 	});
 });
 
-test("authorization-server metadata offers offline_access as its only scope and no OpenID Connect", async () => {
+test("authorization-server metadata offers offline_access and read_only as its scopes and no OpenID Connect", async () => {
 	const as = await call(
 		new Request(`${BASE}/.well-known/oauth-authorization-server/api/auth`),
 	);
@@ -107,9 +108,19 @@ test("authorization-server metadata offers offline_access as its only scope and 
 		new Request(`${BASE}/api/auth/.well-known/openid-configuration`),
 	);
 
-	expect(ep.scopes).toEqual(["offline_access"]);
+	expect(ep.scopes).toEqual([OFFLINE_ACCESS_SCOPE, READ_ONLY_SCOPE]);
 	expect(await as.json()).not.toHaveProperty("userinfo_endpoint");
 	expect(openid.status).toBe(404);
+});
+
+test("protected-resource metadata offers read_only, leaving offline_access to the authorization server", async () => {
+	const prm = await call(
+		new Request(`${BASE}/.well-known/oauth-protected-resource/mcp`),
+	);
+
+	expect(await prm.json()).toMatchObject({
+		scopes_supported: [READ_ONLY_SCOPE],
+	});
 });
 
 test("a public client registers itself with no session", async () => {
@@ -187,12 +198,38 @@ test("authorize refuses a redirect outside the chat apps' callbacks even when th
 	expect(target.searchParams.get("error")).toBe("invalid_redirect");
 });
 
+// `post` sends the authorize parameters as a form body, which oauth-provider
+// reads in place of the query
+type Opening = AuthorizationOptions & { post?: boolean };
+
+async function postAuthorization(a: Authorization): Promise<URL> {
+	const url = new URL(a.url);
+	const res = await call(
+		new Request(url.origin + url.pathname, {
+			method: "POST",
+			headers: {
+				accept: "text/html",
+				"content-type": "application/x-www-form-urlencoded",
+				"sec-fetch-mode": "navigate",
+			},
+			body: url.searchParams,
+		}),
+	);
+	return redirectTarget(res, a.url);
+}
+
 async function startAuthorization(
-	options?: AuthorizationOptions,
+	options?: Opening,
+	clientId?: string,
 ): Promise<{ a: Authorization; login: URL }> {
-	const client = await registerClient(call, ep, options?.redirectUri);
-	const a = authorization(ep, client.client_id, options);
-	return { a, login: await openAuthorization(call, a) };
+	const id =
+		clientId ??
+		(await registerClient(call, ep, options?.redirectUri)).client_id;
+	const a = authorization(ep, id, options);
+	const open = options?.post
+		? postAuthorization
+		: (a: Authorization) => openAuthorization(call, a);
+	return { a, login: await open(a) };
 }
 
 test("authorize with no session sends the browser to /connect with a request readLoginRequest accepts", async () => {
@@ -201,8 +238,24 @@ test("authorize with no session sends the browser to /connect with a request rea
 	expect(login.origin + login.pathname).toBe(`${BASE}/connect`);
 	expect(await auth.readLoginRequest(login)).toEqual({
 		oauthQuery: login.search.slice(1),
+		readOnly: false,
 	});
 });
+
+test.each([
+	["offline_access read_only", true],
+	["offline_access", false],
+	[undefined, false],
+])(
+	"readLoginRequest reads a request for scope %s as readOnly %s",
+	async (scope, readOnly) => {
+		const { login } = await startAuthorization(
+			scope === undefined ? {} : { scope },
+		);
+
+		expect(await auth.readLoginRequest(login)).toMatchObject({ readOnly });
+	},
+);
 
 test("readLoginRequest refuses a tampered request", async () => {
 	const { login } = await startAuthorization();
@@ -217,10 +270,11 @@ const KEY = "bgk_live_sentinel_51c0";
 
 async function connect(
 	origin = ORIGIN,
-	options?: AuthorizationOptions,
+	options?: Opening,
 	key = KEY,
+	clientId?: string,
 ) {
-	const { a, login } = await startAuthorization(options);
+	const { a, login } = await startAuthorization(options, clientId);
 	const request = await auth.readLoginRequest(login);
 	if (!request) throw new Error("login request refused");
 	const res = await auth.completeConnection({
@@ -246,10 +300,11 @@ test.each([REDIRECT_URI, CHATGPT_REDIRECT_URI, CHATGPT_CALLBACK_REDIRECT_URI])(
 
 async function connectedClient(
 	origin = ORIGIN,
-	options?: AuthorizationOptions,
+	options?: Opening,
 	key = KEY,
+	clientId?: string,
 ): Promise<{ clientId: string; tokens: Tokens }> {
-	const { a, back } = await connect(origin, options, key);
+	const { a, back } = await connect(origin, options, key, clientId);
 	const res = await exchangeCode(
 		call,
 		ep,
@@ -263,6 +318,55 @@ async function connectedClient(
 
 const tokensFor = async (...args: Parameters<typeof connectedClient>) =>
 	(await connectedClient(...args)).tokens;
+
+// a client as registered before read_only existed, allowed offline_access alone
+async function clientWithoutReadOnly(): Promise<string> {
+	const client = await registerClient(call, ep);
+	await db.execute({
+		sql: 'UPDATE "oauthClient" SET "scopes" = ? WHERE "clientId" = ?',
+		args: [JSON.stringify([OFFLINE_ACCESS_SCOPE]), client.client_id],
+	});
+	return client.client_id;
+}
+
+test.each([
+	[`${OFFLINE_ACCESS_SCOPE} ${READ_ONLY_SCOPE}`, true],
+	[OFFLINE_ACCESS_SCOPE, false],
+])(
+	"a client registered before read_only existed connects asking for %s, readOnly %s",
+	async (scope, readOnly) => {
+		const clientId = await clientWithoutReadOnly();
+
+		const { tokens } = await connectedClient(ORIGIN, { scope }, KEY, clientId);
+
+		expect(
+			await auth.authenticateMcp(mcpRequest(`Bearer ${tokens.access_token}`)),
+		).toMatchObject({ readOnly });
+	},
+);
+
+test("an authorize POSTed with no scope connects with full access", async () => {
+	const { tokens } = await connectedClient(ORIGIN, { post: true });
+
+	expect(
+		await auth.authenticateMcp(mcpRequest(`Bearer ${tokens.access_token}`)),
+	).toMatchObject({ readOnly: false });
+});
+
+test("a client registered before read_only existed connects read-only by POSTing authorize for offline_access read_only", async () => {
+	const clientId = await clientWithoutReadOnly();
+
+	const { tokens } = await connectedClient(
+		ORIGIN,
+		{ scope: `${OFFLINE_ACCESS_SCOPE} ${READ_ONLY_SCOPE}`, post: true },
+		KEY,
+		clientId,
+	);
+
+	expect(
+		await auth.authenticateMcp(mcpRequest(`Bearer ${tokens.access_token}`)),
+	).toMatchObject({ readOnly: true });
+});
 
 test("the code and its PKCE verifier yield an access token and a refresh token", async () => {
 	const tokens = await tokensFor();
@@ -335,6 +439,26 @@ test("authenticateMcp resolves a bearer to the user whose connection it was issu
 	const connection = await store.get(who?.userId ?? "");
 	expect(connection?.origin).toBe(ORIGIN);
 });
+
+test.each([
+	["offline_access read_only", true],
+	["offline_access", false],
+	[undefined, false],
+])(
+	"authenticateMcp reads a token granted scope %s as readOnly %s",
+	async (scope, readOnly) => {
+		const tokens = await tokensFor(
+			ORIGIN,
+			scope === undefined ? {} : { scope },
+		);
+
+		const who = await auth.authenticateMcp(
+			mcpRequest(`Bearer ${tokens.access_token}`),
+		);
+
+		expect(who).toEqual({ userId: expect.any(String), readOnly });
+	},
+);
 
 test.each([
 	["no Authorization header", undefined],
@@ -438,9 +562,57 @@ test("a refresh token yields a new access token that /mcp accepts", async () => 
 	).toEqual(first);
 });
 
-// oauth-provider's default `storeTokens: "hashed"`: unpadded base64url SHA-256
-const storedToken = (token: string) =>
-	createHash("sha256").update(token).digest("base64url");
+test("a refresh that names no scope keeps the read_only grant", async () => {
+	const { clientId, tokens } = await connectedClient(ORIGIN, {
+		scope: `${OFFLINE_ACCESS_SCOPE} ${READ_ONLY_SCOPE}`,
+	});
+
+	const next = await refreshed(tokens, clientId);
+
+	expect(next.scope.split(" ")).toContain(READ_ONLY_SCOPE);
+	expect(
+		await auth.authenticateMcp(mcpRequest(`Bearer ${next.access_token}`)),
+	).toMatchObject({ readOnly: true });
+});
+
+const refreshForScope = (clientId: string, tokens: Tokens, scope: string) =>
+	call(
+		new Request(ep.token, {
+			method: "POST",
+			headers: { "content-type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				grant_type: "refresh_token",
+				refresh_token: tokens.refresh_token,
+				client_id: clientId,
+				resource: ep.resource,
+				scope,
+			}),
+		}),
+	);
+
+test("a refresh can't shed read_only by asking for offline_access alone", async () => {
+	const { clientId, tokens } = await connectedClient(ORIGIN, {
+		scope: `${OFFLINE_ACCESS_SCOPE} ${READ_ONLY_SCOPE}`,
+	});
+
+	const res = await refreshForScope(clientId, tokens, OFFLINE_ACCESS_SCOPE);
+
+	expect(res.status).toBe(400);
+	expect(await res.json()).toMatchObject({ error: "invalid_scope" });
+	expect(await refreshTokenRow(tokens.refresh_token)).toMatchObject({
+		revoked: null,
+	});
+});
+
+test("a full-access refresh that names offline_access still refreshes", async () => {
+	const { clientId, tokens } = await connectedClient(ORIGIN, {
+		scope: OFFLINE_ACCESS_SCOPE,
+	});
+
+	const res = await refreshForScope(clientId, tokens, OFFLINE_ACCESS_SCOPE);
+
+	expect(res.status).toBe(200);
+});
 
 async function refreshTokenRow(token: string) {
 	const { rows } = await db.execute({

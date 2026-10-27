@@ -180,6 +180,50 @@ test("the address page asks for better.giving or your own site", async () => {
 	expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Continue<\/button>/);
 });
 
+const READ_ONLY_LINE =
+	"<p>This connection is read-only: your AI assistant will be able to view your Better Giving site but not change anything.</p>";
+
+const readOnlyLogin = async () =>
+	(
+		await connectFlow(call, deployment, BASE, {
+			scope: "offline_access read_only",
+		}).startSignIn()
+	).login;
+
+test("the address page for a read-only request says the assistant can view but not change the site", async () => {
+	const html = shown(
+		await (await call(new Request(await readOnlyLogin()))).text(),
+	);
+
+	expect(html).toContain(
+		`return to your AI assistant.</p>${READ_ONLY_LINE}<form`,
+	);
+});
+
+test.each([
+	["no scope", undefined],
+	["offline_access alone", "offline_access"],
+])(
+	"the address page for a request with %s says nothing of read-only",
+	async (_, scope) => {
+		const login = (
+			await connectFlow(call, deployment, BASE, { scope }).startSignIn()
+		).login;
+
+		const html = shown(await (await call(new Request(login))).text());
+
+		expect(html).toContain("return to your AI assistant.</p><form");
+		expect(html).not.toContain("read-only");
+	},
+);
+
+test("a read-only request's address asked for again still says it is read-only", async () => {
+	const res = await flow.submitAddress("my charity", await readOnlyLogin());
+
+	expect(res.status).toBe(400);
+	expect(shown(await res.text())).toContain(READ_ONLY_LINE);
+});
+
 test("the page's stylesheet reaches the browser unescaped", async () => {
 	const html = await (await call(new Request(await loginUrl()))).text();
 
