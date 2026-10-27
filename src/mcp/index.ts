@@ -15,10 +15,10 @@ import {
 	ConnectionKeyUnreadable,
 	type Connections,
 } from "../db";
-import type { DeploymentClient } from "../deployment";
+import type { ActionName, DeploymentClient } from "../deployment";
 import { log } from "../log";
-import { ACTIONS, type ActionSpec } from "./actions";
-import { type RunToolContext, runTool } from "./run-tool";
+import { type ActionSpec, actionsFor } from "./actions";
+import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 
 export type McpDeps = {
 	auth: Pick<AuthFacade, "authenticateMcp" | "dropConnection">;
@@ -52,6 +52,8 @@ export function mcpRoute(deps: McpDeps): Hono {
 		return null;
 	}
 
+	const sessionOf = sessionDetector(deps.client);
+
 	// Chat apps call from their servers and send no Origin, which passes; a
 	// browser page on another site is refused before its bearer is read.
 	const ownHost = [deps.resource.hostname];
@@ -63,12 +65,13 @@ export function mcpRoute(deps: McpDeps): Hono {
 		if (!who) return signIn();
 		const connection = await connectionOf(who.userId);
 		if (!connection) return signIn();
+		const session = await sessionOf(connection);
 		// Built per request, each bound to one caller's connection: the SDK's
 		// per-request channel, AuthInfo, needs a clientId and scopes that
 		// authenticateMcp doesn't return.
 		const handler = createMcpHandler(
 			() =>
-				connectionServer(connection, {
+				connectionServer(session, {
 					client: deps.client,
 					dropConnection: deps.auth.dropConnection,
 				}),
@@ -78,14 +81,69 @@ export function mcpRoute(deps: McpDeps): Hono {
 	});
 }
 
+// A hello that failed, or answered from another origin, stays Standalone this
+// long before hello is asked again, so a brief outage or a temporary redirect
+// doesn't pin a Platform site to Standalone.
+const UNSETTLED_HELLO_MS = 5 * 60 * 1000;
+const MAX_DETECTED = 1000;
+
+// What a hello settled for a connection: Platform's actions as it lists them
+// now, or null for Standalone. Only this is cached, never the row and its key.
+type Detection = { platformActions: ActionName[] | null } | null;
+type Detected = { detection: Promise<Detection>; expiresAt: number };
+
+/**
+ * The connection as this session uses it: Platform or not, asked of its
+ * deployment's hello (keyless) once per connection row this process sees; a
+ * reconnect writes a new row, with a new createdAt, and is asked afresh.
+ * Platform takes the actions its hello lists now, so a row stored before
+ * Platform served its writes is offered them. Never throws: a hello that fails,
+ * or answers from another origin, is Standalone with the stored actions, and
+ * the real tool call meets whatever went wrong.
+ */
+function sessionDetector(client: Pick<DeploymentClient, "hello">) {
+	const detected = new Map<string, Detected>();
+
+	function detect(connection: Connection): Promise<Detection> {
+		const id = `${connection.userId}\n${connection.origin}\n${connection.createdAt.getTime()}`;
+		const known = detected.get(id);
+		if (known && known.expiresAt > Date.now()) return known.detection;
+		const unsettled = () => {
+			entry.expiresAt = Date.now() + UNSETTLED_HELLO_MS;
+			return null;
+		};
+		const entry: Detected = {
+			expiresAt: Number.POSITIVE_INFINITY,
+			detection: client.hello(connection.origin).then((hello) => {
+				if (hello.origin !== connection.origin) return unsettled();
+				return hello.platform ? { platformActions: hello.actions } : null;
+			}, unsettled),
+		};
+		detected.delete(id);
+		detected.set(id, entry);
+		if (detected.size > MAX_DETECTED) {
+			const oldest = detected.keys().next().value;
+			if (oldest !== undefined) detected.delete(oldest);
+		}
+		return entry.detection;
+	}
+
+	return async (connection: Connection): Promise<ToolConnection> => {
+		const detection = await detect(connection);
+		return detection === null
+			? { ...connection, platform: false }
+			: { ...connection, platform: true, actions: detection.platformActions };
+	};
+}
+
 function connectionServer(
-	connection: Connection,
+	connection: ToolConnection,
 	ctx: RunToolContext,
 ): McpServer {
 	// null `actions` (a connection made before this was stored, or a hello that
 	// didn't state them) keeps every tool; otherwise only the actions the
 	// deployment serves, so the chat is never offered one that can only fail.
-	const specs = ACTIONS.filter(
+	const specs = actionsFor(connection.platform).filter(
 		(spec) =>
 			connection.actions === null || connection.actions.includes(spec.action),
 	);

@@ -292,6 +292,10 @@ function remoteFake(dir: string, origin: string): FakeDeployment {
 		},
 		intercept() {},
 		handle: () => Promise.resolve(new Response(null, { status: 500 })),
+		loseAnswers() {},
+		stallCreates() {},
+		setRetryAfter() {},
+		uploadPhoto: () => null,
 	};
 }
 

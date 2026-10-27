@@ -6,6 +6,7 @@ import {
 	DeploymentFailed,
 	DeploymentRejected,
 	isKeyedAction,
+	isPerCallKeyed,
 	KeyRefused,
 	Moved,
 	NeedsUpdate,
@@ -22,6 +23,9 @@ export type RunToolContext = {
 	dropConnection(userId: string): Promise<void>;
 };
 
+/** A stored connection as this session uses it: Platform or not, and on Platform the actions its hello lists now. */
+export type ToolConnection = Connection & { platform: boolean };
+
 type Settled = { outcome: ToolOutcome; result: CallToolResult };
 
 /**
@@ -30,7 +34,7 @@ type Settled = { outcome: ToolOutcome; result: CallToolResult };
  */
 export async function runTool(
 	spec: ActionSpec,
-	connection: Connection,
+	connection: ToolConnection,
 	input: Record<string, unknown>,
 	ctx: RunToolContext,
 ): Promise<CallToolResult> {
@@ -61,7 +65,7 @@ function redactConnectionKey(
 
 async function settle(
 	spec: ActionSpec,
-	connection: Connection,
+	connection: ToolConnection,
 	input: Record<string, unknown>,
 	ctx: RunToolContext,
 ): Promise<Settled> {
@@ -83,7 +87,7 @@ async function settle(
 async function failure(
 	error: unknown,
 	spec: ActionSpec,
-	connection: Connection,
+	connection: ToolConnection,
 	ctx: RunToolContext,
 ): Promise<Settled> {
 	const org = connection.orgName;
@@ -120,6 +124,10 @@ async function failure(
 	if (error instanceof DeploymentRejected) {
 		const replaced = replacedText(error, spec, connection);
 		if (replaced !== null) return said("replaced", replaced);
+		const next = connection.platform ? platformNextStep(error, spec) : null;
+		if (next !== null && error.problem) {
+			return said("rejected", `${next}\n\n${JSON.stringify(error.problem)}`);
+		}
 		return said(
 			"rejected",
 			error.problem
@@ -156,6 +164,49 @@ function replacedText(
 	return connection.actions === null || connection.actions.includes(action)
 		? text
 		: `${text} If ${tool} isn't offered yet, reconnect Better Giving in your AI assistant's connector settings to get it.`;
+}
+
+// What the chat does next about a Platform refusal whose code names it; the
+// problem itself follows, for the fields and detail behind it.
+function platformNextStep(
+	error: DeploymentRejected,
+	spec: ActionSpec,
+): string | null {
+	const code = error.problem?.code;
+	if (error.status === 409) {
+		switch (code) {
+			case "stale_read":
+				if (spec.action === "forms.update") {
+					return "Nothing was saved: this form changed after it was read. Read it again with get_form, make the change against what it shows now (with the updated_at it returns), and try again.";
+				}
+				// Only a tool that takes expected_version can be told to send it.
+				return Object.hasOwn(spec.input.shape, "expected_version")
+					? "Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, make the change against what it shows now, and send the version it returns as expected_version."
+					: "Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, and make the change against what it shows now.";
+			case "campaign_ended":
+				return "Nothing was saved: this campaign has ended, and an ended campaign stays ended. It can't be edited, published, or given a new photo. Tell the operator; a new appeal needs a new campaign.";
+			case "already_published":
+				return "This campaign is already live, so where its gifts go can't be changed here. The operator changes it in the Better Giving dashboard.";
+			case "confirm_required":
+				return "Nothing was saved: this form is live, so donors would see this change. Tell the operator what will change and ask them to confirm. Only after they say yes, call update_form again with the same change and confirm: true.";
+		}
+		if (isPerCallKeyed(spec.action)) {
+			if (code === "idempotency_in_progress") {
+				return `The site is still working on this request. Wait a few seconds, then check with ${spec.checkWith} whether it went through before calling ${spec.tool} again: a new call would make a second one.`;
+			}
+			if (code === "idempotency_conflict") {
+				return `Nothing was made: the site matched this request to a different one. Check with ${spec.checkWith}, then call ${spec.tool} again if it is still needed.`;
+			}
+		}
+	}
+	if (
+		error.status === 422 &&
+		spec.action === "campaigns.update_blocks" &&
+		error.problem?.errors?.some((e) => e.path.endsWith(".image_url"))
+	) {
+		return "Nothing was saved: the hero photo must be one uploaded for this campaign. Make a link with create_photo_upload_link and have the operator upload the photo there; it becomes the campaign's hero, which get_campaign then shows. Otherwise send the hero as get_campaign returns it, or null.";
+	}
+	return null;
 }
 
 function unexpected(

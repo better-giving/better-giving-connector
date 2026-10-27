@@ -6,6 +6,7 @@ import {
 	fakeDeployment,
 	fakeNetwork,
 	hang,
+	type LostAnswer,
 } from "../../test/fake-deployment";
 import { advance, MINUTE } from "../../test/support";
 import { Secret } from "../secret";
@@ -37,6 +38,7 @@ describe("hello", () => {
 			release: "3.4.0",
 			orgName: "Hope Shelter",
 			actions: [...ALL_ACTIONS],
+			platform: false,
 		});
 		expect(dep.calls).toMatchObject([
 			{ method: "GET", path: "/connector/v1/hello", authorization: null },
@@ -78,7 +80,36 @@ describe("hello", () => {
 		);
 		const client = deploymentClient({ fetch: dep.fetch });
 
-		expect(await client.hello(dep.origin)).toMatchObject({ actions: null });
+		expect(await client.hello(dep.origin)).toMatchObject({
+			actions: null,
+			platform: false,
+		});
+	});
+
+	test("reads a hello listing tool names as Platform", async () => {
+		const dep = fakeDeployment({ platform: true });
+		const client = deploymentClient({ fetch: dep.fetch });
+
+		expect(await client.hello(dep.origin)).toMatchObject({ platform: true });
+	});
+
+	test("reads a hello listing any contract name as Standalone, tool names beside it", async () => {
+		const dep = fakeDeployment();
+		dep.intercept(() =>
+			Response.json({
+				service: "better-giving",
+				contract: 1,
+				release: "1.0.0",
+				name: "Give",
+				actions: ["campaigns.list", "create_form"],
+			}),
+		);
+		const client = deploymentClient({ fetch: dep.fetch });
+
+		expect(await client.hello(dep.origin)).toMatchObject({
+			actions: ["campaigns.list", "forms.create"],
+			platform: false,
+		});
 	});
 
 	test.each([
@@ -1175,5 +1206,334 @@ describe("response size cap", () => {
 		await expect(client.call(conn, "forms.list", {})).rejects.toBeInstanceOf(
 			Unreachable,
 		);
+	});
+});
+
+describe("a per-call keyed write", () => {
+	async function platform(isPlatform = true) {
+		const dep = fakeDeployment({ platform: isPlatform });
+		const waits: number[] = [];
+		const client = deploymentClient({
+			fetch: dep.fetch,
+			sleep: async (ms) => {
+				waits.push(ms);
+			},
+		});
+		const exchanged = await client.exchange(dep.origin, dep.mintCode());
+		dep.calls.length = 0;
+		const conn = {
+			origin: dep.origin,
+			key: exchanged.key,
+			userId: "user_1",
+			platform: isPlatform,
+		};
+		return { dep, client, conn, waits };
+	}
+	const formsListed = async (
+		client: ReturnType<typeof deploymentClient>,
+		conn: Parameters<ReturnType<typeof deploymentClient>["call"]>[0],
+	) =>
+		((await client.call(conn, "forms.list", {})).body as { data: unknown[] })
+			.data.length;
+	// The call's answer or its error, past one 15 s timeout for each answer
+	// that never comes.
+	async function settled(
+		how: LostAnswer,
+		run: () => Promise<unknown>,
+		timeouts = 1,
+	) {
+		if (how !== "timeout") return run().catch((error: unknown) => error);
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const pending = run().catch((error: unknown) => error);
+		for (let n = 0; n < timeouts; n++)
+			await vi.advanceTimersByTimeAsync(15_000);
+		return pending;
+	}
+	const LOST: LostAnswer[] = ["dropped", "timeout", "502"];
+
+	test("sends a fresh Idempotency-Key with each create_form call", async () => {
+		const { dep, client, conn } = await platform();
+
+		await client.call(conn, "forms.create", { name: "Gala" });
+		await client.call(conn, "forms.create", { name: "Gala" });
+
+		const [first, second] = dep.calls.map((c) => c.idempotencyKey);
+		expect(first).toMatch(/^[0-9a-f-]{36}$/);
+		expect(second).toMatch(/^[0-9a-f-]{36}$/);
+		expect(second).not.toBe(first);
+		expect(await formsListed(client, conn)).toBe(3);
+	});
+
+	test.each(LOST)(
+		"retries once under the same key when the answer is %s, and gets the form it made",
+		async (how) => {
+			const { dep, client, conn, waits } = await platform();
+			dep.loseAnswers(1, how);
+
+			const made = await settled(how, () =>
+				client.call(conn, "forms.create", { name: "Gala" }),
+			);
+
+			expect(dep.calls).toHaveLength(2);
+			expect(dep.calls[1]?.idempotencyKey).toBe(dep.calls[0]?.idempotencyKey);
+			expect(waits).toEqual([]);
+			// the replay of the first try
+			expect(made).toMatchObject({ status: 200, body: { name: "Gala" } });
+			const listed = await client.call(conn, "forms.list", {});
+			const galas = (
+				listed.body as { data: { id: string; name: string }[] }
+			).data.filter((f) => f.name === "Gala");
+			expect(galas).toHaveLength(1);
+			expect((made as { body: { id: string } }).body.id).toBe(galas[0]?.id);
+		},
+	);
+
+	test.each(LOST)(
+		"a second lost answer (%s) is not retried again",
+		async (how) => {
+			const { dep, client, conn } = await platform();
+			dep.loseAnswers(2, how);
+
+			const failed = await settled(
+				how,
+				() => client.call(conn, "forms.create", { name: "Gala" }),
+				2,
+			);
+
+			expect(failed).toBeInstanceOf(Unreachable);
+			expect(dep.calls).toHaveLength(2);
+			expect(dep.calls[1]?.idempotencyKey).toBe(dep.calls[0]?.idempotencyKey);
+		},
+	);
+
+	test.each(LOST)(
+		"on Standalone, an answer lost as %s is tried once",
+		async (how) => {
+			const { dep, client, conn } = await platform(false);
+			dep.loseAnswers(1, how);
+
+			const failed = await settled(how, () =>
+				client.call(conn, "forms.create", { name: "Gala" }),
+			);
+
+			expect(failed).toBeInstanceOf(Unreachable);
+			expect(dep.calls).toHaveLength(1);
+			expect(dep.calls[0]?.idempotencyKey).toBeNull();
+		},
+	);
+
+	test("the fake site answers in progress only for a key whose first request still runs", async () => {
+		const { dep, conn } = await platform();
+		dep.stallCreates();
+		const create = (key: string) =>
+			dep.handle(
+				new Request(`${dep.origin}/connector/v1/forms`, {
+					method: "POST",
+					headers: {
+						authorization: `Bearer ${conn.key.reveal()}`,
+						"content-type": "application/json",
+						"idempotency-key": key,
+					},
+					body: JSON.stringify({ name: "Gala" }),
+				}),
+			);
+
+		// a new key runs, and is still running when its connection drops
+		await expect(create("key-a")).rejects.toThrow("fetch failed");
+		expect((await create("key-a")).status).toBe(409);
+		await expect(create("key-b")).rejects.toThrow("fetch failed");
+		expect((await create("key-b")).status).toBe(409);
+	});
+
+	test("a 4xx is the site's answer, not a lost one, so it is not retried", async () => {
+		const { dep, client, conn } = await platform();
+
+		await expect(client.call(conn, "forms.create", {})).rejects.toMatchObject({
+			status: 422,
+		});
+		expect(dep.calls).toHaveLength(1);
+	});
+
+	const IN_PROGRESS = () =>
+		new Response(JSON.stringify({ code: "idempotency_in_progress" }), {
+			status: 409,
+			headers: {
+				"content-type": "application/problem+json",
+				"retry-after": "1",
+			},
+		});
+	const BAD_GATEWAY = () => new Response("Bad Gateway", { status: 502 });
+	const DROPPED = () => {
+		throw new TypeError("fetch failed");
+	};
+
+	test.each([
+		{
+			answers: "in progress, in progress, 502",
+			script: [IN_PROGRESS, IN_PROGRESS, BAD_GATEWAY],
+			waits: [1_000, 1_000],
+			failed: Unreachable,
+		},
+		{
+			answers: "502, in progress, dropped",
+			script: [BAD_GATEWAY, IN_PROGRESS, DROPPED],
+			waits: [1_000],
+			failed: Unreachable,
+		},
+		{
+			answers: "in progress three times",
+			script: [IN_PROGRESS, IN_PROGRESS, IN_PROGRESS],
+			waits: [1_000, 1_000],
+			failed: DeploymentRejected,
+		},
+	])(
+		"stops at three tries when the site answers $answers",
+		async ({ script, waits: expected, failed }) => {
+			const { dep, client, conn, waits } = await platform();
+			const next = [...script];
+			dep.intercept((req) =>
+				req.method === "POST" ? next.shift()?.() : undefined,
+			);
+
+			await expect(
+				client.call(conn, "forms.create", { name: "Gala" }),
+			).rejects.toBeInstanceOf(failed);
+			expect(dep.calls).toHaveLength(3);
+			expect(new Set(dep.calls.map((c) => c.idempotencyKey)).size).toBe(1);
+			expect(waits).toEqual(expected);
+		},
+	);
+
+	test("a lost first try still running is retried, waits while in progress, and gets the form it made", async () => {
+		const { dep, client, conn, waits } = await platform();
+		dep.stallCreates(1);
+		dep.setRetryAfter("2");
+
+		const made = await client.call(conn, "forms.create", { name: "Gala" });
+
+		expect(dep.calls).toHaveLength(3);
+		expect(new Set(dep.calls.map((c) => c.idempotencyKey)).size).toBe(1);
+		expect(waits).toEqual([2_000]);
+		// the replay of the first try
+		expect(made.status).toBe(200);
+		expect(made.body).toMatchObject({ name: "Gala" });
+		expect(await formsListed(client, conn)).toBe(2);
+	});
+
+	test("stops after three tries while the create stays in progress", async () => {
+		const { dep, client, conn, waits } = await platform();
+		dep.stallCreates();
+		dep.setRetryAfter("1");
+
+		const failed = await client
+			.call(conn, "forms.create", { name: "Gala" })
+			.catch((error: unknown) => error);
+
+		expect(dep.calls).toHaveLength(3);
+		expect(new Set(dep.calls.map((c) => c.idempotencyKey)).size).toBe(1);
+		expect(waits).toEqual([1_000]);
+		expect(failed).toBeInstanceOf(DeploymentRejected);
+		expect(failed).toMatchObject({
+			status: 409,
+			problem: { code: "idempotency_in_progress" },
+		});
+		// the first request finishes on its own
+		expect(await formsListed(client, conn)).toBe(2);
+	});
+
+	test.each([
+		["60", 5_000],
+		["", 5_000],
+		["soon", 5_000],
+		["-1", 5_000],
+	])(
+		"waits at most five seconds, and the most when Retry-After is %j",
+		async (header, wait) => {
+			const { dep, client, conn, waits } = await platform();
+			dep.stallCreates(1);
+			dep.setRetryAfter(header);
+
+			await client.call(conn, "forms.create", { name: "Gala" });
+
+			expect(waits).toEqual([wait]);
+		},
+	);
+
+	test("on Standalone, create_form sends the request it always has: no key, and one try", async () => {
+		const dep = fakeDeployment();
+		const sent: Request[] = [];
+		const waits: number[] = [];
+		const client = deploymentClient({
+			fetch: async (input, init) => {
+				const req = new Request(input, init);
+				sent.push(req.clone());
+				return dep.fetch(req);
+			},
+			sleep: async (ms) => {
+				waits.push(ms);
+			},
+		});
+		const { key } = await client.exchange(dep.origin, dep.mintCode());
+		sent.length = 0;
+		dep.intercept(
+			() =>
+				new Response(JSON.stringify({ code: "idempotency_in_progress" }), {
+					status: 409,
+					headers: {
+						"content-type": "application/problem+json",
+						"retry-after": "1",
+					},
+				}),
+		);
+		const conn = { origin: dep.origin, key, userId: "user_1", platform: false };
+
+		await expect(
+			client.call(conn, "forms.create", { name: "Gala", amounts: [25, 50] }),
+		).rejects.toMatchObject({
+			status: 409,
+			problem: { code: "idempotency_in_progress" },
+		});
+
+		expect(sent).toHaveLength(1);
+		expect(waits).toEqual([]);
+		const [req] = sent;
+		expect(req?.method).toBe("POST");
+		expect(req?.url).toBe(`${dep.origin}/connector/v1/forms`);
+		expect(Object.fromEntries(req?.headers ?? [])).toEqual({
+			authorization: `Bearer ${key.reveal()}`,
+			accept: "application/json",
+			"content-type": "application/json",
+		});
+		expect(await req?.text()).toBe('{"name":"Gala","amounts":[25,50]}');
+	});
+
+	test("a key used for another body is an idempotency conflict, not retried", async () => {
+		const { dep, client, conn } = await platform();
+		dep.intercept(
+			() =>
+				new Response(JSON.stringify({ code: "idempotency_conflict" }), {
+					status: 409,
+					headers: { "content-type": "application/problem+json" },
+				}),
+		);
+
+		await expect(
+			client.call(conn, "forms.create", { name: "Gala" }),
+		).rejects.toMatchObject({
+			status: 409,
+			problem: { code: "idempotency_conflict" },
+		});
+		expect(dep.calls).toHaveLength(1);
+	});
+
+	test("any other write whose answer is lost is tried once", async () => {
+		const { dep, client, conn } = await platform();
+		dep.loseAnswers(1);
+
+		await expect(
+			client.call(conn, "forms.update", { id: "frm_1", name: "Main" }),
+		).rejects.toBeInstanceOf(Unreachable);
+		expect(dep.calls).toHaveLength(1);
+		expect(dep.calls[0]?.idempotencyKey).toBeNull();
 	});
 });

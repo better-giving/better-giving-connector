@@ -87,6 +87,25 @@ export function DocsPage() {
 					amount raised, use fundraising results.
 				</li>
 				<li>
+					Edit a campaign page's title, story, and cover photo, and change its
+					goal or end date.
+				</li>
+				<li>
+					Publish or end a campaign. These change what donors see. Your AI
+					assistant says what will change and waits for your explicit yes. The
+					first time a campaign is published, it asks where the gifts go: a
+					program, or the general fund. An ended campaign stays ended.
+				</li>
+				<li>
+					Create and edit donation forms, including the donation page's form and
+					each campaign's form. On a live form, a change donors would see waits
+					for your yes.
+				</li>
+				<li>
+					Make a short-lived, single-use link so you can add a campaign's cover
+					photo from your phone. The connector does not upload the file itself.
+				</li>
+				<li>
 					Read the main donation page, donation forms, donors, gifts, monthly
 					gifts, and fundraising results. Monthly gifts cannot be changed from
 					here.
@@ -96,7 +115,7 @@ export function DocsPage() {
 			<h3>Coming to more accounts</h3>
 			<ul>
 				<li>
-					Edit a campaign page's title, story, photos, gift tiers, and
+					Edit a campaign page's photos beside the cover, gift tiers, and
 					questions, and the donation page's heading, or put the donation page
 					back to its default content. The site arranges each page from its
 					content, so your AI assistant does not set the design. Resetting
@@ -104,19 +123,7 @@ export function DocsPage() {
 					yes before it resets the page.
 				</li>
 				<li>
-					Change a campaign's goal, end date, time zone, or the message shown
-					when it is shared.
-				</li>
-				<li>
-					Publish or end a campaign. These change what donors see. Your AI
-					assistant says what will change and waits for your explicit yes. The
-					first time a campaign is published, it asks where the gifts go: a
-					program, or the general fund.
-				</li>
-				<li>
-					Create and edit donation forms, including the donation page's form and
-					each campaign's form. On a live form, a change donors would see waits
-					for your yes.
+					Change a campaign's time zone, or the message shown when it is shared.
 				</li>
 				<li>
 					Record a donation already received in cash or by check. It is not tied
@@ -124,10 +131,6 @@ export function DocsPage() {
 					card, and issues no refund. The same details again match the earlier
 					gift and record nothing new. Add a distinguishing note to record a
 					second gift with the same details.
-				</li>
-				<li>
-					Make a short-lived, single-use link so you can add a photo from your
-					phone. The connector does not upload the file itself.
 				</li>
 			</ul>
 

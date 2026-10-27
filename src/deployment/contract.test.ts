@@ -69,19 +69,26 @@ describe("knownActions", () => {
 	});
 });
 
-test("Platform's hello serves its twelve actions", () => {
+test("Platform's hello serves its nineteen actions, writes included", () => {
 	expect(helloBody.parse(PLATFORM_HELLO).actions).toEqual([
 		"campaigns.list",
 		"campaigns.get",
 		"campaigns.create",
+		"campaigns.update_settings",
+		"campaigns.update_blocks",
+		"campaigns.publish",
+		"campaigns.end",
 		"donation_page.get",
 		"blocks.catalog",
 		"forms.list",
 		"forms.get",
+		"forms.create",
+		"forms.update",
 		"results.summary",
 		"donations.list",
 		"donors.list",
 		"donors.get",
 		"recurring.list",
+		"photos.upload_link",
 	]);
 });

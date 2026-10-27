@@ -27,6 +27,16 @@ const id = z
 	.min(1)
 	.regex(/^(?!\.\.?$)[^/]+$/, "An id is never '.', '..' or contains '/'.");
 const date = z.iso.date();
+// A campaign's version as get_campaign returns it on Platform. It is passed
+// through, never filled in: a version read just before the write would match
+// whatever the page holds, and so guard nothing the chat read.
+const expectedVersion = z
+	.string()
+	.regex(/^\d{1,19}$/, "The version get_campaign returned.")
+	.optional()
+	.describe(
+		"The version get_campaign returned with the campaign this change is based on. Send it whenever get_campaign returns one: if the campaign changed since, nothing is saved, and the campaign is read again before retrying.",
+	);
 /** The longest note Standalone keeps on a gift (its `MAX_NOTE`); a longer one is refused there. */
 export const MAX_NOTE = 2_000;
 const isIanaTimeZone = (zone: string) => {
@@ -482,3 +492,57 @@ export const ACTIONS = toolSpecs([
 		annotations: ADD,
 	},
 ]);
+
+type Tool = (typeof ACTIONS)[number]["tool"];
+const specOf = (tool: Tool) => {
+	const spec = ACTIONS.find((s) => s.tool === tool);
+	if (!spec) throw new Error(`no ${tool} spec`);
+	return spec;
+};
+
+// What Platform's writes add to the specs above: a campaign's version guard,
+// create_form's warning against a second call, updated_at on a form, and photo
+// links for a campaign's hero alone.
+const PLATFORM_CHANGES: Partial<Record<Tool, Partial<ActionSpec<Tool>>>> = {
+	update_campaign_blocks: {
+		description: `${specOf("update_campaign_blocks").description} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null.`,
+		input: specOf("update_campaign_blocks").input.extend({
+			expected_version: expectedVersion,
+		}),
+	},
+	// Platform keeps no time zone or share message of its own, and refuses a change to either.
+	update_campaign_settings: {
+		description:
+			"Sets a campaign's goal or end date. A field left out stays as it is, and null clears it. Page content goes through update_campaign_blocks.",
+		input: specOf("update_campaign_settings")
+			.input.omit({ time_zone: true, sharing: true })
+			.extend({ expected_version: expectedVersion }),
+	},
+	create_form: {
+		description: `${specOf("create_form").description} Each call makes a new form, so after an unclear answer check with list_forms before calling again.`,
+	},
+	update_form: {
+		description:
+			"Changes a donation form. Only the fields sent are changed, in the shape get_form returns; send the updated_at get_form returned, so a change made since is refused rather than overwritten. On a live form, a change donors would see needs confirm set to true, and only after the operator agrees.",
+	},
+	create_photo_upload_link: {
+		description:
+			"Returns a single-use link, good for 15 minutes, for adding a campaign's hero photo. The operator opens the link and chooses a JPEG, PNG or WebP of at most 4 MB; expires_at says when the link stops working. This connector does not upload the file. An ended campaign takes no new photo. The uploaded photo becomes the campaign's hero: read the campaign again with get_campaign before editing its blocks.",
+		input: z.strictObject({
+			target: z.strictObject({ kind: z.literal("campaign"), id }),
+			slot: z
+				.literal("hero")
+				.optional()
+				.describe('Where the photo goes: "hero", or left out.'),
+		}),
+	},
+};
+
+const PLATFORM_ACTIONS: readonly ActionSpec[] = ACTIONS.map((spec) => ({
+	...spec,
+	...PLATFORM_CHANGES[spec.tool],
+}));
+
+/** The specs for a connection: Standalone's as above, or Platform's with its changes. */
+export const actionsFor = (platform: boolean): readonly ActionSpec[] =>
+	platform ? PLATFORM_ACTIONS : ACTIONS;

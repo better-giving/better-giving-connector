@@ -30,6 +30,7 @@ import {
 } from "./harness";
 import type { Call } from "./oauth";
 import { connectFlow, shown } from "./operator";
+import { PLATFORM_HELLO } from "./platform-hello";
 import { advance, failingDb, freshDb, MINUTE, StoreDown } from "./support";
 
 // The whole service, driven the way operators and chat apps drive it, with a
@@ -271,7 +272,11 @@ async function startWorld() {
 			const tokens = await flow.connect();
 			plant("token:access", tokens.access_token, true);
 			plant("token:refresh", tokens.refresh_token, true);
-			return `Bearer ${tokens.access_token}`;
+			const bearer = `Bearer ${tokens.access_token}`;
+			// A connection's first request asks its deployment's hello; settled
+			// here, a scenario's own requests are the ones that reach it.
+			await sendAs(bearer, "tools/list");
+			return bearer;
 		},
 	};
 }
@@ -896,6 +901,35 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			{ path: "/connector/v1/hello", authorization: null },
 		]);
 		expect((await world.sendAs(bearer, "tools/list")).status).toBe(401);
+		expectCleanScenario();
+	});
+
+	test("a first-request hello carrying sentinels reaches no log line and no body", async () => {
+		const tokens = await world.flow.connect();
+		plant("token:access", tokens.access_token, true);
+		plant("token:refresh", tokens.refresh_token, true);
+		const bearer = `Bearer ${tokens.access_token}`;
+		const name = plant("hello:name", "leak-hello-name-71d4", false);
+		const action = plant("hello:action", "leak-hello-action-2a9f", false);
+		world.dep.calls.length = 0;
+		world.dep.intercept((req) =>
+			new URL(req.url).pathname === "/connector/v1/hello"
+				? Response.json({
+						...PLATFORM_HELLO,
+						name,
+						actions: [...PLATFORM_HELLO.actions, action],
+					})
+				: undefined,
+		);
+
+		const listed = await world.sendAs(bearer, "tools/list");
+		const result = await callTool(bearer, ...READ_CALL());
+
+		expect(listed.status).toBe(200);
+		expect(result.isError).toBeUndefined();
+		expect(
+			world.dep.calls.filter((c) => c.path === "/connector/v1/hello"),
+		).toHaveLength(1);
 		expectCleanScenario();
 	});
 
