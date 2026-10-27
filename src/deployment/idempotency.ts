@@ -5,8 +5,9 @@ const KEYED = new Set<ActionName>(["campaigns.create", "donations.record"]);
 
 export const isKeyedAction = (action: ActionName): boolean => KEYED.has(action);
 
-// A form may rightly be made twice with the same fields, so its key is fresh
-// for each tool call and shared only by the in-progress retries inside that call.
+// On Platform. A form may rightly be made twice with the same fields, so its
+// key is fresh for each tool call and shared only by the in-progress retries
+// inside that call. Standalone's create_form sends no key.
 const PER_CALL = new Set<ActionName>(["forms.create"]);
 
 export const isPerCallKeyed = (action: ActionName): boolean =>

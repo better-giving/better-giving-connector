@@ -48,6 +48,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			origin: hello.origin,
 			orgName: hello.orgName,
 			actions: hello.actions,
+			platform: hello.platform,
 			key: exchanged.key,
 			createdAt: opts.now ?? new Date(),
 		};

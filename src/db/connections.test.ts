@@ -21,6 +21,7 @@ async function insertUser1(store = connections(db, SECRET)) {
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(KEY),
 	});
 }
@@ -59,6 +60,7 @@ test("get returns the inserted connection with its key as a Secret", async () =>
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: ["campaigns.list", "donations.record"],
+		platform: false,
 		key: new Secret(KEY),
 	});
 	const conn = await store.get("user-1");
@@ -80,11 +82,29 @@ test("a connection stored with no actions reads them back as null", async () => 
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(KEY),
 	});
 
 	expect((await store.get("user-1"))?.actions).toBeNull();
 });
+
+test.each([true, false])(
+	"a connection stored with platform %s reads it back the same",
+	async (platform) => {
+		const store = connections(db, SECRET);
+		await store.insert({
+			userId: "user-1",
+			origin: ORIGIN,
+			orgName: "Example Org",
+			actions: null,
+			platform,
+			key: new Secret(KEY),
+		});
+
+		expect((await store.get("user-1"))?.platform).toBe(platform);
+	},
+);
 
 test("get drops a stored action name this contract no longer carries", async () => {
 	await insertUser1();
@@ -130,7 +150,7 @@ test("the stored row never contains the plaintext key", async () => {
 test("a row copied to another user fails to decrypt", async () => {
 	await insertUser1();
 	await db.execute(
-		"INSERT INTO connection SELECT 'user-2', origin, org_name, key_ct, created_at, actions FROM connection WHERE user_id = 'user-1'",
+		"INSERT INTO connection (user_id, origin, org_name, key_ct, created_at, actions, platform) SELECT 'user-2', origin, org_name, key_ct, created_at, actions, platform FROM connection WHERE user_id = 'user-1'",
 	);
 
 	await expectUnreadable(connections(db, SECRET).get("user-2"));

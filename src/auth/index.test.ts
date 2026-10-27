@@ -228,6 +228,7 @@ async function connect(
 		origin,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(key),
 	});
 	return { a, res, back: redirectTarget(res, `${BASE}/connect/return`) };
@@ -607,6 +608,7 @@ test("completeConnection refuses an expired login request and creates nothing", 
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(KEY),
 	});
 
@@ -825,6 +827,7 @@ test("a resume that ends without a code undoes the connection and passes the err
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(KEY),
 	});
 
@@ -859,6 +862,7 @@ test("a failure after the user is created undoes the connection and rethrows", a
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(KEY),
 	});
 
@@ -1320,6 +1324,7 @@ test.each([
 			origin: ORIGIN,
 			orgName: "Example Org",
 			actions: null,
+			platform: false,
 			key: new Secret(key),
 		})
 		.catch(() => {});
@@ -1353,6 +1358,7 @@ test("a full sweep batch whose deployments all hang finishes inside the cron's b
 			origin: ORIGIN,
 			orgName: "Example Org",
 			actions: null,
+			platform: false,
 			key: new Secret(`${KEY}_${i}`),
 		});
 	}

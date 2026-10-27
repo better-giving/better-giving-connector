@@ -121,7 +121,7 @@ async function failure(
 	if (error instanceof DeploymentRejected) {
 		const replaced = replacedText(error, spec, connection);
 		if (replaced !== null) return said("replaced", replaced);
-		const next = nextStep(error, spec);
+		const next = connection.platform ? platformNextStep(error, spec) : null;
 		if (next !== null && error.problem) {
 			return said("rejected", `${next}\n\n${JSON.stringify(error.problem)}`);
 		}
@@ -163,16 +163,23 @@ function replacedText(
 		: `${text} If ${tool} isn't offered yet, reconnect Better Giving in your AI assistant's connector settings to get it.`;
 }
 
-// What the chat does next about a refusal whose code names it; the problem
-// itself follows, for the fields and detail behind it.
-function nextStep(error: DeploymentRejected, spec: ActionSpec): string | null {
+// What the chat does next about a Platform refusal whose code names it; the
+// problem itself follows, for the fields and detail behind it.
+function platformNextStep(
+	error: DeploymentRejected,
+	spec: ActionSpec,
+): string | null {
 	const code = error.problem?.code;
 	if (error.status === 409) {
 		switch (code) {
 			case "stale_read":
-				return spec.checkWith === "get_form"
-					? "Nothing was saved: this form changed after it was read. Read it again with get_form, make the change against what it shows now (with the updated_at it returns), and try again."
-					: "Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, make the change against what it shows now, and send the version it returns as expected_version.";
+				if (spec.action === "forms.update") {
+					return "Nothing was saved: this form changed after it was read. Read it again with get_form, make the change against what it shows now (with the updated_at it returns), and try again.";
+				}
+				// Only a tool that takes expected_version can be told to send it.
+				return Object.hasOwn(spec.input.shape, "expected_version")
+					? "Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, make the change against what it shows now, and send the version it returns as expected_version."
+					: "Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, and make the change against what it shows now.";
 			case "campaign_ended":
 				return "Nothing was saved: this campaign has ended, and an ended campaign stays ended. It can't be edited, published, or given a new photo. Tell the operator; a new appeal needs a new campaign.";
 			case "already_published":

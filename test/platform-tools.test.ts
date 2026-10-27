@@ -91,6 +91,61 @@ test("a Platform connection offers its writes and none it doesn't serve", async 
 	}
 });
 
+test("update_campaign_settings offers a goal and end date, and no time zone or share message", async () => {
+	const tools: { name: string; inputSchema: { properties: object } }[] = (
+		await rpc(await send("tools/list"))
+	).result.tools;
+	const settings = tools.find((t) => t.name === "update_campaign_settings");
+
+	expect(Object.keys(settings?.inputSchema.properties ?? {}).sort()).toEqual([
+		"end_date",
+		"expected_version",
+		"goal",
+		"id",
+	]);
+});
+
+test("a campaign changed since it was read, on a tool with no expected_version, is not told to send one", async () => {
+	const k = await draft();
+	deployment.intercept((req) =>
+		req.method === "POST"
+			? Response.json(
+					{ code: "stale_read" },
+					{
+						status: 409,
+						headers: { "content-type": "application/problem+json" },
+					},
+				)
+			: undefined,
+	);
+
+	const { next } = refusal(await tool("publish_campaign", { id: k.id }));
+
+	expect(next).toBe(
+		"Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, and make the change against what it shows now.",
+	);
+});
+
+test("create_campaign answered in progress or conflict is the problem alone, not create_form's advice", async () => {
+	for (const code of ["idempotency_in_progress", "idempotency_conflict"]) {
+		deployment.intercept((req) =>
+			req.method === "POST"
+				? Response.json(
+						{ code },
+						{
+							status: 409,
+							headers: { "content-type": "application/problem+json" },
+						},
+					)
+				: undefined,
+		);
+
+		const result = await tool("create_campaign", { title: "Winter coats" });
+
+		expect(textOf(result)).toBe(JSON.stringify({ code }));
+	}
+});
+
 describe("expected_version", () => {
 	test("a change sent against the campaign's current version is saved", async () => {
 		const k = await draft();

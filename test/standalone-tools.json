@@ -1,0 +1,931 @@
+{
+	"instructions": "These tools act on \"Hope Shelter\", the operator's live Better Giving donation site: what they change, donors see. Before publish_campaign, end_campaign or reset_donation_page, say what will change and wait for the operator's explicit yes in this chat.",
+	"tools": [
+		{
+			"name": "list_campaigns",
+			"title": "List campaigns",
+			"description": "Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": ["draft", "published", "ended"]
+					},
+					"cursor": {
+						"description": "The next_cursor of the previous page.",
+						"type": "string"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100
+					}
+				},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_campaign",
+			"title": "Get a campaign",
+			"description": "Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it on sites with get_content_catalog, or its blocks on sites with get_block_catalog. For the amount raised, use get_results.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "create_campaign",
+			"title": "Create a campaign",
+			"description": "Creates a new draft campaign with the given title. Donors cannot see it until it is published.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": ["title"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "update_campaign_blocks",
+			"title": "Edit a campaign's page",
+			"description": "Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. Each block follows a schema from get_block_catalog. get_campaign returns the current content; send every block the page should keep. For sites that edit pages as blocks.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"propertyNames": {
+								"type": "string"
+							},
+							"additionalProperties": {}
+						},
+						"description": "The page's content as blocks. Each block's schema is in get_block_catalog."
+					}
+				},
+				"required": ["id", "blocks"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": true,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "update_campaign_content",
+			"title": "Edit a campaign's page",
+			"description": "Edits the content of a campaign's page: its heading, lede, story, cover photo (hero), photos beside the cover, gift tiers, and questions (faq). Send only the keys to change: a key left out stays as it is, and null clears it. Each key's shape is in get_content_catalog, and get_campaign returns the current content. Donors see the change once the campaign is published. The site arranges the page from its content, so this tool sets no design, colors, blocks, or share buttons.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"heading": {
+						"description": "The page's title. Empty or null shows the campaign's name.",
+						"type": ["string", "null"]
+					},
+					"lede": {
+						"description": "A sentence or two under the title.",
+						"type": ["string", "null"]
+					},
+					"story": {
+						"description": "The story behind the appeal, as a rich-text document.",
+						"anyOf": [
+							{
+								"type": "object",
+								"propertyNames": {
+									"type": "string"
+								},
+								"additionalProperties": {},
+								"description": "A rich-text document as Tiptap JSON, such as {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Every coat is a warm night.\"}]}]}."
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"hero": {
+						"description": "The cover photo.",
+						"anyOf": [
+							{
+								"type": "object",
+								"properties": {
+									"imageId": {
+										"type": "string",
+										"format": "uuid",
+										"pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+									},
+									"alt": {
+										"description": "What the photo shows, or null.",
+										"type": ["string", "null"]
+									}
+								},
+								"required": ["imageId", "alt"],
+								"additionalProperties": false,
+								"description": "A photo already on the site, named by the imageId get_campaign returns. A new photo comes in through create_photo_upload_link."
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"photos": {
+						"description": "Photos beside the cover, at most 8. Sent whole: the list replaces the current one.",
+						"anyOf": [
+							{
+								"maxItems": 8,
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"imageId": {
+											"type": "string",
+											"format": "uuid",
+											"pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+										},
+										"alt": {
+											"description": "What the photo shows, or null.",
+											"type": ["string", "null"]
+										}
+									},
+									"required": ["imageId", "alt"],
+									"additionalProperties": false,
+									"description": "A photo already on the site, named by the imageId get_campaign returns. A new photo comes in through create_photo_upload_link."
+								}
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"tiers": {
+						"description": "Up to six gift amounts, each with what it buys. Sent whole: the list replaces the current one.",
+						"anyOf": [
+							{
+								"maxItems": 6,
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"amountMinor": {
+											"type": "integer",
+											"exclusiveMinimum": 0,
+											"maximum": 9007199254740991,
+											"description": "The gift in cents, such as 2500 for $25.00."
+										},
+										"buys": {
+											"type": "string",
+											"description": "What that gift buys."
+										}
+									},
+									"required": ["amountMinor", "buys"],
+									"additionalProperties": false
+								}
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"faq": {
+						"description": "Up to ten questions donors ask, each with its answer. Sent whole: the list replaces the current one.",
+						"anyOf": [
+							{
+								"maxItems": 10,
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"question": {
+											"type": "string"
+										},
+										"answer": {
+											"type": "object",
+											"propertyNames": {
+												"type": "string"
+											},
+											"additionalProperties": {},
+											"description": "A rich-text document as Tiptap JSON, such as {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Every coat is a warm night.\"}]}]}."
+										}
+									},
+									"required": ["question", "answer"],
+									"additionalProperties": false
+								}
+							},
+							{
+								"type": "null"
+							}
+						]
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "update_campaign_settings",
+			"title": "Change a campaign's settings",
+			"description": "Sets a campaign's goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {\"message\": null}. Page content goes through update_campaign_content or update_campaign_blocks.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"goal": {
+						"anyOf": [
+							{
+								"type": "object",
+								"properties": {
+									"amount": {
+										"type": "string",
+										"pattern": "^\\d+(\\.\\d{1,2})?$"
+									},
+									"currency": {
+										"type": "string",
+										"const": "USD"
+									}
+								},
+								"required": ["amount", "currency"],
+								"additionalProperties": false,
+								"description": "An object with a decimal-string amount and a currency, such as {\"amount\": \"100.00\", \"currency\": \"USD\"}. A plain number is refused."
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"end_date": {
+						"anyOf": [
+							{
+								"type": "string",
+								"format": "date",
+								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"time_zone": {
+						"type": ["string", "null"]
+					},
+					"sharing": {
+						"type": "object",
+						"properties": {
+							"message": {
+								"type": ["string", "null"]
+							},
+							"channels": {
+								"description": "Share channels, on sites with get_block_catalog only. Sites with get_content_catalog offer the same share buttons on every page and refuse this.",
+								"anyOf": [
+									{
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									},
+									{
+										"type": "null"
+									}
+								]
+							}
+						},
+						"additionalProperties": false
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "publish_campaign",
+			"title": "Publish a campaign",
+			"description": "Puts a draft campaign live at its public link. The first publish requires gifts_go_to: ask the operator where the gifts go, then send a program id, or null for the general fund. Donors see this immediately, so the operator confirms it in the chat first.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"gifts_go_to": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": true,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "end_campaign",
+			"title": "End a campaign",
+			"description": "Ends a campaign for good. It stops taking gifts. Donors see this immediately, so the operator confirms it in the chat first.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": true,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_donation_page",
+			"title": "Get the donation page",
+			"description": "Reads the site's main donation page and its public link. The page is its content on sites with get_content_catalog, where only its heading can be edited, or its blocks on sites with get_block_catalog.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "update_donation_page_blocks",
+			"title": "Edit the donation page",
+			"description": "Edits the content of the site's main donation page, such as its title, story, and hero photo. Each block follows a schema from get_block_catalog. get_donation_page returns the current content; send every block the page should keep. For sites that edit pages as blocks.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"propertyNames": {
+								"type": "string"
+							},
+							"additionalProperties": {}
+						},
+						"description": "The page's content as blocks. Each block's schema is in get_block_catalog."
+					}
+				},
+				"required": ["blocks"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": true,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "update_donation_page_content",
+			"title": "Edit the donation page",
+			"description": "Edits the heading of the site's main donation page, the only content it holds; the rest of the page is the same on every site. An empty heading, or null, shows \"Donate to\" and the organization's name. get_donation_page returns the current heading. The edit goes to the page's draft: donors see it once the operator publishes the donation page in the Better Giving dashboard, and no tool here publishes it. The site arranges the page from its content, so this tool sets no design, colors, blocks, or share buttons.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"heading": {
+						"description": "The page's title, or null for the default.",
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["heading"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "reset_donation_page",
+			"title": "Reset the donation page",
+			"description": "Puts the main donation page back to its default content, discarding what is there now. Donors see this immediately, so the operator confirms it in the chat first.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"confirm": {
+						"type": "boolean",
+						"const": true
+					}
+				},
+				"required": ["confirm"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": true,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_block_catalog",
+			"title": "Get the block catalog",
+			"description": "Lists every block type a page can hold, with what it is for and its JSON Schema. For sites that edit pages as blocks.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_content_catalog",
+			"title": "Get the content catalog",
+			"description": "Lists every content key a page can hold (heading, lede, story, hero, photos, tiers, faq) with what each shows donors and its JSON Schema, and says how the site arranges a campaign from its content. A campaign holds every key; the donation page holds its heading alone.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "list_forms",
+			"title": "List donation forms",
+			"description": "Lists the site's donation forms (suggested amounts, currency, monthly giving), including each form's id. The list includes the donation page's form and each campaign's form; a campaign's form carries that campaign's campaign_id, and any other form has campaign_id null.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"cursor": {
+						"description": "The next_cursor of the previous page.",
+						"type": "string"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100
+					}
+				},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_form",
+			"title": "Get a donation form",
+			"description": "Reads one donation form in full.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "create_form",
+			"title": "Create a donation form",
+			"description": "Creates a donation form. The name is required. Other fields match the shape get_form returns.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"name": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": ["name"],
+				"additionalProperties": {}
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": false,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "update_form",
+			"title": "Edit a donation form",
+			"description": "Changes a donation form. Only the fields sent are changed, in the shape get_form returns. On a live form, a change donors would see needs confirm set to true, and only after the operator agrees.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"name": {
+						"type": "string",
+						"minLength": 1
+					},
+					"confirm": {
+						"type": "boolean",
+						"const": true
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": {}
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_results",
+			"title": "Get fundraising results",
+			"description": "Totals raised, gift count, donor count and per-campaign totals, optionally for one campaign or a date range.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"campaign_id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"from": {
+						"type": "string",
+						"format": "date",
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+					},
+					"to": {
+						"type": "string",
+						"format": "date",
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+					}
+				},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "list_donations",
+			"title": "List donations",
+			"description": "Lists gifts. Optionally limited to one campaign or a date range.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"campaign_id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"from": {
+						"type": "string",
+						"format": "date",
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+					},
+					"to": {
+						"type": "string",
+						"format": "date",
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+					},
+					"cursor": {
+						"description": "The next_cursor of the previous page.",
+						"type": "string"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100
+					}
+				},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "list_donors",
+			"title": "List donors",
+			"description": "Lists donors with their totals. q matches names and emails. Includes each donor's id.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"q": {
+						"type": "string"
+					},
+					"cursor": {
+						"description": "The next_cursor of the previous page.",
+						"type": "string"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100
+					}
+				},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "get_donor",
+			"title": "Get a donor",
+			"description": "Reads one donor and a page of the gifts they have given.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(?!\\.\\.?$)[^/]+$"
+					},
+					"cursor": {
+						"description": "The next_cursor of the previous page.",
+						"type": "string"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100
+					}
+				},
+				"required": ["id"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "list_recurring_gifts",
+			"title": "List monthly gifts",
+			"description": "Lists recurring gifts. This connector cannot change a monthly gift.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"cursor": {
+						"description": "The next_cursor of the previous page.",
+						"type": "string"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100
+					}
+				},
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "record_donation",
+			"title": "Record a donation",
+			"description": "Records a donation already received offline, in cash or by check, so it counts in totals and the donor's history. It moves no money, charges no card, and issues no refund, and it is not tied to a campaign. To record a second gift with the same details, add a distinguishing note; the same details again match the earlier gift and record nothing new.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"amount": {
+						"type": "object",
+						"properties": {
+							"amount": {
+								"type": "string",
+								"pattern": "^\\d+(\\.\\d{1,2})?$"
+							},
+							"currency": {
+								"type": "string",
+								"const": "USD"
+							}
+						},
+						"required": ["amount", "currency"],
+						"additionalProperties": false,
+						"description": "An object with a decimal-string amount and a currency, such as {\"amount\": \"100.00\", \"currency\": \"USD\"}. A plain number is refused."
+					},
+					"date": {
+						"type": "string",
+						"format": "date",
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+					},
+					"donor": {
+						"type": "object",
+						"properties": {
+							"name": {
+								"type": "string",
+								"minLength": 1
+							},
+							"email": {
+								"type": "string",
+								"format": "email",
+								"pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+							}
+						},
+						"required": ["name"],
+						"additionalProperties": false
+					},
+					"method": {
+						"type": "string",
+						"enum": ["cash", "check"]
+					},
+					"note": {
+						"type": "string",
+						"maxLength": 2000
+					}
+				},
+				"required": ["amount", "date", "donor", "method"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			}
+		},
+		{
+			"name": "create_photo_upload_link",
+			"title": "Make a photo upload link",
+			"description": "Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page on sites with get_block_catalog. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most 8 photos beside it; when all 8 are taken, ask the operator which one the new photo replaces.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"target": {
+						"oneOf": [
+							{
+								"type": "object",
+								"properties": {
+									"kind": {
+										"type": "string",
+										"const": "campaign"
+									},
+									"id": {
+										"type": "string",
+										"minLength": 1,
+										"pattern": "^(?!\\.\\.?$)[^/]+$"
+									}
+								},
+								"required": ["kind", "id"],
+								"additionalProperties": false
+							},
+							{
+								"type": "object",
+								"properties": {
+									"kind": {
+										"type": "string",
+										"const": "donation_page"
+									}
+								},
+								"required": ["kind"],
+								"additionalProperties": false
+							}
+						]
+					},
+					"slot": {
+						"description": "Where the photo goes. On sites with get_content_catalog: \"cover\" for the cover, \"new\" to add it after the other photos, or the position of a photo beside the cover to replace it (\"0\" is the first). Left out, or a position with no photo, it becomes the cover when there is none and otherwise goes after the other photos. On sites with get_block_catalog: the id of the photo block it fills; left out, the first empty one.",
+						"type": "string"
+					}
+				},
+				"required": ["target"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": false,
+				"openWorldHint": false
+			}
+		}
+	]
+}

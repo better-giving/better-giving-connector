@@ -31,10 +31,28 @@ export const PLATFORM_HELLO = {
 	],
 };
 
-/** The tools a Platform connection offers. */
-export const PLATFORM_TOOLS = PLATFORM_HELLO.actions.filter(
-	(name) => !["hello", "exchange", "disconnect"].includes(name),
-);
+/** The tools a Platform connection offers, listed apart from the hello so a tool dropped there shows. */
+export const PLATFORM_TOOLS = [
+	"list_campaigns",
+	"get_campaign",
+	"create_campaign",
+	"update_campaign_settings",
+	"update_campaign_blocks",
+	"publish_campaign",
+	"end_campaign",
+	"get_donation_page",
+	"get_block_catalog",
+	"list_forms",
+	"get_form",
+	"create_form",
+	"update_form",
+	"get_results",
+	"list_donations",
+	"list_donors",
+	"get_donor",
+	"list_recurring_gifts",
+	"create_photo_upload_link",
+];
 
 /** Each Platform tool's contract action, as the fake deployment serves it. */
 export const PLATFORM_ACTION_OF: Record<string, string> = {

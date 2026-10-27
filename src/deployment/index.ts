@@ -51,6 +51,8 @@ export type Hello = {
 	orgName: string;
 	/** The actions this deployment serves, or null when hello didn't state them. */
 	actions: ActionName[] | null;
+	/** Platform rather than Standalone: hello listed tool names. */
+	platform: boolean;
 };
 
 export type DeploymentClient = {
@@ -66,9 +68,9 @@ export type DeploymentClient = {
 	/**
 	 * Runs one contract action with the connection's key. Path params (`:id`)
 	 * are taken from `input`; the rest goes as query on GET, JSON body otherwise.
-	 * A per-call keyed write is tried up to three times under one key: again
-	 * only when the site answers that an earlier try under that key is still
-	 * running, after the wait it names. A lost answer is not retried.
+	 * On Platform, a per-call keyed write is tried up to three times under one
+	 * key: again only when the site answers that an earlier try under that key
+	 * is still running, after the wait it names. A lost answer is not retried.
 	 */
 	call(
 		conn: DeploymentTarget,
@@ -89,6 +91,8 @@ export type DeploymentTarget = {
 	key: Secret;
 	/** Present on a stored connection. Keyed writes derive their Idempotency-Key from it. */
 	userId?: string;
+	/** Platform, whose per-call keyed writes carry a key and may be retried. */
+	platform?: boolean;
 };
 
 const TIMEOUT_MS = 15_000;
@@ -170,13 +174,14 @@ export function deploymentClient(deps: {
 			if (status !== 404 && !isSuccess(status)) throw new Unreachable();
 			const hello = helloBody.safeParse(body);
 			if (status === 404 || !hello.success) throw new NeedsUpdate();
-			const { release, orgName, actions } = hello.data;
+			const { release, orgName, actions, platform } = hello.data;
 			// a name that cleans to nothing is shown as the site's own host
 			return {
 				origin,
 				release,
 				orgName: orgName || new URL(origin).hostname,
 				actions,
+				platform,
 			};
 		},
 
@@ -206,7 +211,7 @@ export function deploymentClient(deps: {
 		},
 
 		async call(conn, action, input) {
-			if (!isPerCallKeyed(action)) {
+			if (conn.platform !== true || !isPerCallKeyed(action)) {
 				return succeeded(await attempt(conn, action, input));
 			}
 			const key = randomUUID();

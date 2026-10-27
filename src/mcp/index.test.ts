@@ -35,6 +35,7 @@ async function reconnect(actions: ActionName[] | null) {
 		origin: deployment.origin,
 		orgName: "Give Example",
 		actions,
+		platform: false,
 		key,
 	});
 }
@@ -50,6 +51,7 @@ beforeEach(async () => {
 		origin: deployment.origin,
 		orgName: "Give Example",
 		actions: null,
+		platform: false,
 		key,
 	});
 	signedInAs = USER;

@@ -132,6 +132,20 @@ export const knownActions = (value: unknown): ActionName[] | null =>
 			]
 		: null;
 
+/**
+ * Whether hello's `actions` come from Platform, which lists tool names where
+ * Standalone lists contract names: some tool name, and no contract name.
+ * Platform-only behaviour keys off this.
+ */
+function listsToolNames(value: unknown): boolean {
+	if (!Array.isArray(value)) return false;
+	const names = value.filter((name) => typeof name === "string");
+	return (
+		names.some((name) => Object.hasOwn(TOOL_ACTIONS, name)) &&
+		!names.some(isActionName)
+	);
+}
+
 const ORG_NAME_MAX = 100;
 
 // The deployment writes the org name, and it reaches the model's instructions
@@ -164,6 +178,7 @@ export const helloBody = z
 		release,
 		orgName: orgName(name),
 		actions: knownActions(actions),
+		platform: listsToolNames(actions),
 	}));
 
 // `name` is kept and cleaned the same way hello's is. Absent, it is empty, so

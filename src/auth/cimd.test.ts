@@ -149,6 +149,7 @@ async function cimdConnect(
 		origin: ORIGIN,
 		orgName: "Example Org",
 		actions: null,
+		platform: false,
 		key: new Secret(KEY),
 	});
 	const back = redirectTarget(res, `${BASE}/connect/return`);

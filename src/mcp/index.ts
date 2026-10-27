@@ -17,7 +17,7 @@ import {
 } from "../db";
 import type { DeploymentClient } from "../deployment";
 import { log } from "../log";
-import { ACTIONS, type ActionSpec } from "./actions";
+import { type ActionSpec, actionsFor } from "./actions";
 import { type RunToolContext, runTool } from "./run-tool";
 
 export type McpDeps = {
@@ -85,7 +85,7 @@ function connectionServer(
 	// null `actions` (a connection made before this was stored, or a hello that
 	// didn't state them) keeps every tool; otherwise only the actions the
 	// deployment serves, so the chat is never offered one that can only fail.
-	const specs = ACTIONS.filter(
+	const specs = actionsFor(connection.platform).filter(
 		(spec) =>
 			connection.actions === null || connection.actions.includes(spec.action),
 	);

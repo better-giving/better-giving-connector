@@ -10,6 +10,8 @@ export type Connection = {
 	orgName: string;
 	/** The actions the deployment serves, or null when it didn't state them. */
 	actions: ActionName[] | null;
+	/** Platform rather than Standalone; false on a row made before this was stored. */
+	platform: boolean;
 	key: Secret;
 	createdAt: Date;
 };
@@ -20,6 +22,7 @@ export interface Connections {
 		origin: Origin;
 		orgName: string;
 		actions: ActionName[] | null;
+		platform: boolean;
 		key: Secret;
 	}): Promise<void>;
 	get(userId: string): Promise<Connection | null>;
@@ -31,20 +34,21 @@ export function connections(db: Db, cipherSecret: string): Connections {
 	return {
 		async insert(r) {
 			await db.execute({
-				sql: "INSERT INTO connection (user_id, origin, org_name, key_ct, actions, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+				sql: "INSERT INTO connection (user_id, origin, org_name, key_ct, actions, platform, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 				args: [
 					r.userId,
 					r.origin,
 					r.orgName,
 					await cipher.seal(r.key, bindTo(r.userId, r.origin)),
 					r.actions === null ? null : JSON.stringify(r.actions),
+					r.platform ? 1 : 0,
 					Date.now(),
 				],
 			});
 		},
 		async get(userId) {
 			const { rows } = await db.execute({
-				sql: "SELECT origin, org_name, key_ct, actions, created_at FROM connection WHERE user_id = ?",
+				sql: "SELECT origin, org_name, key_ct, actions, platform, created_at FROM connection WHERE user_id = ?",
 				args: [userId],
 			});
 			const row = rows[0];
@@ -55,6 +59,7 @@ export function connections(db: Db, cipherSecret: string): Connections {
 				origin,
 				orgName: String(row.org_name),
 				actions: parseActions(row.actions),
+				platform: Number(row.platform) === 1,
 				key: await cipher.open(String(row.key_ct), bindTo(userId, origin)),
 				createdAt: new Date(Number(row.created_at)),
 			};

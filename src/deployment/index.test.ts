@@ -37,6 +37,7 @@ describe("hello", () => {
 			release: "3.4.0",
 			orgName: "Hope Shelter",
 			actions: [...ALL_ACTIONS],
+			platform: false,
 		});
 		expect(dep.calls).toMatchObject([
 			{ method: "GET", path: "/connector/v1/hello", authorization: null },
@@ -78,7 +79,36 @@ describe("hello", () => {
 		);
 		const client = deploymentClient({ fetch: dep.fetch });
 
-		expect(await client.hello(dep.origin)).toMatchObject({ actions: null });
+		expect(await client.hello(dep.origin)).toMatchObject({
+			actions: null,
+			platform: false,
+		});
+	});
+
+	test("reads a hello listing tool names as Platform", async () => {
+		const dep = fakeDeployment({ platform: true });
+		const client = deploymentClient({ fetch: dep.fetch });
+
+		expect(await client.hello(dep.origin)).toMatchObject({ platform: true });
+	});
+
+	test("reads a hello listing any contract name as Standalone, tool names beside it", async () => {
+		const dep = fakeDeployment();
+		dep.intercept(() =>
+			Response.json({
+				service: "better-giving",
+				contract: 1,
+				release: "1.0.0",
+				name: "Give",
+				actions: ["campaigns.list", "create_form"],
+			}),
+		);
+		const client = deploymentClient({ fetch: dep.fetch });
+
+		expect(await client.hello(dep.origin)).toMatchObject({
+			actions: ["campaigns.list", "forms.create"],
+			platform: false,
+		});
 	});
 
 	test.each([
@@ -1190,7 +1220,12 @@ describe("a per-call keyed write", () => {
 		});
 		const exchanged = await client.exchange(dep.origin, dep.mintCode());
 		dep.calls.length = 0;
-		const conn = { origin: dep.origin, key: exchanged.key, userId: "user_1" };
+		const conn = {
+			origin: dep.origin,
+			key: exchanged.key,
+			userId: "user_1",
+			platform: isPlatform,
+		};
 		return { dep, client, conn, waits };
 	}
 	const formsListed = async (
@@ -1278,6 +1313,54 @@ describe("a per-call keyed write", () => {
 			expect(waits).toEqual([wait]);
 		},
 	);
+
+	test("on Standalone, create_form sends the request it always has: no key, and one try", async () => {
+		const dep = fakeDeployment();
+		const sent: Request[] = [];
+		const waits: number[] = [];
+		const client = deploymentClient({
+			fetch: async (input, init) => {
+				const req = new Request(input, init);
+				sent.push(req.clone());
+				return dep.fetch(req);
+			},
+			sleep: async (ms) => {
+				waits.push(ms);
+			},
+		});
+		const { key } = await client.exchange(dep.origin, dep.mintCode());
+		sent.length = 0;
+		dep.intercept(
+			() =>
+				new Response(JSON.stringify({ code: "idempotency_in_progress" }), {
+					status: 409,
+					headers: {
+						"content-type": "application/problem+json",
+						"retry-after": "1",
+					},
+				}),
+		);
+		const conn = { origin: dep.origin, key, userId: "user_1", platform: false };
+
+		await expect(
+			client.call(conn, "forms.create", { name: "Gala", amounts: [25, 50] }),
+		).rejects.toMatchObject({
+			status: 409,
+			problem: { code: "idempotency_in_progress" },
+		});
+
+		expect(sent).toHaveLength(1);
+		expect(waits).toEqual([]);
+		const [req] = sent;
+		expect(req?.method).toBe("POST");
+		expect(req?.url).toBe(`${dep.origin}/connector/v1/forms`);
+		expect(Object.fromEntries(req?.headers ?? [])).toEqual({
+			authorization: `Bearer ${key.reveal()}`,
+			accept: "application/json",
+			"content-type": "application/json",
+		});
+		expect(await req?.text()).toBe('{"name":"Gala","amounts":[25,50]}');
+	});
 
 	test("a key used for another body is an idempotency conflict, not retried", async () => {
 		const { dep, client, conn } = await platform();
