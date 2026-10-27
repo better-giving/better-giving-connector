@@ -23,7 +23,7 @@ export type RunToolContext = {
 	dropConnection(userId: string): Promise<void>;
 };
 
-/** A stored connection, and whether its deployment is Platform. */
+/** A stored connection as this session uses it: Platform or not, and on Platform the actions its hello lists now. */
 export type ToolConnection = Connection & { platform: boolean };
 
 type Settled = { outcome: ToolOutcome; result: CallToolResult };

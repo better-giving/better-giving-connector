@@ -502,7 +502,7 @@ const specOf = (tool: Tool) => {
 
 // What Platform's writes add to the specs above: a campaign's version guard,
 // create_form's warning against a second call, updated_at on a form, and photo
-// links for the hero alone.
+// links for a campaign's hero alone.
 const PLATFORM_CHANGES: Partial<Record<Tool, Partial<ActionSpec<Tool>>>> = {
 	update_campaign_blocks: {
 		description: `${specOf("update_campaign_blocks").description} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null.`,
