@@ -135,7 +135,7 @@ export const knownActions = (value: unknown): ActionName[] | null =>
 /**
  * Whether hello's `actions` come from Platform, which lists tool names where
  * Standalone lists contract names: some tool name, and no contract name.
- * Platform-only behaviour keys off this.
+ * Platform-only behavior keys off this.
  */
 function listsToolNames(value: unknown): boolean {
 	if (!Array.isArray(value)) return false;

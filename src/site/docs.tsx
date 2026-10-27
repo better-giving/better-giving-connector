@@ -89,8 +89,8 @@ export function DocsPage() {
 				<li>
 					Edit a campaign page's title, story, and cover photo, and change its
 					goal or end date. When your AI assistant sends the version it read, a
-					campaign changed since is not overwritten: nothing is saved, and it
-					reads the campaign again first.
+					change made since is never overwritten: nothing is saved, and it reads
+					the campaign again before retrying.
 				</li>
 				<li>
 					Publish or end a campaign. These change what donors see. Your AI
