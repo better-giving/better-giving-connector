@@ -100,18 +100,13 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		idempotentHint: false,
 		openWorldHint: false,
 	};
-	const SET = {
-		readOnlyHint: false,
-		destructiveHint: false,
-		idempotentHint: true,
-		openWorldHint: false,
-	};
 	const DESTRUCTIVE = {
 		readOnlyHint: false,
 		destructiveHint: true,
 		idempotentHint: true,
 		openWorldHint: false,
 	};
+	const PUBLIC = { ...DESTRUCTIVE, openWorldHint: true };
 
 	test("tools/list offers one tool per action, each with its annotations", async () => {
 		const tools = await listTools();
@@ -135,20 +130,20 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			get_campaign: READ,
 			create_campaign: { ...ADD, idempotentHint: true },
 			update_campaign_blocks: DESTRUCTIVE,
-			update_campaign_content: SET,
-			update_campaign_settings: SET,
-			publish_campaign: DESTRUCTIVE,
-			end_campaign: DESTRUCTIVE,
+			update_campaign_content: DESTRUCTIVE,
+			update_campaign_settings: DESTRUCTIVE,
+			publish_campaign: PUBLIC,
+			end_campaign: PUBLIC,
 			get_donation_page: READ,
 			update_donation_page_blocks: DESTRUCTIVE,
-			update_donation_page_content: SET,
-			reset_donation_page: DESTRUCTIVE,
+			update_donation_page_content: DESTRUCTIVE,
+			reset_donation_page: PUBLIC,
 			get_block_catalog: READ,
 			get_content_catalog: READ,
 			list_forms: READ,
 			get_form: READ,
 			create_form: ADD,
-			update_form: SET,
+			update_form: DESTRUCTIVE,
 			get_results: READ,
 			list_donations: READ,
 			list_donors: READ,
@@ -225,7 +220,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(instructions).not.toContain(" or ");
 	});
 
-	test("publish, end, reset, and whole-page block replacement are destructive", async () => {
+	test("publish, end, reset, and every overwrite are destructive", async () => {
 		const tools: {
 			name: string;
 			annotations: { destructiveHint?: boolean; readOnlyHint?: boolean };
@@ -237,13 +232,31 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			"end_campaign",
 			"reset_donation_page",
 			"update_campaign_blocks",
+			"update_campaign_content",
+			"update_campaign_settings",
 			"update_donation_page_blocks",
+			"update_donation_page_content",
+			"update_form",
 		]) {
 			expect(byName.get(name)).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: true,
 			});
 		}
+	});
+
+	test("only the tools that change what the public sees immediately are open-world", async () => {
+		const tools: {
+			name: string;
+			annotations: { openWorldHint?: boolean };
+		}[] = await listTools();
+
+		expect(
+			tools
+				.filter((t) => t.annotations.openWorldHint)
+				.map((t) => t.name)
+				.toSorted(),
+		).toEqual(["end_campaign", "publish_campaign", "reset_donation_page"]);
 	});
 
 	test("each tool's input schema requires what its contract body needs", async () => {
