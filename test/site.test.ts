@@ -309,10 +309,13 @@ test("the docs tool reference lists every tool once, and only reads as Read", as
 	}
 });
 
-test("the docs name no rate limit figure of their own", async () => {
+test("the docs state the approximate per-connection rate limit", async () => {
 	const docs = await (await get("/docs")).text();
-	expect(docs).toContain("rate limits of your Better Giving account");
-	expect(docs).not.toMatch(/\d+ (requests|calls) (per|a|an) /i);
+	expect(docs).toContain("about 120 requests per minute");
+	expect(docs).toContain("HTTP 429");
+	expect(docs).toContain("rate_limited");
+	expect(docs).toMatch(/no\s+Retry-After header/);
+	expect(docs).toMatch(/passes that answer through without\s+retrying/);
 });
 
 test("the root path redirects to the docs", async () => {

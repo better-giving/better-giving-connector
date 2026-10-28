@@ -344,9 +344,11 @@ export function DocsPage() {
 				</li>
 			</ul>
 			<p>
-				Requests are subject to the rate limits of your Better Giving account's
-				API. The connector does not retry a request the account refuses; your AI
-				assistant gets the refusal as the account sent it.
+				Each signed-in connection can make about 120 requests per minute. Past
+				that, the account answers with HTTP 429 and the body{" "}
+				<code>{'{"code":"rate_limited","status":429}'}</code>, with no
+				Retry-After header. The connector passes that answer through without
+				retrying, so your AI assistant should wait a minute before trying again.
 			</p>
 
 			<h2>Troubleshooting</h2>
