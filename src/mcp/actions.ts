@@ -141,8 +141,9 @@ const campaignContent = {
 };
 const CONTENT_KEYS = Object.keys(campaignContent);
 
-// openWorldHint is true for tools that change what the public sees
-// immediately, and false for every other tool. Those are PUBLIC below.
+// A write changes data on the operator's site, a separate system, so every
+// write is open-world. A read changes nothing there and is closed-world.
+// OpenAI's app review flags a write marked closed-world.
 // destructiveHint false on a read matches the directory packet; the spec
 // treats it as meaningful only when readOnlyHint is false.
 const READ = {
@@ -156,7 +157,7 @@ const ADD = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	idempotentHint: false,
-	openWorldHint: false,
+	openWorldHint: true,
 };
 // The deployment replays these two when the arguments match, so a retry
 // does not add a second campaign or gift.
@@ -171,12 +172,6 @@ const DESTRUCTIVE = {
 	readOnlyHint: false,
 	destructiveHint: true,
 	idempotentHint: true,
-	openWorldHint: false,
-};
-// Changes what the public sees immediately: puts a campaign live, ends it, or
-// resets the donation page. OpenAI's app review requires openWorldHint here.
-const PUBLIC = {
-	...DESTRUCTIVE,
 	openWorldHint: true,
 };
 
@@ -290,7 +285,7 @@ export const ACTIONS = toolSpecs([
 			id,
 			gifts_go_to: z.string().nullable().optional(),
 		}),
-		annotations: PUBLIC,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
 	},
 	{
@@ -299,7 +294,7 @@ export const ACTIONS = toolSpecs([
 		title: "End a campaign",
 		description: `Ends a campaign for good. It stops taking gifts. ${CONFIRMED}`,
 		input: z.strictObject({ id }),
-		annotations: PUBLIC,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
 	},
 	{
@@ -339,7 +334,7 @@ export const ACTIONS = toolSpecs([
 		title: "Reset the donation page",
 		description: `Puts the main donation page back to its default content, discarding what is there now. ${CONFIRMED}`,
 		input: z.strictObject({ confirm: z.literal(true) }),
-		annotations: PUBLIC,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_donation_page",
 	},
 	{
