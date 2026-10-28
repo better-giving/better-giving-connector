@@ -9,6 +9,7 @@ import {
 } from "../src/auth/token-lifetimes";
 import type { Db } from "../src/db";
 import { PLATFORM_ORIGIN } from "../src/deployment/origin";
+import { ACTIONS } from "../src/mcp/actions";
 import { fakeDeployment } from "./fake-deployment";
 import { BASE, env, warmUp } from "./harness";
 import type { Call } from "./oauth";
@@ -287,6 +288,34 @@ test("the logo is a square svg and a 512px png", async () => {
 	);
 	expect(bytes.readUInt32BE(16)).toBe(512);
 	expect(bytes.readUInt32BE(20)).toBe(512);
+});
+
+test("the docs tool reference lists every tool once, and only reads as Read", async () => {
+	const docs = await (await get("/docs")).text();
+	const rows = [
+		...docs.matchAll(/<tr><td><code>(\w+)<\/code><\/td><td>([^<]+)<\/td>/g),
+	].map(([, tool, toolClass]) => ({ tool, toolClass }));
+
+	expect(docs).toContain("<h2>Tool reference</h2>");
+	expect(rows.map((row) => row.tool).sort()).toEqual(
+		ACTIONS.map((spec) => spec.tool).sort(),
+	);
+	for (const spec of ACTIONS) {
+		const row = rows.find((r) => r.tool === spec.tool);
+		expect(row?.toolClass === "Read", spec.tool).toBe(
+			spec.annotations.readOnlyHint === true,
+		);
+		expect(["Read", "Write", "Sensitive write"]).toContain(row?.toolClass);
+	}
+});
+
+test("the docs state the approximate per-connection rate limit", async () => {
+	const docs = await (await get("/docs")).text();
+	expect(docs).toContain("about 120 requests per minute");
+	expect(docs).toContain("HTTP 429");
+	expect(docs).toContain("rate_limited");
+	expect(docs).toMatch(/no\s+Retry-After header/);
+	expect(docs).toMatch(/passes that answer through without\s+retrying/);
 });
 
 test("the root path redirects to the docs", async () => {
