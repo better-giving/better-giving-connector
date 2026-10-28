@@ -33,7 +33,7 @@ function contrastAgainstWhite(hex: string): number {
 // A deliberate package change updates these.
 const CURATED_SHA256: Record<string, string> = {
 	"plugin.json":
-		"901cf0b46b13695279dd0868e8f99de0ac5730d775e411b8b4c53204491e7a1e",
+		"2f25f729983bbf4d9956c03c38e49cbec6a7c5fee3746100e216ed21aa53d3c0",
 	"mcp.json":
 		"358381dab7af77a6735d4337b26d2ada12800295c97e6d1fea0d66f618721f30",
 	"assets/icon.png":
@@ -41,7 +41,7 @@ const CURATED_SHA256: Record<string, string> = {
 	"assets/logo.png":
 		"866ff337a58861cd687c121d64ffde2dafce5094689177d6097652b8ed409aa8",
 	"skills/get-started/SKILL.md":
-		"94e01531ca76156dddd84667f1b11043170f7eeb8ead0d49255fc6dda27359f8",
+		"09d0ff7597f5199ced54afa22576a6fc5e2404d52de76ef3a568620158bd8df0",
 };
 
 const sha256 = (data: Buffer) =>
@@ -95,7 +95,7 @@ test("plugin.json matches the packet's listing and the recommended listing value
 	expect(iface.websiteURL).toBe("https://better.giving");
 	expect(manifest.author).toMatchObject({
 		name: "Better Giving",
-		email: "hi@better.giving",
+		email: "support@better.giving",
 		url: "https://better.giving",
 	});
 	expect(iface.brandColor).toBe("#1E6DAB");

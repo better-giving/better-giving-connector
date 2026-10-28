@@ -31,7 +31,7 @@ const ORIGIN = "https://app.connect.better.giving";
 export const BRAND_COLOR = "#1E6DAB";
 
 /** Contact address on the directory listing. */
-export const AUTHOR_EMAIL = "hi@better.giving";
+export const AUTHOR_EMAIL = "support@better.giving";
 
 /**
  * Recommended listing values included in the package. Finance would read as
@@ -75,7 +75,8 @@ const ONBOARDING_SKILL = [
 	"Rules:",
 	"- The connector moves no money. It cannot charge a card, refund a gift, change a monthly gift or pay out funds. Say so if asked.",
 	"- Act only on the connected account.",
-	"- Before `publish_campaign` or `end_campaign`, ask where the gifts go and wait for an explicit yes.",
+	"- Before `publish_campaign`, ask where the gifts go and wait for an explicit yes.",
+	"- Before `end_campaign`, confirm with the user and wait for an explicit yes.",
 	"",
 ].join("\n");
 
