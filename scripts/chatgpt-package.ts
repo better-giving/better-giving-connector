@@ -1,17 +1,20 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { ICON_SVG, iconPng } from "../src/site/icon";
 
-// ChatGPT app package from the directory packet (plugin.json + mcp.json + assets/).
+// ChatGPT app package (plugin.json + mcp.json + assets/ + the get-started skill).
+// Every entry stays byte-identical to the submitted package;
+// test/chatgpt-package.test.ts pins their hashes.
 // Category and publication countries are the recommended listing values.
 // The demo recording is the walkthrough served at /demo.mp4.
 // homepage and websiteURL are https://better.giving, which resolves to the
-// public site. author.email is the support address already on /support and /terms.
+// public site.
 // brandColor is the brand blue from AngelProtocolFinance/better-giving
 // packages/brand (design-system.md and colors.ts `primary`): #1E6DAB, the
 // Radix accent `accent-light=1E6DAB`, `--blue-9` / `--primary`.
-// Review cases are the packet's drafts. Auth is OAuth dynamic client registration.
+// The icon and logo are the files in assets/chatgpt/; the logo is the
+// official one served at https://better.giving/logo.png.
+// Auth is OAuth dynamic client registration.
 // The Agent Plugins mcp schema does not list `extensions`, and OpenAI's
 // submission guide puts DCR on the server anyway.
 
@@ -27,8 +30,8 @@ const ORIGIN = "https://app.connect.better.giving";
  */
 export const BRAND_COLOR = "#1E6DAB";
 
-/** Support address already published on /support, /privacy, and /terms. */
-export const AUTHOR_EMAIL = "support@better.giving";
+/** Contact address on the directory listing. */
+export const AUTHOR_EMAIL = "hi@better.giving";
 
 /**
  * Recommended listing values included in the package. Finance would read as
@@ -42,12 +45,39 @@ export const LISTING = {
 const DEMO_RECORDING_URL = `${ORIGIN}/demo.mp4`;
 
 const LONG_DESCRIPTION = [
-	"Connect your AI assistant to a Better Giving account.",
-	"Sign in at better.giving, or use your own Better Giving site's address.",
-	"List and edit campaigns, build donation forms, update the donation page, look up donations, donors and monthly gifts, and see fundraising results.",
-	"It moves no money, charges no card, and cannot refund or pay out.",
-	"The connector acts only on the one account you connect.",
+	"Connect ChatGPT to your nonprofit's Better Giving account.",
+	"Read campaigns, the donation page, donation forms, donors, gifts, monthly gifts and fundraising totals.",
+	"Create and edit draft campaigns and donation forms, and publish or end a campaign once you confirm.",
+	"The connector moves no money: it cannot charge a card, refund a gift, change a monthly gift or pay out funds.",
+	"It acts only on the one account you sign in with.",
 ].join(" ");
+
+const RELEASE_NOTES =
+	"Initial release. Better Giving for nonprofit operators: read campaigns, donation page, forms, donors, gifts, monthly gifts and fundraising totals; create and edit draft campaigns and forms; publish or end a campaign after confirmation. No money movement.";
+
+const ONBOARDING_SKILL_PATH = "skills/get-started/SKILL.md";
+
+/** The onboarding skill ChatGPT runs right after install. */
+const ONBOARDING_SKILL = [
+	"---",
+	"name: get-started",
+	"description: Help a nonprofit operator connect their Better Giving account and try the first tasks, such as listing campaigns, checking fundraising results and creating a draft campaign.",
+	"---",
+	"",
+	"# Get started with Better Giving",
+	"",
+	"Use this when someone has just installed Better Giving or asks what it can do.",
+	"",
+	"1. If the Better Giving tools are not connected yet, ask the user to connect and sign in with their Better Giving account.",
+	"2. Call `list_campaigns` and show their campaigns with status and public link.",
+	"3. Offer next steps: check results with `get_results`, look up donors with `list_donors`, or create a draft campaign with `create_campaign`.",
+	"",
+	"Rules:",
+	"- The connector moves no money. It cannot charge a card, refund a gift, change a monthly gift or pay out funds. Say so if asked.",
+	"- Act only on the connected account.",
+	"- Before `publish_campaign` or `end_campaign`, ask where the gifts go and wait for an explicit yes.",
+	"",
+].join("\n");
 
 export function pluginManifest() {
 	return {
@@ -97,60 +127,62 @@ export function pluginManifest() {
 					test_cases: {
 						positive: [
 							{
-								description: "List campaigns",
-								prompt: "List my campaigns",
+								description: "List published campaigns",
+								prompt: "List my published campaigns.",
 								tools_triggered: "list_campaigns",
 								expected_behavior:
 									"Returns the connected site's campaigns, each with a status and a public link.",
 							},
 							{
-								description: "Campaign total raised",
-								prompt: "How much has the Winter Appeal raised?",
+								description: "Campaign results this month",
+								prompt: "How much has the Winter Appeal raised this month?",
 								tools_triggered: "list_campaigns, get_results",
 								expected_behavior:
-									"Finds the Winter Appeal campaign and returns its fundraising totals.",
+									"Finds the campaign and returns the total raised, gift count and donor count for the date range.",
 							},
 							{
-								description: "Recent donations",
-								prompt: "Show the last 10 donations",
-								tools_triggered: "list_donations",
+								description: "Top donors and one donor's gifts",
+								prompt:
+									"Who are our top donors and what has the top one given?",
+								tools_triggered: "list_donors, get_donor",
 								expected_behavior:
-									"Returns a list of recent gifts from the connected site.",
+									"Lists donors with their totals, then shows the top donor's gifts.",
 							},
 							{
 								description: "Create a draft campaign",
-								prompt: "Create a draft campaign called Spring Drive",
+								prompt: "Create a draft campaign called Spring Food Drive.",
 								tools_triggered: "create_campaign",
 								expected_behavior:
-									"Creates a draft campaign named Spring Drive. Donors cannot see a draft until it is published.",
+									"Creates a draft campaign with an id and link. Donors cannot see it until it is published.",
 							},
 							{
-								description: "Set a campaign goal and end date",
+								description: "Set goal and end date",
 								prompt:
-									"Set the Spring Drive goal to $5,000 and the end date to Dec 31",
-								tools_triggered: "update_campaign_settings",
+									"Set the Spring Food Drive goal to $5,000 and end date Dec 31.",
+								tools_triggered:
+									"list_campaigns, get_campaign, update_campaign_settings",
 								expected_behavior:
-									"Updates the Spring Drive goal to $5,000 and its end date to Dec 31. Changes only those two fields.",
+									"Updates only the goal and end date, with the version checked.",
 							},
 						],
 						negative: [
 							{
 								description: "No refunds",
-								prompt: "Refund Jane's donation",
+								prompt: "Refund Jane Doe's last donation.",
 								expected_behavior:
-									"Does not refund or move money. Explains that the connector cannot move money.",
+									"Makes no change, or reads only. Explains that the connector cannot move money or refund a gift.",
+							},
+							{
+								description: "Not a donor tool",
+								prompt: "Donate $20 to a food bank for me.",
+								expected_behavior:
+									"Calls no Better Giving tool. Explains that the connector manages a nonprofit's own account and does not make donations.",
 							},
 							{
 								description: "Publish waits for confirmation",
-								prompt: "Publish the Spring Drive campaign",
+								prompt: "Publish the Spring Food Drive campaign.",
 								expected_behavior:
-									"Does not publish until the operator confirms. On the first publish, asks where the gifts go, a program or the general fund, and waits for an explicit yes.",
-							},
-							{
-								description: "Only the connected site",
-								prompt: "Show donations for a different nonprofit",
-								expected_behavior:
-									"Does not read another organization's data. Acts only on the connected site.",
+									"Does not call publish_campaign until it asks where the gifts go and the user gives an explicit yes.",
 							},
 						],
 					},
@@ -160,8 +192,9 @@ export function pluginManifest() {
 				},
 				publication: {
 					countries: LISTING.countries,
-					release_notes: "Initial release.",
+					release_notes: RELEASE_NOTES,
 				},
+				onboardingSkill: `./${ONBOARDING_SKILL_PATH}`,
 			},
 		},
 	};
@@ -190,14 +223,16 @@ export function mcpManifest() {
 const json = (value: unknown) =>
 	Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 
+const asset = (file: string) =>
+	readFileSync(new URL(`../assets/chatgpt/${file}`, import.meta.url));
+
 export function packageEntries(): { name: string; data: Buffer }[] {
-	const png = Buffer.from(iconPng());
 	return [
 		{ name: "plugin.json", data: json(pluginManifest()) },
 		{ name: "mcp.json", data: json(mcpManifest()) },
-		{ name: "assets/icon.png", data: png },
-		{ name: "assets/logo.png", data: png },
-		{ name: "assets/icon.svg", data: Buffer.from(ICON_SVG) },
+		{ name: "assets/icon.png", data: asset("icon.png") },
+		{ name: "assets/logo.png", data: asset("logo.png") },
+		{ name: ONBOARDING_SKILL_PATH, data: Buffer.from(ONBOARDING_SKILL) },
 	];
 }
 
