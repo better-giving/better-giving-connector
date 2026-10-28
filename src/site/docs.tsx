@@ -15,8 +15,8 @@ export function DocsPage() {
 			/>
 			<p>
 				The Better Giving Connector lets a nonprofit manage its Better Giving
-				account from your AI assistant. Sign in at better.giving, or connect
-				your own Better Giving site's address.
+				account from your AI assistant. You sign in at better.giving and press
+				Allow.
 			</p>
 
 			<h2>Demo</h2>
@@ -51,11 +51,7 @@ export function DocsPage() {
 			<h2>Before you connect</h2>
 			<p>You need both of these:</p>
 			<ul>
-				<li>
-					A Better Giving account. Sign in at better.giving, or use your own
-					Better Giving site's address. An older site that does not speak this
-					connector cannot connect yet.
-				</li>
+				<li>A Better Giving account you sign in to at better.giving.</li>
 				<li>Permission to manage that account.</li>
 			</ul>
 
@@ -64,11 +60,7 @@ export function DocsPage() {
 				<li>
 					In your AI assistant, add the connector at the server URL above.
 				</li>
-				<li>
-					When this site opens, continue with better.giving, or type your own
-					Better Giving site's address. Use that address, not your
-					organization's main website.
-				</li>
+				<li>Press Connect. better.giving opens.</li>
 				<li>Sign in to your Better Giving account and press Allow.</li>
 				<li>You return to your AI assistant, connected to that one account.</li>
 			</ol>
@@ -158,13 +150,12 @@ export function DocsPage() {
 					your AI assistant and press Connect again.
 				</li>
 				<li>
-					If the address didn't answer, check it. If we couldn't find Better
-					Giving at that address, use better.giving or your own Better Giving
-					site's address.
+					If the page says better.giving didn't answer or can't connect right
+					now, wait a moment and press Connect again.
 				</li>
 				<li>
 					If a tool tells you to reconnect, the account refused the key or
-					moved. Connect again and type the current address.
+					moved. Connect again.
 				</li>
 			</ul>
 			<p>
@@ -176,7 +167,7 @@ export function DocsPage() {
 				Disconnect the connector in your AI assistant. That deletes the
 				connection stored here and asks that account to revoke the key. If a
 				tool says the account has moved or no longer accepts the connection,
-				connect again and type the current address.
+				connect again.
 			</p>
 
 			<h2>More</h2>

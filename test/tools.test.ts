@@ -51,7 +51,12 @@ beforeEach(async () => {
 		host: "www.hopeshelter.org",
 		name: "Hope Shelter",
 	});
-	const app = createApp({ env, db, fetch: fakeNetwork(deployment, www) });
+	const app = createApp({
+		env,
+		db,
+		fetch: fakeNetwork(deployment, www),
+		platformOrigin: deployment.origin,
+	});
 	call = async (req) => app.request(req);
 	await warmUp(call);
 	bearer = `Bearer ${(await connectFlow(call, deployment, BASE).connect()).access_token}`;
@@ -1010,7 +1015,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		);
 	});
 
-	test("a site that moved to another address answers reconnect at the new address and drops the connection", async () => {
+	test("a site that moved to another address answers reconnect and drops the connection", async () => {
 		deployment.intercept(() =>
 			Response.redirect(
 				"https://www.hopeshelter.org/connector/v1/campaigns",
@@ -1022,7 +1027,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		expect(result.isError).toBe(true);
 		expect(textOf(result)).toBe(
-			"Hope Shelter's Better Giving site has moved to a new address. Reconnect Better Giving in your AI assistant's connector settings and type the new address.",
+			"Hope Shelter's Better Giving site has moved to a new address. Reconnect Better Giving in your AI assistant's connector settings.",
 		);
 		expect(await connectionRows(db)).toEqual(NO_CONNECTION_ROWS);
 		expect((await send("tools/list")).status).toBe(401);
@@ -1128,7 +1133,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			/^DELETE FROM connection/,
 			new StoreDown("sentinel-store-detail"),
 		);
-		const app = createApp({ env, db: failing.db, fetch: deployment.fetch });
+		const app = createApp({
+			env,
+			db: failing.db,
+			fetch: deployment.fetch,
+			platformOrigin: deployment.origin,
+		});
 		call = async (req) => app.request(req);
 		await warmUp(call);
 	}

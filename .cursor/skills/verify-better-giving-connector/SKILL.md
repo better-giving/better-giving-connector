@@ -32,7 +32,7 @@ What that script does:
 - Sets `PUBLIC_URL=http://localhost:3000` and `TURSO_DATABASE_URL=file:/tmp/bgc-verify-<run-id>/local.db`. `pnpm dev` refuses a non-`file:` URL and a `PUBLIC_URL` with no port. An existing `.env.local` fills only names the process left unset; `VERCEL` in that file makes `pnpm dev` refuse the file database, and launch stops.
 - Generates a local CA and a certificate for `give.example.org`, and adds `127.0.0.1 give.example.org` to `/etc/hosts` when that name is absent. The connector accepts a donation-site address only as public `https` with no port (`parseOrigin` in `src/deployment/origin.ts`), so the fake listens on `127.0.0.1:443`. Binding 443 uses `sudo -n`.
 - Starts the fake in tmux session `bgc-verify-fake-<run-id>` via `scripts/fake-server.ts`. The process serves `fakeDeployment({ host: "give.example.org", name: "Hope Shelter" })` from `test/fake-deployment.ts`. Its ready line is `fake ready org=Hope Shelter`. The fake seeds donation form `frm_1` and a starting donation page in memory. The connector database has no connection row until OAuth finishes.
-- Starts the connector in tmux session `bgc-verify-connector-<run-id>` with `pnpm dev` (`tsx watch --import ./scripts/mp4-register.mjs --env-file-if-exists=.env.local src/dev.ts`) and `NODE_EXTRA_CA_CERTS` pointing at the run CA. `src/dev.ts` prints no listen line.
+- Starts the connector in tmux session `bgc-verify-connector-<run-id>` with `pnpm dev` (`tsx watch --import ./scripts/binary-register.mjs --env-file-if-exists=.env.local src/dev.ts`) and `NODE_EXTRA_CA_CERTS` pointing at the run CA. `src/dev.ts` prints no listen line.
 
 Ready (both, and the migration check) — `pnpm dev` has finished `migrate()` before `listen`:
 

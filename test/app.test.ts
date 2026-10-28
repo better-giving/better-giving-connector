@@ -22,7 +22,12 @@ let flow: ConnectFlow;
 beforeEach(async () => {
 	db = await freshDb();
 	deployment = fakeDeployment({ name: "Hope Shelter" });
-	const app = createApp({ env, db, fetch: deployment.fetch });
+	const app = createApp({
+		env,
+		db,
+		fetch: deployment.fetch,
+		platformOrigin: deployment.origin,
+	});
 	call = async (req) => app.request(req);
 	flow = connectFlow(call, deployment, BASE);
 	await warmUp(call);
@@ -130,6 +135,7 @@ test("a deploy under another connection-key secret answers 500 and keeps the con
 		},
 		db,
 		fetch: deployment.fetch,
+		platformOrigin: deployment.origin,
 	});
 
 	const res = await rotated.request(mcpPost(INITIALIZE, bearer));
@@ -173,7 +179,12 @@ const DETAIL = "sentinel-detail-7f3a";
 // once `fail()` is called.
 async function appOverFailingDb() {
 	const failing = failingDb(db);
-	const app = createApp({ env, db: failing.db, fetch: deployment.fetch });
+	const app = createApp({
+		env,
+		db: failing.db,
+		fetch: deployment.fetch,
+		platformOrigin: deployment.origin,
+	});
 	await warmUp(async (req) => app.request(req));
 	return {
 		fail: () => failing.failOn(/./, new StoreDown(DETAIL)),

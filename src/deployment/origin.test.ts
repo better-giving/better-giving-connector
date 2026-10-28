@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { parseOrigin, parseTypedOrigin } from "./origin";
+import { PLATFORM_ORIGIN, parseOrigin } from "./origin";
+
+test("the platform is better.giving over https", () => {
+	expect(PLATFORM_ORIGIN).toBe("https://better.giving");
+});
 
 describe("parseOrigin", () => {
 	test.each([
@@ -32,23 +36,5 @@ describe("parseOrigin", () => {
 		["garbage", "not a host"],
 	])("refuses %s", (_, input) => {
 		expect(parseOrigin(input)).toBeNull();
-	});
-});
-
-describe("parseTypedOrigin", () => {
-	test.each([
-		["http://give.example.org/donate", "https://give.example.org"],
-		[" HTTP://give.example.org", "https://give.example.org"],
-		["give.example.org", "https://give.example.org"],
-	])("accepts %j as %s", (input, origin) => {
-		expect(parseTypedOrigin(input)).toBe(origin);
-	});
-
-	test.each([
-		["http on a port", "http://give.example.org:8080"],
-		["http to an IPv4 literal", "http://127.0.0.1"],
-		["another scheme", "ftp://give.example.org"],
-	])("refuses %s", (_, input) => {
-		expect(parseTypedOrigin(input)).toBeNull();
 	});
 });

@@ -237,7 +237,12 @@ async function startWorld() {
 			return res;
 		};
 
-	const app = createApp({ env, db: flaky.db, fetch: net });
+	const app = createApp({
+		env,
+		db: flaky.db,
+		fetch: net,
+		platformOrigin: dep.origin,
+	});
 	const call = serve(app);
 	await warmUp(call);
 	const flow = connectFlow(call, dep, BASE);
@@ -264,6 +269,7 @@ async function startWorld() {
 					env: { ...env, CONNECTION_KEY_SECRET: ROTATED_SECRET },
 					db,
 					fetch: net,
+					platformOrigin: dep.origin,
 				}),
 			),
 		failOn: flaky.failOn,
@@ -396,14 +402,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	const heading = async (res: Response) =>
 		/<h1>(.*?)<\/h1>/.exec(shown(await res.text()))?.[1];
 
-	const postAddress = (login: URL, address: string) =>
-		world.call(
-			new Request(login, {
-				method: "POST",
-				headers: { origin: BASE, "sec-fetch-site": "same-origin" },
-				body: new URLSearchParams({ address }),
-			}),
-		);
+	const openLogin = async () =>
+		world.call(new Request((await world.flow.startSignIn()).login));
 
 	test("connect walk: a full connection, then /mcp initialize and tools/list", async () => {
 		const at = await world.flow.toReturn();
@@ -432,17 +432,53 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expectCleanScenario();
 	});
 
-	test("connect walk: a return and an address that arrive after the request timed out", async () => {
+	test("connect walk: a return and an open that arrive after the request timed out", async () => {
 		const at = await world.flow.toReturn();
 		plant("allow-code", at.back.searchParams.get("code") ?? "", false);
 		const login = (await world.flow.startSignIn()).login;
 		advance(11 * MINUTE);
 
 		const lateReturn = await world.flow.returnTo(at.back, at.cookie);
-		const lateAddress = await postAddress(login, arg("late-address"));
+		const lateOpen = await world.call(new Request(login));
 
 		expect(await heading(lateReturn)).toBe("Connection request timed out");
-		expect(await heading(lateAddress)).toBe("Connection request timed out");
+		expect(await heading(lateOpen)).toBe("Connection request timed out");
+		expectCleanScenario();
+	});
+
+	test("connect walk: returns carrying sentinels in state, iss and error", async () => {
+		const { back, cookie } = await world.flow.toReturn();
+		plant("allow-code", back.searchParams.get("code") ?? "", false);
+		const changed = (params: Record<string, string>) => {
+			const url = new URL(back);
+			for (const [name, value] of Object.entries(params)) {
+				url.searchParams.set(name, value);
+			}
+			return url;
+		};
+
+		const wrongState = await world.flow.returnTo(
+			changed({ state: arg("return-state") }),
+			cookie,
+		);
+		const wrongIssuer = await world.flow.returnTo(
+			changed({
+				iss: `https://${arg("return-iss")}.example`,
+				error: arg("return-error"),
+			}),
+			cookie,
+		);
+		const otherError = await world.flow.returnTo(
+			changed({ error: arg("return-error") }),
+			cookie,
+		);
+
+		expect(await heading(wrongState)).toBe("Connection request timed out");
+		expect(await heading(wrongIssuer)).toBe("Couldn't finish connecting");
+		expect(await heading(otherError)).toBe("Couldn't finish connecting");
+		expect(world.dep.calls.map((c) => c.path)).not.toContain(
+			"/connector/v1/exchange",
+		);
 		expectCleanScenario();
 	});
 
@@ -457,29 +493,32 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expectCleanScenario();
 	});
 
-	test("connect walk: Cancel, and addresses the form refuses", async () => {
-		const chat = await world.flow.startSignIn();
-		const page = await world.call(new Request(chat.login));
-		const cancelled = await world.flow.pressButton(page, "Cancel");
-		const notAnAddress = await postAddress(
-			chat.login,
-			`${arg("not-an-address")} charity`,
-		);
-		const silent = await postAddress(
-			chat.login,
-			`${arg("silent-host")}.example`,
+	test("connect walk: a platform that doesn't answer or can't connect, Back to your AI assistant, and a posted address", async () => {
+		world.dep.intercept(() => new Response(HIDDEN, { status: 503 }));
+		const silent = await openLogin();
+		const back = await world.flow.pressButton(
+			silent.clone(),
+			"Back to your AI assistant",
 		);
 		world.dep.intercept(
 			() => new Response(`<h1>${HIDDEN}</h1>`, { status: 404 }),
 		);
-		const notBetterGiving = await postAddress(chat.login, world.dep.host);
+		const notBetterGiving = await openLogin();
+		world.dep.intercept(null);
+		const posted = await world.call(
+			new Request((await world.flow.startSignIn()).login, {
+				method: "POST",
+				headers: { origin: BASE, "sec-fetch-site": "same-origin" },
+				body: new URLSearchParams({
+					address: `${arg("posted-address")}.example`,
+				}),
+			}),
+		);
 
-		expect(cancelled.status).toBe(302);
-		expect([
-			notAnAddress.status,
-			silent.status,
-			notBetterGiving.status,
-		]).toEqual([400, 502, 400]);
+		expect([silent.status, back.status, notBetterGiving.status]).toEqual([
+			502, 302, 502,
+		]);
+		expect([404, 405]).toContain(posted.status);
 		expectCleanScenario();
 	});
 
@@ -518,12 +557,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expectCleanScenario();
 	});
 
-	test("connect walk: unexpected throws on the address and the return", async () => {
+	test("connect walk: unexpected throws on the open and the return", async () => {
 		world.dep.intercept(
 			() =>
 				new Response(null, { status: 301, headers: { location: "https://[" } }),
 		);
-		const address = await world.flow.submitAddress(world.dep.host);
+		const opened = await openLogin();
 		world.dep.intercept(null);
 		const { back, cookie } = await world.flow.toReturn();
 		world.failOn(
@@ -533,7 +572,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		const stored = await world.flow.returnTo(back, cookie);
 
-		expect(address.status).toBe(500);
+		expect(opened.status).toBe(500);
 		expect(stored.status).toBe(500);
 		expectCleanScenario();
 	});
@@ -879,7 +918,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expectCleanScenario();
 	});
 
-	test("a read meeting a site that moved says reconnect at the new address, sends the key nowhere else and drops the connection", async () => {
+	test("a read meeting a site that moved says reconnect, sends the key nowhere else and drops the connection", async () => {
 		const bearer = await world.signIn();
 		world.dep.intercept(
 			() =>
@@ -1130,7 +1169,9 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 		"ok",
 		"denied",
 		"expired",
-		"invalid_address",
+		"state_mismatch",
+		"issuer_mismatch",
+		"code_invalid",
 		"unreachable",
 		"needs_update",
 		"failed",

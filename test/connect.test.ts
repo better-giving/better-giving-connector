@@ -6,7 +6,16 @@ import {
 	fakeDeployment,
 	fakeNetwork,
 } from "./fake-deployment";
-import { BASE, env, INITIALIZE, mcpPost, rpc, warmUp } from "./harness";
+import {
+	BASE,
+	env,
+	INITIALIZE,
+	MCP_VERSIONS,
+	mcpPost,
+	mcpRequest,
+	rpc,
+	warmUp,
+} from "./harness";
 import {
 	type Call,
 	CHATGPT_CALLBACK_REDIRECT_URI,
@@ -30,8 +39,9 @@ let deployment: FakeDeployment;
 let call: Call;
 let flow: ConnectFlow;
 
-function serve(fetch: typeof globalThis.fetch) {
-	const app = createApp({ env, db, fetch });
+// `platform` is the site /connect sends every operator to.
+function serve(fetch: typeof globalThis.fetch, platform = deployment) {
+	const app = createApp({ env, db, fetch, platformOrigin: platform.origin });
 	call = async (req) => app.request(req);
 	flow = connectFlow(call, deployment, BASE);
 }
@@ -105,11 +115,25 @@ const DIDNT_FINISH = {
 	message:
 		"Connecting didn't finish. Go back to your AI assistant and press Connect again.",
 };
-const NOT_AN_ADDRESS =
-	"Enter better.giving, or your own Better Giving site's address.";
-const NEEDS_UPDATE =
-	"We couldn't find Better Giving at that address. Use better.giving, or your own Better Giving site's address, not your organization's main website. If the address is right, that site can't connect through the connector yet.";
-const UNREACHABLE = "That address didn't answer. Check it and try again.";
+const UNREACHABLE = {
+	heading: "Couldn't reach Better Giving",
+	message:
+		"better.giving didn't answer. Go back to your AI assistant and press Connect again.",
+};
+const NEEDS_UPDATE = {
+	heading: "Couldn't connect",
+	message:
+		"better.giving can't connect right now. Go back to your AI assistant and press Connect again.",
+};
+const CROSS_SITE = {
+	heading: "Couldn't connect",
+	message:
+		"This form has to be sent from this page. Go back to your AI assistant and press Connect again.",
+};
+
+const LOGO =
+	'<img class="logo" src="/connect/assets/logo.png" alt="Better Giving" width="64" height="64"/>';
+const WAY_BACK = /<button[^>]*>Back to your AI assistant<\/button>/;
 
 // The page a flow ended on: its status, and the outcome it is titled and headed for.
 async function expectPage(
@@ -119,14 +143,29 @@ async function expectPage(
 ): Promise<string> {
 	expect(res.status).toBe(status);
 	const html = shown(await res.text());
-	expect(html).toContain(`<title>${page.heading}</title>`);
+	expect(html).toMatch(/^<!doctype html>/i);
+	expect(html).toContain(`<title>${page.heading} · Better Giving</title>`);
 	expect(html).toContain(`<h1>${page.heading}</h1>`);
 	expect(html).toContain(page.message);
-	expect(html).not.toMatch(/Claude|ChatGPT/);
+	expect(html).toContain(LOGO);
+	// what the operator reads, not the stylesheet or the form's action
+	const read = [...html.matchAll(/<(title|h1|p|button)[^>]*>([\s\S]*?)<\/\1>/g)]
+		.map(([, , text]) => text)
+		.join("\n");
+	expect(read).toContain(page.message);
+	expect(read).not.toMatch(/Claude|ChatGPT/);
+	// every operator signs in at better.giving; no page offers a site to choose
+	expect(read).not.toMatch(/address|(different|own|another|choose a) site/i);
 	// the title and h1 carry the outcome; an alert on load is read twice or not at all
 	expect(html).not.toContain('role="alert"');
 	return html;
 }
+
+// The connect log lines written since `lines` started watching.
+const connectLines = (lines: { mock: { calls: unknown[][] } }) =>
+	lines.mock.calls
+		.map(([line]) => JSON.parse(String(line)))
+		.filter((e) => e.kind === "connect");
 
 const CHAT_APP_CALLBACKS = [
 	REDIRECT_URI,
@@ -135,10 +174,10 @@ const CHAT_APP_CALLBACKS = [
 ];
 
 test.each(CHAT_APP_CALLBACKS)(
-	"connecting walks from the address page through Allow to a working /mcp, back to %s",
+	"connecting walks from opening the login request through Allow to a working /mcp, back to %s",
 	async (redirectUri) => {
 		const chat = await flow.startSignIn(redirectUri);
-		const handOff = await flow.submitAddress("give.example.org", chat.login);
+		const handOff = await flow.open(chat.login);
 		const back = await flow.press(handOff.headers.get("location") ?? "");
 
 		const done = await flow.returnTo(back, cookieFrom(handOff));
@@ -159,94 +198,10 @@ test.each(CHAT_APP_CALLBACKS)(
 	},
 );
 
-test("the address page asks for better.giving or your own site", async () => {
-	const res = await call(new Request(await loginUrl()));
+test("opening the login request hands the browser to the platform's Allow with a state cookie", async () => {
+	const lines = vi.spyOn(console, "log").mockImplementation(() => {});
 
-	expect(res.headers.get("content-type")).toMatch(/^text\/html/);
-	const html = await expectPage(res, 200, {
-		heading: "Connect Better Giving",
-		message:
-			"Sign in to your Better Giving account at better.giving. To use your own Better Giving site's address instead, type that address. You'll sign in and press Allow, then return to your AI assistant.",
-	});
-	expect(html).toMatch(/^<!doctype html>/i);
-	expect(html).toContain(
-		'<label for="address">Your Better Giving address</label>',
-	);
-	const input = html.match(/<input[^>]*name="address"[^>]*>/)?.[0] ?? "";
-	const hint = input.match(/aria-describedby="([^"]+)"/)?.[1];
-	expect(html).toContain(
-		`<p id="${hint}" class="hint">better.giving, or your own Better Giving site's address. Not your organization's main website.</p>`,
-	);
-	expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Continue<\/button>/);
-});
-
-const READ_ONLY_LINE =
-	"<p>This connection is read-only: your AI assistant will be able to view your Better Giving account and site but not change anything.</p>";
-
-const readOnlyLogin = async () =>
-	(
-		await connectFlow(call, deployment, BASE, {
-			scope: "offline_access read_only",
-		}).startSignIn()
-	).login;
-
-test("the address page for a read-only request says the assistant can view but not change the site", async () => {
-	const html = shown(
-		await (await call(new Request(await readOnlyLogin()))).text(),
-	);
-
-	expect(html).toContain(
-		`return to your AI assistant.</p>${READ_ONLY_LINE}<form`,
-	);
-});
-
-test.each([
-	["no scope", undefined],
-	["offline_access alone", "offline_access"],
-])(
-	"the address page for a request with %s says nothing of read-only",
-	async (_, scope) => {
-		const login = (
-			await connectFlow(call, deployment, BASE, { scope }).startSignIn()
-		).login;
-
-		const html = shown(await (await call(new Request(login))).text());
-
-		expect(html).toContain("return to your AI assistant.</p><form");
-		expect(html).not.toContain("read-only");
-	},
-);
-
-test("a read-only request's address asked for again still says it is read-only", async () => {
-	const res = await flow.submitAddress("my charity", await readOnlyLogin());
-
-	expect(res.status).toBe(400);
-	expect(shown(await res.text())).toContain(READ_ONLY_LINE);
-});
-
-test("the page's stylesheet reaches the browser unescaped", async () => {
-	const html = await (await call(new Request(await loginUrl()))).text();
-
-	const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
-	expect(style).toContain('"Segoe UI"');
-	expect(style).not.toContain("&quot;");
-});
-
-test.each([
-	["no login request", async () => `${BASE}/connect`],
-	[
-		"a tampered login request",
-		async () => (await loginUrl()).href.replace("client_id=", "client_id=x"),
-	],
-])("the address page with %s says the request timed out", async (_, url) => {
-	const res = await call(new Request(await url()));
-
-	const html = await expectPage(res, 400, TIMED_OUT);
-	expect(html).not.toContain("<form");
-});
-
-test("an address hands the browser to the deployment's Allow with a state cookie", async () => {
-	const res = await flow.submitAddress("give.example.org");
+	const res = await flow.open();
 
 	expect(res.status).toBe(302);
 	const allow = new URL(res.headers.get("location") ?? "");
@@ -260,43 +215,279 @@ test("an address hands the browser to the deployment's Allow with a state cookie
 	expect(cookie).toMatch(/; HttpOnly(;|$)/);
 	expect(cookie).toMatch(/; Secure(;|$)/);
 	expect(cookie).toMatch(/; SameSite=Lax(;|$)/);
+	expect(requestsTo("hello")).toHaveLength(1);
+	expect(connectLines(lines)).toEqual([
+		{ kind: "connect", step: "open", outcome: "ok" },
+	]);
 });
 
 test.each([
-	"give.example.org",
-	" Give.Example.org ",
-	"https://give.example.org/donate?campaign=winter",
-	"http://give.example.org",
-])("typing %j connects to that deployment", async (address) => {
-	await flow.connect(address);
+	["Standalone", false],
+	["Platform", true],
+])(
+	"opening the login request hands the browser to better.giving's Allow on %s",
+	async (_, platform) => {
+		deployment = fakeDeployment({
+			host: "better.giving",
+			name: "Hope Shelter",
+			platform,
+		});
+		serve(deployment.fetch);
+		await warmUp(call);
 
+		const res = await flow.open();
+
+		expect(res.status).toBe(302);
+		const allow = new URL(res.headers.get("location") ?? "");
+		expect(allow.origin).toBe("https://better.giving");
+		expect(allow.pathname).toBe("/admin/connector/allow");
+		expect(res.headers.get("set-cookie")).toMatch(/^__Secure-connect=/);
+		expect(requestsTo("hello")).toHaveLength(1);
+	},
+);
+
+test("connecting at better.giving stores better.giving as the connection's site", async () => {
+	deployment = fakeDeployment({ host: "better.giving", name: "Hope Shelter" });
+	serve(deployment.fetch);
+	await warmUp(call);
+
+	const tokens = await flow.connect();
+
+	expect(await instructions(tokens)).toContain("Hope Shelter");
 	expect(await connectionRows()).toEqual([
-		{ origin: "https://give.example.org", orgName: "Hope Shelter" },
+		{ origin: "https://better.giving", orgName: "Hope Shelter" },
 	]);
 });
 
-test("an apex that redirects to www connects to www", async () => {
-	const apex = fakeDeployment({ host: "hopeshelter.org" });
-	apex.intercept(
+test("a form posted to /connect is not accepted and reaches no other site", async () => {
+	const urls: string[] = [];
+	serve(async (input, init) => {
+		urls.push(new Request(input, init).url);
+		return deployment.fetch(input, init);
+	});
+	await warmUp(call);
+
+	const res = await call(
+		new Request(await loginUrl(), {
+			method: "POST",
+			headers: {
+				origin: BASE,
+				"sec-fetch-site": "same-origin",
+				"content-type": "application/x-www-form-urlencoded",
+			},
+			body: new URLSearchParams({ address: "evil.example" }),
+		}),
+	);
+
+	expect(res.status).toBe(404);
+	expect(res.headers.get("set-cookie")).toBeNull();
+	expect(res.headers.get("location") ?? "").not.toContain("evil.example");
+	expect(urls.filter((url) => url.includes("evil.example"))).toEqual([]);
+	expect(requestsTo("hello")).toEqual([]);
+});
+
+test.each([
+	[
+		"better.giving doesn't answer",
+		() => serve(deployment.fetch, fakeDeployment({ host: "better.giving" })),
+		"unreachable",
+		UNREACHABLE,
+	],
+	[
+		"better.giving answers 500",
+		() => answer("hello", 500),
+		"unreachable",
+		UNREACHABLE,
+	],
+	[
+		"better.giving can't connect",
+		() => answer("hello", 404),
+		"needs_update",
+		NEEDS_UPDATE,
+	],
+] as const)(
+	"when %s, opening says so with a way back and sets no cookie",
+	async (_, arrange, outcome, page) => {
+		arrange();
+		await warmUp(call);
+		const lines = vi.spyOn(console, "log").mockImplementation(() => {});
+		const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+		const res = await flow.open();
+
+		expect(res.headers.get("set-cookie")).toBeNull();
+		const html = await expectPage(res, 502, page);
+		expect(html).toMatch(WAY_BACK);
+		expect(connectLines(lines)).toEqual([
+			{ kind: "connect", step: "open", outcome },
+		]);
+		expect(errors).not.toHaveBeenCalled();
+	},
+);
+
+test("an open nine minutes into the login request still hands the browser to Allow", async () => {
+	const login = await loginUrl();
+	advance(9 * MINUTE);
+
+	const res = await flow.open(login);
+
+	expect(res.status).toBe(302);
+	expect(new URL(res.headers.get("location") ?? "").origin).toBe(
+		deployment.origin,
+	);
+});
+
+test("an address and origin added to the login request are refused as a tampered request, reaching no other site", async () => {
+	const urls: string[] = [];
+	serve(async (input, init) => {
+		urls.push(new Request(input, init).url);
+		return deployment.fetch(input, init);
+	});
+	await warmUp(call);
+	const login = await loginUrl();
+	const tampered = new URL(
+		`${login.href}&address=evil.example&origin=https://evil.example`,
+	);
+
+	const res = await flow.open(tampered);
+
+	// the added parameters break the login request's signature
+	const html = await expectPage(res, 400, TIMED_OUT);
+	expect(html).not.toContain("<form");
+	expect(res.headers.get("set-cookie")).toBeNull();
+	expect(requestsTo("hello")).toEqual([]);
+	expect(urls.filter((url) => url.includes("evil.example"))).toEqual([]);
+});
+
+const readOnlyLogin = async () =>
+	(
+		await connectFlow(call, deployment, BASE, {
+			scope: "offline_access read_only",
+		}).startSignIn()
+	).login;
+
+test("a read-only request opens straight to Allow, with no page first", async () => {
+	const res = await flow.open(await readOnlyLogin());
+
+	expect(res.status).toBe(302);
+	expect(new URL(res.headers.get("location") ?? "").origin).toBe(
+		deployment.origin,
+	);
+	expect(await res.text()).toBe("");
+});
+
+// The tools a token is offered, with whether each is read-only.
+async function offeredTools(tokens: Tokens) {
+	const res = await call(
+		mcpRequest(
+			MCP_VERSIONS[0],
+			`Bearer ${tokens.access_token}`,
+			"tools/list",
+			undefined,
+			1,
+		),
+	);
+	return (
+		(await rpc(res)).result.tools as {
+			annotations?: { readOnlyHint?: boolean };
+		}[]
+	).map((t) => t.annotations?.readOnlyHint === true);
+}
+
+test("a read-only connect reaches /mcp with only read-only tools", async () => {
+	const full = await offeredTools(await flow.connect());
+
+	const readOnly = await offeredTools(
+		await connectFlow(call, deployment, BASE, {
+			scope: "offline_access read_only",
+		}).connect(),
+	);
+
+	expect(full).toContain(false);
+	expect(readOnly.length).toBeGreaterThan(0);
+	expect(readOnly).not.toContain(false);
+});
+
+test("the page's stylesheet reaches the browser unescaped and loads the platform's font", async () => {
+	const html = await (await call(new Request(`${BASE}/connect`))).text();
+
+	const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+	expect(style).toContain('font-family:"Quicksand Variable"');
+	expect(style).toContain("src:url(/connect/assets/quicksand.woff2)");
+	expect(style).toContain("font-display:swap");
+	expect(style).not.toContain("&quot;");
+});
+
+test.each([
+	["/connect/assets/logo.png", "image/png"],
+	["/connect/assets/quicksand.woff2", "font/woff2"],
+])("%s is served as %s", async (path, type) => {
+	const res = await call(new Request(new URL(path, BASE)));
+
+	expect(res.status).toBe(200);
+	expect(res.headers.get("content-type")).toBe(type);
+	expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+	expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+	expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);
+});
+
+test.each([
+	["no login request", async () => `${BASE}/connect`],
+	[
+		"a tampered login request",
+		async () => (await loginUrl()).href.replace("client_id=", "client_id=x"),
+	],
+	[
+		"a login request eleven minutes old",
+		async () => {
+			const login = await loginUrl();
+			advance(11 * MINUTE);
+			return login.href;
+		},
+	],
+])(
+	"opening with %s says the request timed out, with no way back",
+	async (_, url) => {
+		const target = await url();
+		const lines = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const res = await call(new Request(target));
+
+		const html = await expectPage(res, 400, TIMED_OUT);
+		expect(html).not.toContain("<form");
+		expect(requestsTo("hello")).toEqual([]);
+		expect(connectLines(lines)).toEqual([
+			{ kind: "connect", step: "open", outcome: "expired" },
+		]);
+	},
+);
+
+test("a platform whose hello redirects to another origin is refused before any Allow", async () => {
+	const elsewhere = fakeDeployment({ host: "elsewhere.example.org" });
+	const platform = fakeDeployment({ host: "better.giving" });
+	platform.intercept(
 		() =>
 			new Response(null, {
-				status: 301,
-				headers: { location: "https://www.hopeshelter.org/connector/v1/hello" },
+				status: 302,
+				headers: {
+					location: "https://elsewhere.example.org/connector/v1/hello",
+				},
 			}),
 	);
-	deployment = fakeDeployment({
-		host: "www.hopeshelter.org",
-		name: "Hope Shelter",
-	});
-	serve(fakeNetwork(apex, deployment));
+	serve(fakeNetwork(platform, elsewhere), platform);
+	const lines = vi.spyOn(console, "log").mockImplementation(() => {});
 
-	const at = await flow.toReturn("hopeshelter.org");
-	await flow.finish(at);
+	const res = await flow.open();
 
-	expect(new URL(at.allow).origin).toBe("https://www.hopeshelter.org");
-	expect(await connectionRows()).toEqual([
-		{ origin: "https://www.hopeshelter.org", orgName: "Hope Shelter" },
+	expect(res.headers.get("set-cookie")).toBeNull();
+	expect(res.headers.get("location")).toBeNull();
+	const html = await expectPage(res, 502, UNREACHABLE);
+	expect(html).toMatch(WAY_BACK);
+	expect(elsewhere.calls.map((c) => c.path)).toEqual(["/connector/v1/hello"]);
+	expect(connectLines(lines)).toEqual([
+		{ kind: "connect", step: "open", outcome: "unreachable" },
 	]);
+	expect(await connectionRows()).toEqual([]);
 });
 
 test("a blank hello name and a blank exchange name is the site's hostname", async () => {
@@ -381,9 +572,7 @@ test("an org name written as instructions reaches the chat app's instructions as
 async function resumeWith(actionsField: string[] | undefined | null) {
 	const chat = await flow.startSignIn();
 	const back = await flow.press(
-		(await flow.submitAddress(deployment.host, chat.login)).headers.get(
-			"location",
-		) ?? "",
+		(await flow.open(chat.login)).headers.get("location") ?? "",
 	);
 	const cookie = `${await signedConnectCookie(
 		{
@@ -420,112 +609,6 @@ test("a connect-state cookie carrying an unknown action name stores only the kno
 	expect(done.status).toBe(302);
 	// `.filter(isActionName)` drops the name this contract doesn't carry.
 	expect(await storedActions()).toEqual(["campaigns.list", "donations.record"]);
-});
-
-test.each([
-	["text that isn't an address", "my charity", 400, NOT_AN_ADDRESS, () => {}],
-	["a blank address", "", 400, NOT_AN_ADDRESS, () => {}],
-	[
-		"an address with no Better Giving",
-		"give.example.org",
-		400,
-		NEEDS_UPDATE,
-		() => answer("hello", 404),
-	],
-	[
-		"an address that doesn't answer",
-		"nowhere.example.org",
-		502,
-		UNREACHABLE,
-		() => {},
-	],
-])(
-	"%s is asked for again, the typed value kept",
-	async (_, address, status, message, arrange) => {
-		arrange();
-
-		const res = await flow.submitAddress(address);
-
-		expect(res.status).toBe(status);
-		expect(res.headers.get("set-cookie")).toBeNull();
-		const html = shown(await res.text());
-		const input = html.match(/<input[^>]*>/)?.[0] ?? "";
-		expect(input).toContain(`value="${address}"`);
-		expect(input).toContain('aria-invalid="true"');
-		const described = (input.match(/aria-describedby="([^"]+)"/)?.[1] ?? "")
-			.split(" ")
-			.map(
-				(id) => html.match(new RegExp(`<p id="${id}"[^>]*>([^<]*)</p>`))?.[1],
-			);
-		expect(described).toContain(message);
-		expect(html).toContain(
-			`<p id="address-error" class="error" role="alert">${message}</p>`,
-		);
-		expect(html).toContain("<title>Error: Connect Better Giving</title>");
-		expect(html).toContain("<h1>Connect Better Giving</h1>");
-	},
-);
-
-test("an address that is markup comes back escaped in the page's raw HTML", async () => {
-	const res = await flow.submitAddress('"><img src=x onerror=1>');
-
-	expect(res.status).toBe(400);
-	const raw = await res.text();
-	const input = raw.match(/<input[^>]*name="address"[^>]*>/)?.[0] ?? "";
-	expect(input).toContain('value="&quot;&gt;&lt;img src=x onerror=1&gt;"');
-	expect(raw).not.toContain("<img");
-});
-
-// A POST to the address page's own URL, built by hand.
-async function postAddress(init: RequestInit, login?: URL): Promise<Response> {
-	return call(
-		new Request(login ?? (await loginUrl()), { method: "POST", ...init }),
-	);
-}
-
-test("a cross-site post of the address form is refused before any hello", async () => {
-	const res = await postAddress({
-		headers: { origin: "https://evil.example", "sec-fetch-site": "cross-site" },
-		body: new URLSearchParams({ address: "give.example.org" }),
-	});
-
-	const html = await expectPage(res, 403, {
-		heading: "Couldn't connect",
-		message:
-			"This form has to be sent from this page. Go back to your AI assistant and press Connect again.",
-	});
-	expect(html).not.toContain("<form");
-	expect(requestsTo("hello")).toEqual([]);
-});
-
-test("an address sent as anything but a form is refused before any hello", async () => {
-	const res = await postAddress({
-		headers: {
-			origin: BASE,
-			"sec-fetch-site": "same-origin",
-			"content-type": "application/json",
-		},
-		body: JSON.stringify({ address: "give.example.org" }),
-	});
-
-	expect(res.status).toBe(415);
-	expect(requestsTo("hello")).toEqual([]);
-});
-
-test("an address posted after the request expired says it timed out before any hello", async () => {
-	const login = await loginUrl();
-	advance(11 * MINUTE);
-
-	const res = await postAddress(
-		{
-			headers: { origin: BASE, "sec-fetch-site": "same-origin" },
-			body: new URLSearchParams({ address: "give.example.org" }),
-		},
-		login,
-	);
-
-	await expectPage(res, 400, TIMED_OUT);
-	expect(requestsTo("hello")).toEqual([]);
 });
 
 test("the return clears the state cookie", async () => {
@@ -580,6 +663,31 @@ test("pressing Deny says the connection wasn't allowed and exchanges nothing", a
 
 	await expectPage(res, 400, DENIED);
 	expect(requestsTo("exchange")).toEqual([]);
+});
+
+test("a login request that expires during the exchange says connecting didn't finish, with no way back", async () => {
+	// the clock passes the login request's expiry once the code is redeemed,
+	// between the return's own check and completeConnection's
+	serve(async (input, init) => {
+		const res = await deployment.fetch(input, init);
+		if (new Request(input, init).url.endsWith("/connector/v1/exchange")) {
+			advance(11 * MINUTE);
+		}
+		return res;
+	});
+	await warmUp(call);
+	const { back, cookie } = await flow.toReturn();
+	const lines = vi.spyOn(console, "log").mockImplementation(() => {});
+
+	const res = await flow.returnTo(back, cookie);
+
+	const html = await expectPage(res, 400, DIDNT_FINISH);
+	expect(html).not.toContain("<form");
+	expect(requestsTo("exchange")).toHaveLength(1);
+	expect(connectLines(lines)).toEqual([
+		{ kind: "connect", step: "complete", outcome: "expired" },
+	]);
+	expect(await connectionRows()).toEqual([]);
 });
 
 test("a replayed return says connecting didn't finish and makes no second connection", async () => {
@@ -640,8 +748,8 @@ test("the deployment's key reaches no response and no log line", async () => {
 });
 
 test.each([
-	["a connection", "allow", ["address:ok", "complete:ok"]],
-	["a denial", "deny", ["address:ok", "return:denied"]],
+	["a connection", "allow", ["open:ok", "complete:ok"]],
+	["a denial", "deny", ["open:ok", "return:denied"]],
 ] as const)(
 	"%s writes one line per step it ended",
 	async (_, button, expected) => {
@@ -776,7 +884,7 @@ test("an unexpected failure shows the didn't-finish page and logs only the error
 			new Response(null, { status: 301, headers: { location: "https://[" } }),
 	);
 
-	const res = await flow.submitAddress("give.example.org");
+	const res = await flow.open();
 
 	await expectPage(res, 500, DIDNT_FINISH);
 	expect(errors.mock.calls).toEqual([
@@ -790,88 +898,28 @@ test("an unexpected failure shows the didn't-finish page and logs only the error
 	]);
 });
 
+// A Cancel posted from another site.
+const crossSiteCancel = async () =>
+	call(
+		new Request(new URL(`/connect/cancel${(await loginUrl()).search}`, BASE), {
+			method: "POST",
+			headers: {
+				origin: "https://evil.example",
+				"sec-fetch-site": "cross-site",
+			},
+			body: new URLSearchParams(),
+		}),
+	);
+
 test.each([
-	["the address page", async () => call(new Request(await loginUrl()))],
 	["a timed-out page", async () => call(new Request(`${BASE}/connect`))],
-	[
-		"the cross-site refusal",
-		async () =>
-			postAddress({
-				headers: {
-					origin: "https://evil.example",
-					"sec-fetch-site": "cross-site",
-				},
-				body: new URLSearchParams({ address: "give.example.org" }),
-			}),
-	],
+	["the cross-site refusal", crossSiteCancel],
 ])("%s can't be framed", async (_, open) => {
 	const res = await open();
 
 	expect(res.headers.get("content-security-policy")).toBe(
 		"frame-ancestors 'none'",
 	);
-});
-
-test("Continue says it's checking in a status line, stays focusable, refuses a second press, and comes back on a return to the page", async () => {
-	const html = await (await call(new Request(await loginUrl()))).text();
-	expect(html).toMatch(
-		/<p id="address-status" role="status"[^>]*><\/p>[\s\S]*<script>/,
-	);
-	const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? "";
-	const on: Record<string, (event?: unknown) => void> = {};
-	const attributes: Record<string, string> = {};
-	const button = {
-		setAttribute: (name: string, value: string) => {
-			attributes[name] = value;
-		},
-		removeAttribute: (name: string) => {
-			delete attributes[name];
-		},
-	};
-	const status = { textContent: "" };
-	const elements: Record<string, unknown> = {
-		"address-form": {
-			addEventListener: (type: string, fn: () => void) => {
-				on[`form:${type}`] = fn;
-			},
-		},
-		continue: button,
-		"address-status": status,
-	};
-	const document = {
-		getElementById: (id: string) =>
-			html.includes(`id="${id}"`) ? elements[id] : null,
-	};
-	const addEventListener = (type: string, fn: () => void) => {
-		on[`window:${type}`] = fn;
-	};
-	new Function("document", "addEventListener", script)(
-		document,
-		addEventListener,
-	);
-	const submit = () => {
-		const event = { prevented: false, preventDefault: () => {} };
-		event.preventDefault = () => {
-			event.prevented = true;
-		};
-		on["form:submit"]?.(event);
-		return event.prevented;
-	};
-
-	const first = submit();
-	const pending = { ...attributes, said: status.textContent };
-	const second = submit();
-	on["window:pageshow"]?.();
-	const back = { ...attributes, said: status.textContent };
-	const afterReturn = submit();
-
-	expect([first, second, afterReturn]).toEqual([false, true, false]);
-	expect(pending).toEqual({
-		"aria-disabled": "true",
-		said: "Checking your address…",
-	});
-	expect(back).toEqual({ said: "" });
-	expect(html).not.toMatch(/<button[^>]*disabled/);
 });
 
 // Where a way-out button sent the browser, checked as the chat app's denial.
@@ -886,25 +934,24 @@ function expectChatToldDenied(
 	expect(callback.searchParams.get("state")).toBe(chat.a.state);
 }
 
-test.each(CHAT_APP_CALLBACKS)(
-	"Cancel on the address page tells the chat app at %s the operator declined",
-	async (redirectUri) => {
-		const chat = await flow.startSignIn(redirectUri);
-		const page = await call(new Request(chat.login));
+// The unreachable page, for a login request opened from `redirectUri`'s chat app.
+async function unreachablePage(redirectUri?: string) {
+	serve(deployment.fetch, fakeDeployment({ host: "better.giving" }));
+	const chat = await flow.startSignIn(redirectUri);
+	return { chat, page: await flow.open(chat.login) };
+}
 
-		const res = await flow.pressButton(page, "Cancel");
+test.each(CHAT_APP_CALLBACKS)(
+	"Back to your AI assistant on the unreachable page tells the chat app at %s the operator declined",
+	async (redirectUri) => {
+		const { chat, page } = await unreachablePage(redirectUri);
+
+		const res = await flow.pressButton(page, "Back to your AI assistant");
 
 		expectChatToldDenied(res, chat, redirectUri);
 		expect(await connectionRows()).toEqual([]);
 	},
 );
-
-test("the address page shown again after a refused address keeps Cancel", async () => {
-	const chat = await flow.startSignIn();
-	const refused = await flow.submitAddress("my charity", chat.login);
-
-	expectChatToldDenied(await flow.pressButton(refused, "Cancel"), chat);
-});
 
 test.each([
 	["the denied page", (allow: string) => flow.press(allow, "deny")],
@@ -929,31 +976,21 @@ test.each([
 	},
 );
 
-test("Cancel after the request expired says it timed out", async () => {
-	const page = await call(new Request(await loginUrl()));
+test("Back to your AI assistant after the request expired says it timed out", async () => {
+	const { page } = await unreachablePage();
 	advance(11 * MINUTE);
 
-	const res = await flow.pressButton(page, "Cancel");
+	const res = await flow.pressButton(page, "Back to your AI assistant");
 
 	const html = await expectPage(res, 400, TIMED_OUT);
 	expect(html).not.toContain("<form");
 });
 
-test("a cross-site Cancel is refused", async () => {
-	const login = await loginUrl();
+test("a cross-site Cancel is refused with a page and no way back", async () => {
+	const res = await crossSiteCancel();
 
-	const res = await call(
-		new Request(new URL(`/connect/cancel${login.search}`, BASE), {
-			method: "POST",
-			headers: {
-				origin: "https://evil.example",
-				"sec-fetch-site": "cross-site",
-			},
-			body: new URLSearchParams(),
-		}),
-	);
-
-	expect(res.status).toBe(403);
+	const html = await expectPage(res, 403, CROSS_SITE);
+	expect(html).not.toContain("<form");
 });
 
 test("the unexpected-failure page offers Back to your AI assistant", async () => {
@@ -963,24 +1000,10 @@ test("the unexpected-failure page offers Back to your AI assistant", async () =>
 		() =>
 			new Response(null, { status: 301, headers: { location: "https://[" } }),
 	);
-	const page = await flow.submitAddress("give.example.org", chat.login);
+	const page = await flow.open(chat.login);
 
 	expectChatToldDenied(
 		await flow.pressButton(page, "Back to your AI assistant"),
 		chat,
 	);
-});
-
-test("a malformed form body is a 400, not the cross-site refusal", async () => {
-	const res = await postAddress({
-		headers: {
-			origin: BASE,
-			"sec-fetch-site": "same-origin",
-			"content-type": "multipart/form-data; boundary=x",
-		},
-		body: "not multipart",
-	});
-
-	expect(res.status).toBe(400);
-	expect(requestsTo("hello")).toEqual([]);
 });

@@ -6,12 +6,19 @@ import { connectRoutes } from "./connect";
 import { cronRoutes } from "./cron";
 import { connections as connectionStore, type Db } from "./db";
 import { deploymentClient } from "./deployment";
+import type { Origin } from "./deployment/origin";
 import type { Env } from "./env";
 import { log } from "./log";
 import { mcpRoute } from "./mcp";
 import { siteRoutes } from "./site";
 
-export type AppDeps = { env: Env; db: Db; fetch: typeof fetch };
+export type AppDeps = {
+	env: Env;
+	db: Db;
+	fetch: typeof fetch;
+	/** Where /connect sends every operator to sign in and press Allow. */
+	platformOrigin: Origin;
+};
 
 export function createApp(deps: AppDeps): Hono {
 	const connections = connectionStore(deps.db, deps.env.CONNECTION_KEY_SECRET);
@@ -35,6 +42,7 @@ export function createApp(deps: AppDeps): Hono {
 				.update("connect state cookie")
 				.digest("base64url"),
 			publicUrl: deps.env.PUBLIC_URL,
+			platformOrigin: deps.platformOrigin,
 		}),
 	);
 	app.route("/cron", cronRoutes({ auth, secret: deps.env.CRON_SECRET }));

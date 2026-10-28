@@ -8,6 +8,7 @@ import {
 	SESSION_EXPIRES_IN,
 } from "../src/auth/token-lifetimes";
 import type { Db } from "../src/db";
+import { PLATFORM_ORIGIN } from "../src/deployment/origin";
 import { fakeDeployment } from "./fake-deployment";
 import { BASE, env, warmUp } from "./harness";
 import type { Call } from "./oauth";
@@ -18,7 +19,12 @@ let call: Call;
 
 beforeEach(async () => {
 	db = await freshDb();
-	const served = createApp({ env, db, fetch: fakeDeployment().fetch });
+	const served = createApp({
+		env,
+		db,
+		fetch: fakeDeployment().fetch,
+		platformOrigin: PLATFORM_ORIGIN,
+	});
 	call = async (req) => served.request(req);
 	// Auth seeds its tables on the first request. Wait for that before the
 	// database closes, the way the other app tests do.
@@ -229,7 +235,13 @@ test("docs and support describe the connector and name the support address", asy
 	// 4); it must not appear on any other page.
 	expect(docs + support + privacy).not.toMatch(/Anthropic/);
 	expect(docs).toContain("better.giving");
-	expect(docs).toContain("your own Better Giving site&#39;s address");
+	expect(docs).toContain(
+		"Sign in to your Better Giving account and press Allow.",
+	);
+	expect(support).toContain(
+		"Sign in to your Better Giving account and press Allow.",
+	);
+	expect(docs + support).not.toMatch(/type (your|the)|site&#39;s address/i);
 	expect(docs).toContain("in cash or by check");
 	expect(docs).toContain("distinguishing note");
 	expect(docs).toContain("explicit yes");
@@ -363,6 +375,7 @@ test("the OpenAI challenge returns the token as plain text and does not log it",
 		env: { ...env, OPENAI_APPS_CHALLENGE: token },
 		db,
 		fetch: fakeDeployment().fetch,
+		platformOrigin: PLATFORM_ORIGIN,
 	});
 	await warmUp(async (req) => served.request(req));
 

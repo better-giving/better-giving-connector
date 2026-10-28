@@ -20,18 +20,14 @@ export function SupportPage() {
 					</a>
 					.
 				</li>
-				<li>
-					Continue with better.giving, or type your own Better Giving site's
-					address. Use that address, not your organization's main website.
-				</li>
+				<li>Press Connect. better.giving opens.</li>
 				<li>Sign in to your Better Giving account and press Allow.</li>
 			</ol>
 			<p>
 				If the page says the connection request timed out, or that connecting
 				didn't finish, go back to your AI assistant and press Connect again. If
-				the address didn't answer, check it. If we couldn't find Better Giving
-				at that address, use better.giving or your own Better Giving site's
-				address.
+				it says better.giving didn't answer or can't connect right now, wait a
+				moment and press Connect again.
 			</p>
 
 			<h2>Disconnect</h2>
@@ -39,7 +35,7 @@ export function SupportPage() {
 				Disconnect Better Giving in your AI assistant's connector settings. That
 				deletes the connection stored here and asks that account to revoke the
 				key. If a tool tells you to reconnect, the account refused the key or
-				moved: connect again and type the current address.
+				moved: connect again.
 			</p>
 
 			<h2>Money</h2>

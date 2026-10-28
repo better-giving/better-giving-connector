@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 import { createDb } from "./db";
 import { migrate } from "./db/migrate";
+import { PLATFORM_ORIGIN } from "./deployment/origin";
 import { env } from "./env";
 
 // Migrates on every start, so it refuses anything but a local file database.
@@ -18,7 +19,7 @@ if (!port) {
 const db = createDb({ url: env.TURSO_DATABASE_URL });
 await migrate(db);
 serve({
-	fetch: createApp({ env, db, fetch }).fetch,
+	fetch: createApp({ env, db, fetch, platformOrigin: PLATFORM_ORIGIN }).fetch,
 	port,
 	hostname: "localhost",
 });
