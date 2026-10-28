@@ -26,7 +26,12 @@ let rpcId = 0;
 beforeEach(async () => {
 	db = await freshDb();
 	deployment = fakeDeployment({ name: "Hope Shelter", platform: true });
-	const app = createApp({ env, db, fetch: fakeNetwork(deployment) });
+	const app = createApp({
+		env,
+		db,
+		fetch: fakeNetwork(deployment),
+		platformOrigin: deployment.origin,
+	});
 	call = async (req) => app.request(req);
 	await warmUp(call);
 	bearer = `Bearer ${(await connectFlow(call, deployment, BASE).connect()).access_token}`;

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export async function load(url, context, nextLoad) {
-	if (!url.endsWith(".mp4")) return nextLoad(url, context);
+	if (!/\.(mp4|png|woff2)$/.test(url)) return nextLoad(url, context);
 	const encoded = readFileSync(fileURLToPath(url)).toString("base64");
 	return {
 		format: "module",

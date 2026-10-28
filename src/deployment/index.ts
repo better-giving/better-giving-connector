@@ -45,7 +45,7 @@ export {
 } from "./idempotency";
 
 export type Hello = {
-	/** Where hello answered: the typed origin, or the one it moved to. */
+	/** Where hello answered: the origin asked, or the one it moved to. */
 	origin: Origin;
 	release: string;
 	orgName: string;
@@ -59,7 +59,8 @@ export type DeploymentClient = {
 	/**
 	 * Unauthenticated probe: is there a Better Giving speaking this contract at
 	 * `origin`? Follows one redirect to another origin `parseOrigin` accepts, so
-	 * an apex typed for a www site (or the reverse) still connects.
+	 * a stored Standalone origin whose site moved between apex and www still
+	 * answers; the answering origin comes back in `Hello.origin`.
 	 */
 	hello(origin: Origin): Promise<Hello>;
 	/** The deployment's Allow screen; it returns the browser to an address fixed in its own code. */
@@ -103,8 +104,8 @@ const DISCONNECT_TIMEOUT_MS = 5_000;
 // At most one retry follows a lost answer.
 const KEYED_TRIES = 3;
 const MAX_RETRY_WAIT_MS = 5_000;
-// hello runs before sign-in against any address typed, so an unbounded read
-// would let anyone stream the function out of memory.
+// hello runs unauthenticated, before sign-in, so an unbounded read would let
+// whoever answers it stream the function out of memory.
 const MAX_BODY_BYTES = 1024 * 1024;
 const NOT_JSON = Symbol("not json");
 
@@ -160,9 +161,9 @@ export function deploymentClient(deps: {
 	}
 
 	const client: DeploymentClient = {
-		async hello(typed) {
+		async hello(asked) {
 			const helloUrl = (at: Origin) => `${at}${BASE_PATH}/hello`;
-			let origin = typed;
+			let origin = asked;
 			let answer = await send(helloUrl(origin), {}, "manual");
 			if (isRedirect(answer.status)) {
 				const target = redirectTarget(answer, helloUrl(origin));

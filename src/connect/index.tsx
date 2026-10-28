@@ -2,9 +2,7 @@ import { randomBytes } from "node:crypto";
 import { type Context, Hono } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { csrf } from "hono/csrf";
-import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { validator } from "hono/validator";
 import { z } from "zod";
 import { type AuthFacade, LoginRequestRefused } from "../auth";
 import {
@@ -17,11 +15,13 @@ import {
 	NeedsUpdate,
 	Unreachable,
 } from "../deployment";
-import { parseOrigin, parseTypedOrigin } from "../deployment/origin";
+import { type Origin, parseOrigin } from "../deployment/origin";
 import { type ConnectOutcome, type ConnectStep, log } from "../log";
-import { AddressPage, MessagePage, VIA_SIGN_IN } from "./page";
+import logoPng from "./assets/logo.png";
+import quicksandWoff2 from "./assets/quicksand-latin-wght-normal.woff2";
+import { FONT_PATH, LOGO_PATH, MessagePage } from "./page";
 
-// Where a request ends without the form: the page's heading and its one line.
+// Where a request ends short of Allow: the page's heading and its one line.
 const END = {
 	timedOut: {
 		heading: "Connection request timed out",
@@ -38,6 +38,16 @@ const END = {
 		message:
 			"Connecting didn't finish. Go back to your AI assistant and press Connect again.",
 	},
+	unreachable: {
+		heading: "Couldn't reach Better Giving",
+		message:
+			"better.giving didn't answer. Go back to your AI assistant and press Connect again.",
+	},
+	needsUpdate: {
+		heading: "Couldn't connect",
+		message:
+			"better.giving can't connect right now. Go back to your AI assistant and press Connect again.",
+	},
 	crossSite: {
 		heading: "Couldn't connect",
 		message:
@@ -46,20 +56,6 @@ const END = {
 } as const;
 type End = (typeof END)[keyof typeof END];
 
-// What the address form says under the field.
-const FIELD = {
-	notAnAddress: "Enter your Better Giving site's address.",
-	needsUpdate:
-		"We couldn't find Better Giving at that address. Use your Better Giving site's address, not your organization's main website. If the address is right, that site can't connect through the connector yet.",
-	unreachable: "That address didn't answer. Check it and try again.",
-} as const;
-
-// What the sign-in form says under its button when better.giving fails it.
-const SIGN_IN = {
-	needsUpdate: "better.giving can't connect right now. Try again later.",
-	unreachable: "better.giving didn't answer. Try again in a moment.",
-} as const;
-
 export type ConnectDeps = {
 	auth: Pick<
 		AuthFacade,
@@ -67,16 +63,26 @@ export type ConnectDeps = {
 	>;
 	client: Pick<DeploymentClient, "hello" | "allowUrl" | "exchange">;
 	stateSecret: string;
-	/** This service's origin, the only one the address form posts from. */
+	/** This service's origin, the only one its forms post from. */
 	publicUrl: string;
+	/** Where every operator signs in and presses Allow. */
+	platformOrigin: Origin;
 };
+
+// The page links its assets by full path; these routes sit under /connect.
+const assetRoute = (path: string) => path.slice("/connect".length);
+const assetHeaders = (contentType: string) => ({
+	"content-type": contentType,
+	"x-content-type-options": "nosniff",
+	"cache-control": "public, max-age=3600",
+});
 
 const STATE_COOKIE = "connect";
 // Bounds the cookie only: the return verifies the login request it carries again.
 const STATE_TTL_SECONDS = 600;
 const COOKIE_SCOPE = { prefix: "secure", path: "/connect" } as const;
 
-// What the address step hands the return, in the browser's signed cookie only.
+// What opening the request hands the return, in the browser's signed cookie only.
 const handshake = z.object({
 	nonce: z.string(),
 	origin: z.string().transform((value, ctx) => {
@@ -105,23 +111,6 @@ function readHandshake(raw: string | false | undefined): Handshake | null {
 		return null;
 	}
 }
-
-// The form validator reads a body only under a form content type and sees
-// `{}` otherwise, which would render as a blank address.
-const formOnly = createMiddleware(async (c, next) => {
-	const type = c.req.header("content-type") ?? "";
-	if (
-		!/^(application\/x-www-form-urlencoded|multipart\/form-data)\b/i.test(type)
-	) {
-		return c.text("Unsupported Media Type", 415);
-	}
-	await next();
-});
-
-const addressForm = validator("form", (form) => ({
-	address: typeof form.address === "string" ? form.address : "",
-	signIn: form.via === VIA_SIGN_IN,
-}));
 
 // `login`: the chat app's signed request, once it has verified on this request.
 type ConnectEnv = { Variables: { login?: string } };
@@ -169,66 +158,33 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 		await next();
 	});
 
-	app.get("/", async (c) => {
-		const url = new URL(c.req.url);
-		const login = await deps.auth.readLoginRequest(url);
-		if (!login) return stop(c, "open", "expired", END.timedOut, 400);
-		return c.html(
-			<AddressPage
-				action={url.pathname + url.search}
-				cancel={cancelAction(login.oauthQuery)}
-				readOnly={login.readOnly}
-			/>,
-		);
-	});
+	app.get(assetRoute(LOGO_PATH), (c) =>
+		c.body(logoPng, 200, assetHeaders("image/png")),
+	);
+	app.get(assetRoute(FONT_PATH), (c) =>
+		c.body(quicksandWoff2, 200, assetHeaders("font/woff2")),
+	);
 
-	app.post("/", sameOrigin, formOnly, addressForm, async (c) => {
-		const url = new URL(c.req.url);
-		const login = await deps.auth.readLoginRequest(url);
-		if (!login) return stop(c, "address", "expired", END.timedOut, 400);
+	app.get("/", async (c) => {
+		const login = await deps.auth.readLoginRequest(new URL(c.req.url));
+		if (!login) return stop(c, "open", "expired", END.timedOut, 400);
 		c.set("login", login.oauthQuery);
-		const { address, signIn } = c.req.valid("form");
-		const page = (
-			said: { value: string; error: string } | { signInError: string },
-		) => (
-			<AddressPage
-				action={url.pathname + url.search}
-				cancel={cancelAction(login.oauthQuery)}
-				readOnly={login.readOnly}
-				{...said}
-			/>
-		);
-		const askAgain = (
-			outcome: ConnectOutcome,
-			error: string,
-			status: 400 | 502,
-		) => {
-			log({ kind: "connect", step: "address", outcome });
-			return c.html(page({ value: address, error }), status);
-		};
-		// better.giving failing the sign-in button isn't the operator's input:
-		// the address field comes back empty and its disclosure closed.
-		const signInFailed = (outcome: ConnectOutcome, signInError: string) => {
-			log({ kind: "connect", step: "address", outcome });
-			return c.html(page({ signInError }), 502);
-		};
-		const typed = parseTypedOrigin(address);
-		if (!typed) return askAgain("invalid_address", FIELD.notAnAddress, 400);
 		let hello: Hello;
 		try {
-			hello = await deps.client.hello(typed);
+			hello = await deps.client.hello(deps.platformOrigin);
 		} catch (error) {
 			if (error instanceof NeedsUpdate) {
-				return signIn
-					? signInFailed("needs_update", SIGN_IN.needsUpdate)
-					: askAgain("needs_update", FIELD.needsUpdate, 400);
+				return stop(c, "open", "needs_update", END.needsUpdate, 502);
 			}
 			if (error instanceof Unreachable) {
-				return signIn
-					? signInFailed("unreachable", SIGN_IN.unreachable)
-					: askAgain("unreachable", FIELD.unreachable, 502);
+				return stop(c, "open", "unreachable", END.unreachable, 502);
 			}
 			throw error;
+		}
+		// hello follows a redirect for stored Standalone origins; the platform
+		// answers at its own origin, and anywhere else must not get the Allow.
+		if (hello.origin !== deps.platformOrigin) {
+			return stop(c, "open", "unreachable", END.unreachable, 502);
 		}
 		const state: Handshake = {
 			nonce: randomBytes(32).toString("base64url"),
@@ -249,7 +205,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 				maxAge: STATE_TTL_SECONDS,
 			},
 		);
-		log({ kind: "connect", step: "address", outcome: "ok" });
+		log({ kind: "connect", step: "open", outcome: "ok" });
 		return c.redirect(
 			deps.client.allowUrl(state.origin, state.nonce).href,
 			302,
@@ -352,8 +308,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 	// Every failure here lands on a page; the app's JSON 500 never reaches the operator.
 	app.onError((err, c) => {
 		if (err instanceof HTTPException) {
-			// csrf refuses with a 403; the form validator's 400 is for a body no
-			// browser sends from this page.
+			// csrf's refusal is the only 403 that reaches here.
 			if (err.status === 403) return endPage(c, END.crossSite, 403);
 			return err.getResponse();
 		}

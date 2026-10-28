@@ -31,7 +31,12 @@ let rpcId = 0;
 
 function serve(platform: boolean) {
 	deployment = fakeDeployment({ name: "Hope Shelter", platform });
-	const app = createApp({ env, db, fetch: fakeNetwork(deployment) });
+	const app = createApp({
+		env,
+		db,
+		fetch: fakeNetwork(deployment),
+		platformOrigin: deployment.origin,
+	});
 	call = async (req) => app.request(req);
 	return warmUp(call);
 }

@@ -16,8 +16,10 @@ import { freshDb } from "./support";
 // Standalone connection sees and sends what it did before them. The snapshot
 // is tools/list and the instructions as d1a35fb served them to a
 // Standalone connection serving every action, plus each tool's title in its
-// annotations. A deliberate Standalone change edits the entry it changes;
-// re-dumping the whole list would hide one that isn't.
+// annotations, destructiveHint true on every tool that overwrites, and
+// openWorldHint true on publish, end, and reset. A deliberate Standalone
+// change edits the entry it changes; re-dumping the whole list would hide one
+// that isn't.
 
 let db: Db;
 let deployment: FakeDeployment;
@@ -28,7 +30,12 @@ let rpcId = 0;
 beforeEach(async () => {
 	db = await freshDb();
 	deployment = fakeDeployment({ name: "Hope Shelter" });
-	const app = createApp({ env, db, fetch: fakeNetwork(deployment) });
+	const app = createApp({
+		env,
+		db,
+		fetch: fakeNetwork(deployment),
+		platformOrigin: deployment.origin,
+	});
 	call = async (req) => app.request(req);
 	await warmUp(call);
 	bearer = `Bearer ${(await connectFlow(call, deployment, BASE).connect()).access_token}`;

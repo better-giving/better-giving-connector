@@ -1,39 +1,37 @@
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 
-// No design system exists yet (sheet: `screens`), so the look is this sheet:
-// system font, one column, made for a 375 px phone.
+// Where the connect routes serve the page's two assets.
+export const LOGO_PATH = "/connect/assets/logo.png";
+export const FONT_PATH = "/connect/assets/quicksand.woff2";
+
+// Better Giving Platform's look, copied by value from the platform repo:
+// packages/brand/src/colors.css (palette; light-only per
+// packages/brand/design-system.md), packages/ui/src/styles/theme.css and
+// fonts.css (Quicksand Variable, latin subset), components.css (.btn,
+// .btn-primary at the btn-lg tier), and the solo-card notice layout of
+// apps/platform/src/routes/_app.login_.reset/check-email.tsx. The focus ring
+// is --primary, not the platform's --ring (blue-8): that is under WCAG's 3:1
+// for non-text against the page.
 const STYLE = `
+@font-face{font-family:"Quicksand Variable";font-style:normal;font-display:swap;font-weight:300 700;src:url(${FONT_PATH}) format("woff2-variations");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{--background:#fbfcfe;--panel:#f6f9fd;--border:#d2dbe7;--ink:#1a2029;--primary:#1e6dab;--primary-hover:#055f9c;--primary-fg:#fff;--secondary:#e4f4ff;--radius:.25rem}
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;font:18px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1a1a1a;background:#fff}
-main{max-width:30rem;margin:0 auto;padding:2.5rem 1rem}
-h1{font-size:1.6rem;line-height:1.25;margin:0 0 .75rem}
-p{margin:0 0 1.5rem}
-label{display:block;font-weight:600;margin-bottom:.4rem}
-input{display:block;width:100%;font:inherit;color:inherit;padding:.75rem;border:2px solid #767676;border-radius:.5rem}
-input[aria-invalid=true]{border-color:#b00020}
-.hint{color:#555;font-size:.9rem;margin:.5rem 0 0}
-.error{color:#b00020;margin:.5rem 0 0}
-.status{margin:.75rem 0 0}
-button{display:block;width:100%;margin-top:1.5rem;font:inherit;font-weight:600;padding:.9rem;border:2px solid #1d4ed8;border-radius:.5rem;color:#fff;background:#1d4ed8}
-button[aria-disabled=true]{cursor:progress}
-.secondary{margin-top:.75rem;color:#1d4ed8;background:transparent}
-details{margin-top:1.5rem}
-summary{padding:.6rem 0;font-weight:600;color:#1d4ed8;cursor:pointer}
-details[open] summary{margin-bottom:.75rem}
-:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
-@media (prefers-color-scheme:dark){body{color:#f2f2f2;background:#121212}.hint{color:#bbb}input{background:#1e1e1e;border-color:#8a8a8a}input[aria-invalid=true]{border-color:#ff8a80}.error{color:#ff8a80}button{background:#2563eb;border-color:#2563eb}:focus-visible{outline-color:#93c5fd}.secondary,summary{color:#93c5fd}.secondary{background:transparent}}
+body{margin:0;font:400 1rem/1.5 "Quicksand Variable",sans-serif;color:var(--ink);background:var(--background)}
+main{display:grid;justify-items:center;padding:2.5rem 1rem}
+.card{display:grid;justify-items:center;width:100%;max-width:28rem;padding:1.75rem 1.5rem;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);text-align:center}
+.logo{display:block;width:4rem;height:4rem;border-radius:50%;background:var(--secondary)}
+h1{font-size:1.5rem;line-height:1.333;font-weight:700;margin:1.25rem 0 0}
+p{margin:.75rem 0 0;line-height:1.625}
+form{width:100%;margin-top:1.5rem}
+.btn{display:flex;justify-content:center;align-items:center;width:100%;min-block-size:3.25rem;padding:.75rem 2rem;font:inherit;font-size:1.125rem;line-height:1.556;font-weight:700;border:0;border-radius:var(--radius);cursor:pointer}
+.btn-primary{background:var(--primary);color:var(--primary-fg)}
+.btn-primary:hover,.btn-primary:active{background:var(--primary-hover)}
+.btn-primary:active{transform:translateY(1px)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 `;
 
-function Page({
-	heading,
-	title = heading,
-	children,
-}: {
-	heading: string;
-	title?: string;
-	children: Child;
-}) {
+function Page({ heading, children }: { heading: string; children: Child }) {
 	return (
 		<>
 			{raw("<!doctype html>")}
@@ -41,14 +39,23 @@ function Page({
 				<head>
 					<meta charset="utf-8" />
 					<meta name="viewport" content="width=device-width, initial-scale=1" />
-					<title>{title}</title>
+					<title>{`${heading} · Better Giving`}</title>
 					{/* as a child it would be escaped, and the font stack's quotes with it */}
 					<style dangerouslySetInnerHTML={{ __html: STYLE }} />
 				</head>
 				<body>
 					<main>
-						<h1>{heading}</h1>
-						{children}
+						<div class="card">
+							<img
+								class="logo"
+								src={LOGO_PATH}
+								alt="Better Giving"
+								width="64"
+								height="64"
+							/>
+							<h1>{heading}</h1>
+							{children}
+						</div>
 					</main>
 				</body>
 			</html>
@@ -56,149 +63,10 @@ function Page({
 	);
 }
 
-// hello can take seconds; the pressed form's status line says so, and both
-// buttons read busy because a second press of either form is refused.
-// aria-disabled, not disabled, so the pressed button keeps focus. A page
-// restored from the back-forward cache gets its buttons back.
-// No top-level `status`: in a classic script that is window.status.
-const PENDING = `
-var pending = false;
-var buttons = [document.getElementById("sign-in"), document.getElementById("continue")];
-var lines = [];
-function hold(formId, lineId, said) {
-	var line = document.getElementById(lineId);
-	lines.push(line);
-	document.getElementById(formId).addEventListener("submit", function (event) {
-		if (pending) return event.preventDefault();
-		pending = true;
-		buttons.forEach(function (button) {
-			button.setAttribute("aria-disabled", "true");
-		});
-		line.textContent = said;
-	});
-}
-addEventListener("pageshow", function () {
-	pending = false;
-	buttons.forEach(function (button) {
-		button.removeAttribute("aria-disabled");
-	});
-	lines.forEach(function (line) {
-		line.textContent = "";
-	});
-});
-hold("sign-in-form", "sign-in-status", "Opening better.giving…");
-hold("address-form", "address-status", "Checking your address…");
-`;
-
-/** What the sign-in button submits as the address. */
-const PLATFORM_ADDRESS = "better.giving";
-
-/** The sign-in form's `via`, which tells its post from the typed address's. */
-export const VIA_SIGN_IN = "sign-in";
-
-const SIGN_IN_ERROR_ID = "sign-in-error";
-const ERROR_ID = "address-error";
-const HINT_ID = "address-hint";
-
-/**
- * The connect page: one button signs in at better.giving; "Use a different
- * site" opens the address form for a site of the operator's own. Both forms
- * post to `action`, the request's own path and query: the signed login
- * request rides in it from GET to POST. The sign-in form also posts `via`.
- * `error` is the address field's; `signInError` is the sign-in button's.
- */
-export function AddressPage(props: {
-	action: string;
-	/** Where Cancel posts. */
-	cancel: string;
-	value?: string;
-	error?: string;
-	signInError?: string;
-	/** Whether the verified login request asks for `read_only`. */
-	readOnly?: boolean;
-}) {
-	const { action, cancel, value, error, signInError, readOnly } = props;
-	const invalid = error !== undefined;
-	const signInFailed = signInError !== undefined;
-	return (
-		<Page
-			heading="Connect Better Giving"
-			title={
-				invalid || signInFailed ? "Error: Connect Better Giving" : undefined
-			}
-		>
-			<p>
-				Sign in to Better Giving and press Allow. Then you'll return to your AI
-				assistant.
-			</p>
-			{readOnly && (
-				<p>
-					This connection is read-only: your AI assistant will be able to view
-					your Better Giving account and site but not change anything.
-				</p>
-			)}
-			<form id="sign-in-form" method="post" action={action}>
-				<input type="hidden" name="address" value={PLATFORM_ADDRESS} />
-				<input type="hidden" name="via" value={VIA_SIGN_IN} />
-				<button
-					id="sign-in"
-					type="submit"
-					autofocus={signInFailed}
-					aria-describedby={signInFailed ? SIGN_IN_ERROR_ID : undefined}
-				>
-					Sign in with better.giving
-				</button>
-				{signInFailed && (
-					<p id={SIGN_IN_ERROR_ID} class="error" role="alert">
-						{signInError}
-					</p>
-				)}
-				{/* present from the start: a live region added later isn't announced */}
-				<p id="sign-in-status" role="status" class="status"></p>
-			</form>
-			<details open={invalid}>
-				<summary>Use a different site</summary>
-				<form id="address-form" method="post" action={action}>
-					<label for="address">Your Better Giving site's address</label>
-					<input
-						id="address"
-						name="address"
-						type="text"
-						inputmode="url"
-						autocomplete="url"
-						autocapitalize="none"
-						spellcheck={false}
-						required
-						value={value}
-						autofocus={invalid}
-						aria-invalid={invalid ? "true" : undefined}
-						aria-describedby={invalid ? `${ERROR_ID} ${HINT_ID}` : HINT_ID}
-					/>
-					{invalid && (
-						<p id={ERROR_ID} class="error" role="alert">
-							{error}
-						</p>
-					)}
-					<p id={HINT_ID} class="hint">
-						Only if your organization runs its own Better Giving site. Not its
-						main website.
-					</p>
-					<button id="continue" type="submit">
-						Continue
-					</button>
-					<p id="address-status" role="status" class="status"></p>
-				</form>
-			</details>
-			<script dangerouslySetInnerHTML={{ __html: PENDING }} />
-			<WayOut action={cancel} label="Cancel" />
-		</Page>
-	);
-}
-
 /**
  * A dead end with one thing to do, said in `message`. `back` is where "Back
- * to your AI assistant" posts, given only while the login request still
- * verifies.
+ * to your AI assistant" posts, ending the chat app's request as declined;
+ * given only while the login request still verifies.
  */
 export function MessagePage(props: {
 	heading: string;
@@ -209,19 +77,12 @@ export function MessagePage(props: {
 		<Page heading={props.heading}>
 			<p>{props.message}</p>
 			{props.back !== undefined && (
-				<WayOut action={props.back} label="Back to your AI assistant" />
+				<form method="post" action={props.back}>
+					<button type="submit" class="btn btn-primary">
+						Back to your AI assistant
+					</button>
+				</form>
 			)}
 		</Page>
-	);
-}
-
-// Ends the chat app's request as declined.
-function WayOut(props: { action: string; label: string }) {
-	return (
-		<form method="post" action={props.action}>
-			<button type="submit" class="secondary">
-				{props.label}
-			</button>
-		</form>
 	);
 }

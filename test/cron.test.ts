@@ -15,7 +15,12 @@ let call: Call;
 beforeEach(async () => {
 	db = await freshDb();
 	deployment = fakeDeployment();
-	const app = createApp({ env, db, fetch: deployment.fetch });
+	const app = createApp({
+		env,
+		db,
+		fetch: deployment.fetch,
+		platformOrigin: deployment.origin,
+	});
 	call = async (req) => app.request(req);
 	await warmUp(call);
 	return () => db.close();

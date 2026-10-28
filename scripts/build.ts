@@ -8,5 +8,5 @@ await build({
 	target: "node24",
 	packages: "external",
 	outfile: "dist/index.js",
-	loader: { ".mp4": "binary" },
+	loader: { ".mp4": "binary", ".png": "binary", ".woff2": "binary" },
 });

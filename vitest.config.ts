@@ -1,14 +1,16 @@
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vitest/config";
 
-/** The demo import is the file bytes, matching esbuild's binary loader. */
-function mp4Bytes(): Plugin {
+const BINARY = /\.(mp4|png|woff2)$/;
+
+/** A video, image or font import is the file bytes, matching esbuild's binary loader. */
+function binaryBytes(): Plugin {
 	return {
-		name: "mp4-bytes",
+		name: "binary-bytes",
 		enforce: "pre",
 		load(id) {
 			const path = id.split("?")[0] ?? id;
-			if (!path.endsWith(".mp4")) return null;
+			if (!BINARY.test(path)) return null;
 			const encoded = readFileSync(path).toString("base64");
 			return [
 				`const bin = atob(${JSON.stringify(encoded)});`,
@@ -21,7 +23,7 @@ function mp4Bytes(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [mp4Bytes()],
+	plugins: [binaryBytes()],
 	test: {
 		include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
 	},

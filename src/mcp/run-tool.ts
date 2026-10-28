@@ -102,7 +102,7 @@ async function failure(
 		await ctx.dropConnection(connection.userId);
 		return said(
 			"moved",
-			`${org}'s Better Giving site has moved to a new address. Reconnect Better Giving in your AI assistant's connector settings and type the new address.`,
+			`${org}'s Better Giving site has moved to a new address. Reconnect Better Giving in your AI assistant's connector settings.`,
 		);
 	}
 	if (error instanceof NeedsUpdate) {

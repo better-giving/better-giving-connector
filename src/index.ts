@@ -1,5 +1,6 @@
 import { createApp } from "./app";
 import { createDb } from "./db";
+import { PLATFORM_ORIGIN } from "./deployment/origin";
 import { env } from "./env";
 
 export default createApp({
@@ -9,4 +10,5 @@ export default createApp({
 		authToken: env.TURSO_AUTH_TOKEN,
 	}),
 	fetch,
+	platformOrigin: PLATFORM_ORIGIN,
 });

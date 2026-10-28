@@ -18,10 +18,9 @@ export type ToolOutcome =
 	| "server_error"
 	| "failed";
 
-/** Where a connect request ended: GET /connect, its POST, the return's stages, or Cancel. */
+/** Where a connect request ended: GET /connect, the return's stages, or Cancel. */
 export type ConnectStep =
 	| "open"
-	| "address"
 	| "return"
 	| "exchange"
 	| "complete"
@@ -30,7 +29,6 @@ export type ConnectStep =
 export type ConnectOutcome =
 	| "ok"
 	| "expired"
-	| "invalid_address"
 	| "needs_update"
 	| "unreachable"
 	| "denied"

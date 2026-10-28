@@ -24,7 +24,7 @@ const stateSecret = (betterAuthSecret: string) =>
 
 // Signs an arbitrary connect-state payload into the `__Secure-connect` cookie
 // header a browser would hold, using the same `generateSignedCookie` and key
-// `POST /connect/` signs with. The payload is unknown-shaped on purpose: this
+// `GET /connect/` signs with. The payload is unknown-shaped on purpose: this
 // is how a test forges a cookie written by an older release (one without
 // `actions`, say) to drive the return against it.
 export async function signedConnectCookie(
@@ -41,8 +41,8 @@ export async function signedConnectCookie(
 }
 
 // The operator's side of connecting: the chat app opens its authorize URL,
-// the browser lands on /connect, submits an address, presses Allow (or Deny)
-// on the deployment and comes back to /connect/return.
+// the browser lands on /connect, is sent on to the deployment, presses Allow
+// (or Deny) there and comes back to /connect/return.
 
 export type ChatApp = { ep: Endpoints; a: Authorization; login: URL };
 
@@ -122,20 +122,10 @@ export function connectFlow(
 		);
 	}
 
-	// Opens the connect page and presses "Sign in with better.giving".
-	async function signInWithPlatform(login?: URL): Promise<Response> {
-		const page = await call(new Request(login ?? (await startSignIn()).login));
-		return pressButton(page, "Sign in with better.giving");
-	}
-
-	// Opens the connect page and submits `address` through the "Use a
-	// different site" form.
-	async function submitAddress(
-		address: string,
-		login?: URL,
-	): Promise<Response> {
-		const page = await call(new Request(login ?? (await startSignIn()).login));
-		return pressButton(page, "Continue", { address });
+	// Opens the chat app's login URL on /connect, which hands the browser to
+	// the deployment's Allow.
+	async function open(login?: URL): Promise<Response> {
+		return call(new Request(login ?? (await startSignIn()).login));
 	}
 
 	// Presses Allow (or Deny) on the deployment; returns where it sends the browser.
@@ -159,12 +149,9 @@ export function connectFlow(
 		);
 	}
 
-	async function toReturn(
-		address = deployment.host,
-		redirectUri?: string,
-	): Promise<AtReturn> {
+	async function toReturn(redirectUri?: string): Promise<AtReturn> {
 		const chat = await startSignIn(redirectUri);
-		const handOff = await submitAddress(address, chat.login);
+		const handOff = await open(chat.login);
 		const allow = handOff.headers.get("location") ?? "";
 		return {
 			chat,
@@ -186,13 +173,12 @@ export function connectFlow(
 	return {
 		startSignIn,
 		pressButton,
-		signInWithPlatform,
-		submitAddress,
+		open,
 		press,
 		returnTo,
 		toReturn,
 		finish,
-		connect: async (address?: string, redirectUri?: string) =>
-			finish(await toReturn(address, redirectUri)),
+		connect: async (redirectUri?: string) =>
+			finish(await toReturn(redirectUri)),
 	};
 }
