@@ -141,7 +141,8 @@ const campaignContent = {
 };
 const CONTENT_KEYS = Object.keys(campaignContent);
 
-// openWorldHint is false: every tool talks only to the one connected site.
+// openWorldHint is true for tools that change what the public sees
+// immediately, and false for every other tool. Those are PUBLIC below.
 // destructiveHint false on a read matches the directory packet; the spec
 // treats it as meaningful only when readOnlyHint is false.
 const READ = {
@@ -163,20 +164,20 @@ const REPLAYS = {
 	...ADD,
 	idempotentHint: true,
 };
-// Sets fields to the values sent. The same call again leaves them as they are.
-const SET = {
-	readOnlyHint: false,
-	destructiveHint: false,
-	idempotentHint: true,
-	openWorldHint: false,
-};
-// Replaces or retires something donors can see. The same call again does not
-// stack: the page is that block list, or the campaign is in that state.
+// Overwrites what is there now: a page, a form, or a campaign's settings or
+// state. The same call again does not stack: the fields hold the values
+// sent, or the campaign is in that state.
 const DESTRUCTIVE = {
 	readOnlyHint: false,
 	destructiveHint: true,
 	idempotentHint: true,
 	openWorldHint: false,
+};
+// Changes what the public sees immediately: puts a campaign live, ends it, or
+// resets the donation page. OpenAI's app review requires openWorldHint here.
+const PUBLIC = {
+	...DESTRUCTIVE,
+	openWorldHint: true,
 };
 
 const CONFIRMED =
@@ -246,7 +247,7 @@ export const ACTIONS = toolSpecs([
 					),
 				`Send at least one content key: ${CONTENT_KEYS.join(", ")}.`,
 			),
-		annotations: SET,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
 	},
 	{
@@ -277,7 +278,7 @@ export const ACTIONS = toolSpecs([
 				})
 				.optional(),
 		}),
-		annotations: SET,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
 	},
 	{
@@ -289,7 +290,7 @@ export const ACTIONS = toolSpecs([
 			id,
 			gifts_go_to: z.string().nullable().optional(),
 		}),
-		annotations: DESTRUCTIVE,
+		annotations: PUBLIC,
 		checkWith: "get_campaign",
 	},
 	{
@@ -298,7 +299,7 @@ export const ACTIONS = toolSpecs([
 		title: "End a campaign",
 		description: `Ends a campaign for good. It stops taking gifts. ${CONFIRMED}`,
 		input: z.strictObject({ id }),
-		annotations: DESTRUCTIVE,
+		annotations: PUBLIC,
 		checkWith: "get_campaign",
 	},
 	{
@@ -329,7 +330,7 @@ export const ACTIONS = toolSpecs([
 				.nullable()
 				.describe("The page's title, or null for the default."),
 		}),
-		annotations: SET,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_donation_page",
 	},
 	{
@@ -338,7 +339,7 @@ export const ACTIONS = toolSpecs([
 		title: "Reset the donation page",
 		description: `Puts the main donation page back to its default content, discarding what is there now. ${CONFIRMED}`,
 		input: z.strictObject({ confirm: z.literal(true) }),
-		annotations: DESTRUCTIVE,
+		annotations: PUBLIC,
 		checkWith: "get_donation_page",
 	},
 	{
@@ -397,7 +398,7 @@ export const ACTIONS = toolSpecs([
 			name: z.string().trim().min(1).optional(),
 			confirm: z.literal(true).optional(),
 		}),
-		annotations: SET,
+		annotations: DESTRUCTIVE,
 		checkWith: "get_form",
 	},
 	{
