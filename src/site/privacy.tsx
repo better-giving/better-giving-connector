@@ -268,8 +268,8 @@ export function PrivacyPage() {
 				</li>
 				<li>
 					Better Giving revokes a connection key after 90 days without use.
-					Revoked keys can no longer be used and are kept until your account is
-					deleted.
+					Revoked keys can no longer be used and are deleted 30 days after
+					they're revoked.
 				</li>
 				<li>
 					<strong>Access and refresh tokens</strong> are stored as one-way
@@ -407,7 +407,11 @@ export function PrivacyPage() {
 			<ul>
 				<li>
 					Version {PRIVACY_VERSION.version}, effective{" "}
-					{PRIVACY_VERSION.effective}: new connections always go through
+					{PRIVACY_VERSION.effective}: deletes revoked connection keys 30 days
+					after they're revoked.
+				</li>
+				<li>
+					Version 1.2, effective 2026-10-28: new connections always go through
 					better.giving; removes the option to connect your own site's address.
 				</li>
 				<li>Version 1.1, effective 2026-10-27: adds read-only access.</li>

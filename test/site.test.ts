@@ -59,7 +59,7 @@ test("privacy and terms use the filled wording and the version", async () => {
 	const support = await (await get("/support")).text();
 	const both = privacy + terms + support;
 
-	expect(privacy).toContain("Version 1.2");
+	expect(privacy).toContain("Version 1.3");
 	expect(privacy).toContain("Effective date: 2026-10-28");
 	expect(privacy).toContain("Last updated: 2026-10-28");
 	expect(terms).toContain("Version 1.1");
@@ -125,16 +125,18 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"Tool requests and results are held in memory only while a request runs. They are not written to our database or logs.",
 	);
 	expect(flat).toContain(
-		"Better Giving revokes a connection key after 90 days without use. Revoked keys can no longer be used and are kept until your account is deleted.",
+		"Better Giving revokes a connection key after 90 days without use. Revoked keys can no longer be used and are deleted 30 days after they&#39;re revoked.",
 	);
 	expect(flat).toContain(
 		"You connect by signing in at better.giving and pressing Allow. Connections made earlier to another Better Giving site keep working until you disconnect them.",
 	);
 	expect(flat).not.toContain("30 days later");
-	// No deletion period for revoked keys, however it is worded.
-	expect(flat).not.toMatch(/revoked keys[^.]*\d+\s+days/i);
-	expect(flat).not.toMatch(/delet\w+ (the )?revoked/i);
-	expect(flat).not.toMatch(/\d+\s+days\s+(later|after)/i);
+	expect(flat).not.toContain("kept until your account is deleted");
+	// The 30-day deletion period appears only in the retention sentence and the changelog.
+	expect(flat.match(/\d+\s+days\s+after/gi)).toEqual([
+		"30 days after",
+		"30 days after",
+	]);
 	expect(flat).toContain(
 		"Set by the Connector (better.giving) and your Better Giving account, when you connect",
 	);
@@ -215,6 +217,9 @@ test("privacy and terms use the filled wording and the version", async () => {
 	expect(privacy).not.toContain("AngelProtocolFinance");
 	const termsFlat = terms.replace(/\s+/g, " ");
 	expect(flat).toContain(
+		"Version 1.3, effective 2026-10-28: deletes revoked connection keys 30 days after they&#39;re revoked.",
+	);
+	expect(privacy).toContain(
 		"Version 1.2, effective 2026-10-28: new connections always go through better.giving; removes the option to connect your own site&#39;s address.",
 	);
 	expect(flat).toContain(
