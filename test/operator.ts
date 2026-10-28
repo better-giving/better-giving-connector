@@ -93,8 +93,8 @@ export function connectFlow(
 		return { ep, a, login: await openAuthorization(call, a) };
 	}
 
-	// Presses the page's button labelled `label`, submitting its form with
-	// `fields` as a browser on this site would.
+	// Presses the page's button labelled `label`, submitting its form's hidden
+	// fields and `fields` as a browser on this site would.
 	async function pressButton(
 		page: Response,
 		label: string,
@@ -107,16 +107,29 @@ export function connectFlow(
 			new RegExp(`<button[^>]*>${label}</button>`).test(inner ?? ""),
 		);
 		if (!form?.[1]) throw new Error(`no ${label} button on the page`);
+		const hidden = [
+			...(form[2] ?? "").matchAll(/<input[^>]*type="hidden"[^>]*>/g),
+		].map(([input]): [string, string] => [
+			/name="([^"]*)"/.exec(input)?.[1] ?? "",
+			/value="([^"]*)"/.exec(input)?.[1] ?? "",
+		]);
 		return call(
 			new Request(new URL(form[1], base), {
 				method: "POST",
 				headers: { origin: base, "sec-fetch-site": "same-origin" },
-				body: new URLSearchParams(fields),
+				body: new URLSearchParams([...hidden, ...Object.entries(fields)]),
 			}),
 		);
 	}
 
-	// Opens the address page and submits `address` through its form.
+	// Opens the connect page and presses "Sign in with better.giving".
+	async function signInWithPlatform(login?: URL): Promise<Response> {
+		const page = await call(new Request(login ?? (await startSignIn()).login));
+		return pressButton(page, "Sign in with better.giving");
+	}
+
+	// Opens the connect page and submits `address` through the "Use a
+	// different site" form.
 	async function submitAddress(
 		address: string,
 		login?: URL,
@@ -173,6 +186,7 @@ export function connectFlow(
 	return {
 		startSignIn,
 		pressButton,
+		signInWithPlatform,
 		submitAddress,
 		press,
 		returnTo,

@@ -105,10 +105,9 @@ const DIDNT_FINISH = {
 	message:
 		"Connecting didn't finish. Go back to your AI assistant and press Connect again.",
 };
-const NOT_AN_ADDRESS =
-	"Enter better.giving, or your own Better Giving site's address.";
+const NOT_AN_ADDRESS = "Enter your Better Giving site's address.";
 const NEEDS_UPDATE =
-	"We couldn't find Better Giving at that address. Use better.giving, or your own Better Giving site's address, not your organization's main website. If the address is right, that site can't connect through the connector yet.";
+	"We couldn't find Better Giving at that address. Use your Better Giving site's address, not your organization's main website. If the address is right, that site can't connect through the connector yet.";
 const UNREACHABLE = "That address didn't answer. Check it and try again.";
 
 // The page a flow ended on: its status, and the outcome it is titled and headed for.
@@ -159,26 +158,144 @@ test.each(CHAT_APP_CALLBACKS)(
 	},
 );
 
-test("the address page asks for better.giving or your own site", async () => {
+test("the connect page offers sign-in at better.giving first", async () => {
 	const res = await call(new Request(await loginUrl()));
 
 	expect(res.headers.get("content-type")).toMatch(/^text\/html/);
 	const html = await expectPage(res, 200, {
 		heading: "Connect Better Giving",
 		message:
-			"Sign in to your Better Giving account at better.giving. To use your own Better Giving site's address instead, type that address. You'll sign in and press Allow, then return to your AI assistant.",
+			"Sign in to Better Giving and press Allow. Then you'll return to your AI assistant.",
 	});
 	expect(html).toMatch(/^<!doctype html>/i);
-	expect(html).toContain(
-		'<label for="address">Your Better Giving address</label>',
+	const signIn =
+		html.match(/<form id="sign-in-form"[^>]*>([\s\S]*?)<\/form>/)?.[1] ?? "";
+	expect(signIn).toContain(
+		'<input type="hidden" name="address" value="better.giving"/>',
 	);
-	const input = html.match(/<input[^>]*name="address"[^>]*>/)?.[0] ?? "";
-	const hint = input.match(/aria-describedby="([^"]+)"/)?.[1];
-	expect(html).toContain(
-		`<p id="${hint}" class="hint">better.giving, or your own Better Giving site's address. Not your organization's main website.</p>`,
+	expect(signIn).toMatch(
+		/<button[^>]*type="submit"[^>]*>Sign in with better.giving<\/button>/,
 	);
-	expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Continue<\/button>/);
+	expect(html.indexOf("sign-in-form")).toBeLessThan(html.indexOf("<details"));
 });
+
+test("the connect page keeps the address field folded under Use a different site", async () => {
+	const html = shown(await (await call(new Request(await loginUrl()))).text());
+
+	const details =
+		html.match(/<details>([\s\S]*?)<\/details>/)?.[1] ?? "<missing>";
+	expect(details).toMatch(/^<summary>Use a different site<\/summary>/);
+	const outside = html.replace(/<details[\s\S]*?<\/details>/, "");
+	expect(outside).not.toMatch(/<input(?![^>]*type="hidden")[^>]*>/);
+	expect(outside).not.toContain("required");
+	expect(details).toContain(
+		'<label for="address">Your Better Giving site\'s address</label>',
+	);
+	const input = details.match(/<input[^>]*id="address"[^>]*>/)?.[0] ?? "";
+	expect(input).toContain("required");
+	const hint = input.match(/aria-describedby="([^"]+)"/)?.[1];
+	expect(details).toContain(
+		`<p id="${hint}" class="hint">Only if your organization runs its own Better Giving site. Not its main website.</p>`,
+	);
+	expect(details).toMatch(/<button[^>]*type="submit"[^>]*>Continue<\/button>/);
+});
+
+test.each([
+	["Standalone", false],
+	["Platform", true],
+])(
+	"Sign in with better.giving hands the browser to better.giving's Allow on %s",
+	async (_, platform) => {
+		deployment = fakeDeployment({
+			host: "better.giving",
+			name: "Hope Shelter",
+			platform,
+		});
+		serve(deployment.fetch);
+		await warmUp(call);
+
+		const res = await flow.signInWithPlatform();
+
+		expect(res.status).toBe(302);
+		const allow = new URL(res.headers.get("location") ?? "");
+		expect(allow.origin).toBe("https://better.giving");
+		expect(allow.pathname).toBe("/admin/connector/allow");
+		expect(res.headers.get("set-cookie")).toMatch(/^__Secure-connect=/);
+		expect(requestsTo("hello")).toHaveLength(1);
+	},
+);
+
+test("Sign in with better.giving connects through Allow to a working /mcp", async () => {
+	deployment = fakeDeployment({ host: "better.giving", name: "Hope Shelter" });
+	serve(deployment.fetch);
+	await warmUp(call);
+	const chat = await flow.startSignIn();
+	const handOff = await flow.signInWithPlatform(chat.login);
+	const back = await flow.press(handOff.headers.get("location") ?? "");
+
+	const tokens = await flow.finish({
+		chat,
+		allow: handOff.headers.get("location") ?? "",
+		back,
+		cookie: cookieFrom(handOff),
+	});
+
+	expect(await instructions(tokens)).toContain("Hope Shelter");
+	expect(await connectionRows()).toEqual([
+		{ origin: "https://better.giving", orgName: "Hope Shelter" },
+	]);
+});
+
+test.each([
+	[
+		"better.giving doesn't answer",
+		() => {},
+		"unreachable",
+		"better.giving didn't answer. Try again in a moment.",
+	],
+	[
+		"better.giving can't connect",
+		() => {
+			deployment = fakeDeployment({ host: "better.giving" });
+			serve(deployment.fetch);
+			answer("hello", 404);
+		},
+		"needs_update",
+		"better.giving can't connect right now. Try again later.",
+	],
+])(
+	"when %s, Sign in with better.giving says so at its button and leaves the address form alone",
+	async (_, arrange, outcome, message) => {
+		arrange();
+		await warmUp(call);
+		const lines = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const res = await flow.signInWithPlatform();
+
+		expect(lines.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+			{ kind: "connect", step: "address", outcome },
+		]);
+		expect(res.status).toBe(502);
+		expect(res.headers.get("set-cookie")).toBeNull();
+		const html = shown(await res.text());
+		expect(html).toContain("<title>Error: Connect Better Giving</title>");
+		const signIn = html.match(/<form id="sign-in-form"[\s\S]*?<\/form>/)?.[0];
+		expect(signIn).toMatch(
+			new RegExp(
+				`<button id="sign-in"[^>]*>Sign in with better.giving</button><p id="sign-in-error" class="error" role="alert">${message}</p>`,
+			),
+		);
+		const button = signIn?.match(/<button[^>]*>/)?.[0] ?? "";
+		expect(button).toContain('aria-describedby="sign-in-error"');
+		expect(button).toContain("autofocus");
+		expect(html).toMatch(/<details>\s*<summary>Use a different site/);
+		const input = html.match(/<input[^>]*id="address"[^>]*>/)?.[0] ?? "";
+		expect(input).not.toContain("value=");
+		expect(input).not.toContain("aria-invalid");
+		expect(input).not.toContain("autofocus");
+		expect(html).not.toContain('id="address-error"');
+	},
+);
 
 const READ_ONLY_LINE =
 	"<p>This connection is read-only: your AI assistant will be able to view your Better Giving account and site but not change anything.</p>";
@@ -216,6 +333,19 @@ test.each([
 		expect(html).not.toContain("read-only");
 	},
 );
+
+test("a read-only request's Sign in with better.giving still reaches Allow", async () => {
+	deployment = fakeDeployment({ host: "better.giving" });
+	serve(deployment.fetch);
+	await warmUp(call);
+
+	const res = await flow.signInWithPlatform(await readOnlyLogin());
+
+	expect(res.status).toBe(302);
+	expect(new URL(res.headers.get("location") ?? "").origin).toBe(
+		"https://better.giving",
+	);
+});
 
 test("a read-only request's address asked for again still says it is read-only", async () => {
 	const res = await flow.submitAddress("my charity", await readOnlyLogin());
@@ -449,7 +579,11 @@ test.each([
 		expect(res.status).toBe(status);
 		expect(res.headers.get("set-cookie")).toBeNull();
 		const html = shown(await res.text());
-		const input = html.match(/<input[^>]*>/)?.[0] ?? "";
+		expect(html).toMatch(
+			/<details open="">\s*<summary>Use a different site<\/summary>/,
+		);
+		const details = html.match(/<details[\s\S]*?<\/details>/)?.[0] ?? "";
+		const input = details.match(/<input[^>]*id="address"[^>]*>/)?.[0] ?? "";
 		expect(input).toContain(`value="${address}"`);
 		expect(input).toContain('aria-invalid="true"');
 		const described = (input.match(/aria-describedby="([^"]+)"/)?.[1] ?? "")
@@ -458,7 +592,7 @@ test.each([
 				(id) => html.match(new RegExp(`<p id="${id}"[^>]*>([^<]*)</p>`))?.[1],
 			);
 		expect(described).toContain(message);
-		expect(html).toContain(
+		expect(details).toContain(
 			`<p id="address-error" class="error" role="alert">${message}</p>`,
 		);
 		expect(html).toContain("<title>Error: Connect Better Giving</title>");
@@ -471,7 +605,7 @@ test("an address that is markup comes back escaped in the page's raw HTML", asyn
 
 	expect(res.status).toBe(400);
 	const raw = await res.text();
-	const input = raw.match(/<input[^>]*name="address"[^>]*>/)?.[0] ?? "";
+	const input = raw.match(/<input[^>]*id="address"[^>]*>/)?.[0] ?? "";
 	expect(input).toContain('value="&quot;&gt;&lt;img src=x onerror=1&gt;"');
 	expect(raw).not.toContain("<img");
 });
@@ -812,67 +946,107 @@ test.each([
 	);
 });
 
-test("Continue says it's checking in a status line, stays focusable, refuses a second press, and comes back on a return to the page", async () => {
+// The page's script run against a stand-in for its forms, buttons and status lines.
+async function pendingScript() {
 	const html = await (await call(new Request(await loginUrl()))).text();
-	expect(html).toMatch(
-		/<p id="address-status" role="status"[^>]*><\/p>[\s\S]*<script>/,
-	);
 	const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? "";
-	const on: Record<string, (event?: unknown) => void> = {};
-	const attributes: Record<string, string> = {};
-	const button = {
-		setAttribute: (name: string, value: string) => {
-			attributes[name] = value;
-		},
-		removeAttribute: (name: string) => {
-			delete attributes[name];
-		},
+	const on: Record<string, ((event?: unknown) => void)[]> = {};
+	const listen = (key: string) => (type: string, fn: () => void) => {
+		on[`${key}:${type}`] = [...(on[`${key}:${type}`] ?? []), fn];
 	};
-	const status = { textContent: "" };
-	const elements: Record<string, unknown> = {
-		"address-form": {
-			addEventListener: (type: string, fn: () => void) => {
-				on[`form:${type}`] = fn;
+	const fire = (key: string, event?: unknown) => {
+		for (const fn of on[key] ?? []) fn(event);
+	};
+	const attributes: Record<string, Record<string, string>> = {};
+	const button = (id: string) => {
+		attributes[id] = {};
+		return {
+			setAttribute: (name: string, value: string) => {
+				(attributes[id] ?? {})[name] = value;
 			},
-		},
-		continue: button,
-		"address-status": status,
+			removeAttribute: (name: string) => {
+				delete attributes[id]?.[name];
+			},
+		};
+	};
+	const lines = {
+		"sign-in-status": { textContent: "" },
+		"address-status": { textContent: "" },
+	};
+	const elements: Record<string, unknown> = {
+		"sign-in-form": { addEventListener: listen("sign-in-form") },
+		"address-form": { addEventListener: listen("address-form") },
+		"sign-in": button("sign-in"),
+		continue: button("continue"),
+		...lines,
 	};
 	const document = {
 		getElementById: (id: string) =>
 			html.includes(`id="${id}"`) ? elements[id] : null,
 	};
-	const addEventListener = (type: string, fn: () => void) => {
-		on[`window:${type}`] = fn;
-	};
 	new Function("document", "addEventListener", script)(
 		document,
-		addEventListener,
+		listen("window"),
 	);
-	const submit = () => {
+	const submit = (form: string) => {
 		const event = { prevented: false, preventDefault: () => {} };
 		event.preventDefault = () => {
 			event.prevented = true;
 		};
-		on["form:submit"]?.(event);
+		fire(`${form}:submit`, event);
 		return event.prevented;
 	};
-
-	const first = submit();
-	const pending = { ...attributes, said: status.textContent };
-	const second = submit();
-	on["window:pageshow"]?.();
-	const back = { ...attributes, said: status.textContent };
-	const afterReturn = submit();
-
-	expect([first, second, afterReturn]).toEqual([false, true, false]);
-	expect(pending).toEqual({
-		"aria-disabled": "true",
-		said: "Checking your address…",
+	const seen = () => ({
+		"sign-in": { ...attributes["sign-in"] },
+		continue: { ...attributes.continue },
+		"sign-in-status": lines["sign-in-status"].textContent,
+		"address-status": lines["address-status"].textContent,
 	});
-	expect(back).toEqual({ said: "" });
-	expect(html).not.toMatch(/<button[^>]*disabled/);
-});
+	return { html, submit, seen, returnToPage: () => fire("window:pageshow") };
+}
+
+const NOTHING_PENDING = {
+	"sign-in": {},
+	continue: {},
+	"sign-in-status": "",
+	"address-status": "",
+};
+
+test.each([
+	[
+		"Sign in with better.giving",
+		"sign-in-form",
+		"sign-in-status",
+		"Opening better.giving…",
+	],
+	["Continue", "address-form", "address-status", "Checking your address…"],
+])(
+	"%s says so in its status line, marks both buttons busy but focusable, refuses a second press of either form, and comes back on a return to the page",
+	async (_, form, line, said) => {
+		const page = await pendingScript();
+		expect(page.html).toMatch(
+			new RegExp(`<p id="${line}" role="status"[^>]*></p>[\\s\\S]*<script>`),
+		);
+		const other = form === "sign-in-form" ? "address-form" : "sign-in-form";
+
+		const first = page.submit(form);
+		const pending = page.seen();
+		const again = [page.submit(form), page.submit(other)];
+		page.returnToPage();
+		const back = page.seen();
+		const afterReturn = page.submit(other);
+
+		expect([first, ...again, afterReturn]).toEqual([false, true, true, false]);
+		expect(pending).toEqual({
+			...NOTHING_PENDING,
+			"sign-in": { "aria-disabled": "true" },
+			continue: { "aria-disabled": "true" },
+			[line]: said,
+		});
+		expect(back).toEqual(NOTHING_PENDING);
+		expect(page.html).not.toMatch(/<button[^>]*disabled/);
+	},
+);
 
 // Where a way-out button sent the browser, checked as the chat app's denial.
 function expectChatToldDenied(

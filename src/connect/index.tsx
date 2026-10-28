@@ -19,7 +19,7 @@ import {
 } from "../deployment";
 import { parseOrigin, parseTypedOrigin } from "../deployment/origin";
 import { type ConnectOutcome, type ConnectStep, log } from "../log";
-import { AddressPage, MessagePage } from "./page";
+import { AddressPage, MessagePage, VIA_SIGN_IN } from "./page";
 
 // Where a request ends without the form: the page's heading and its one line.
 const END = {
@@ -48,11 +48,16 @@ type End = (typeof END)[keyof typeof END];
 
 // What the address form says under the field.
 const FIELD = {
-	notAnAddress:
-		"Enter better.giving, or your own Better Giving site's address.",
+	notAnAddress: "Enter your Better Giving site's address.",
 	needsUpdate:
-		"We couldn't find Better Giving at that address. Use better.giving, or your own Better Giving site's address, not your organization's main website. If the address is right, that site can't connect through the connector yet.",
+		"We couldn't find Better Giving at that address. Use your Better Giving site's address, not your organization's main website. If the address is right, that site can't connect through the connector yet.",
 	unreachable: "That address didn't answer. Check it and try again.",
+} as const;
+
+// What the sign-in form says under its button when better.giving fails it.
+const SIGN_IN = {
+	needsUpdate: "better.giving can't connect right now. Try again later.",
+	unreachable: "better.giving didn't answer. Try again in a moment.",
 } as const;
 
 export type ConnectDeps = {
@@ -115,6 +120,7 @@ const formOnly = createMiddleware(async (c, next) => {
 
 const addressForm = validator("form", (form) => ({
 	address: typeof form.address === "string" ? form.address : "",
+	signIn: form.via === VIA_SIGN_IN,
 }));
 
 // `login`: the chat app's signed request, once it has verified on this request.
@@ -181,23 +187,30 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 		const login = await deps.auth.readLoginRequest(url);
 		if (!login) return stop(c, "address", "expired", END.timedOut, 400);
 		c.set("login", login.oauthQuery);
-		const { address } = c.req.valid("form");
+		const { address, signIn } = c.req.valid("form");
+		const page = (
+			said: { value: string; error: string } | { signInError: string },
+		) => (
+			<AddressPage
+				action={url.pathname + url.search}
+				cancel={cancelAction(login.oauthQuery)}
+				readOnly={login.readOnly}
+				{...said}
+			/>
+		);
 		const askAgain = (
 			outcome: ConnectOutcome,
 			error: string,
 			status: 400 | 502,
 		) => {
 			log({ kind: "connect", step: "address", outcome });
-			return c.html(
-				<AddressPage
-					action={url.pathname + url.search}
-					cancel={cancelAction(login.oauthQuery)}
-					value={address}
-					error={error}
-					readOnly={login.readOnly}
-				/>,
-				status,
-			);
+			return c.html(page({ value: address, error }), status);
+		};
+		// better.giving failing the sign-in button isn't the operator's input:
+		// the address field comes back empty and its disclosure closed.
+		const signInFailed = (outcome: ConnectOutcome, signInError: string) => {
+			log({ kind: "connect", step: "address", outcome });
+			return c.html(page({ signInError }), 502);
 		};
 		const typed = parseTypedOrigin(address);
 		if (!typed) return askAgain("invalid_address", FIELD.notAnAddress, 400);
@@ -206,10 +219,14 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 			hello = await deps.client.hello(typed);
 		} catch (error) {
 			if (error instanceof NeedsUpdate) {
-				return askAgain("needs_update", FIELD.needsUpdate, 400);
+				return signIn
+					? signInFailed("needs_update", SIGN_IN.needsUpdate)
+					: askAgain("needs_update", FIELD.needsUpdate, 400);
 			}
 			if (error instanceof Unreachable) {
-				return askAgain("unreachable", FIELD.unreachable, 502);
+				return signIn
+					? signInFailed("unreachable", SIGN_IN.unreachable)
+					: askAgain("unreachable", FIELD.unreachable, 502);
 			}
 			throw error;
 		}

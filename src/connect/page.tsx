@@ -18,8 +18,11 @@ input[aria-invalid=true]{border-color:#b00020}
 button{display:block;width:100%;margin-top:1.5rem;font:inherit;font-weight:600;padding:.9rem;border:2px solid #1d4ed8;border-radius:.5rem;color:#fff;background:#1d4ed8}
 button[aria-disabled=true]{cursor:progress}
 .secondary{margin-top:.75rem;color:#1d4ed8;background:transparent}
+details{margin-top:1.5rem}
+summary{padding:.6rem 0;font-weight:600;color:#1d4ed8;cursor:pointer}
+details[open] summary{margin-bottom:.75rem}
 :focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
-@media (prefers-color-scheme:dark){body{color:#f2f2f2;background:#121212}.hint{color:#bbb}input{background:#1e1e1e;border-color:#8a8a8a}input[aria-invalid=true]{border-color:#ff8a80}.error{color:#ff8a80}button{background:#2563eb;border-color:#2563eb}:focus-visible{outline-color:#93c5fd}.secondary{color:#93c5fd;background:transparent}}
+@media (prefers-color-scheme:dark){body{color:#f2f2f2;background:#121212}.hint{color:#bbb}input{background:#1e1e1e;border-color:#8a8a8a}input[aria-invalid=true]{border-color:#ff8a80}.error{color:#ff8a80}button{background:#2563eb;border-color:#2563eb}:focus-visible{outline-color:#93c5fd}.secondary,summary{color:#93c5fd}.secondary{background:transparent}}
 `;
 
 function Page({
@@ -53,35 +56,56 @@ function Page({
 	);
 }
 
-// hello can take seconds; the status line says so and a second press is
-// refused. aria-disabled, not disabled, so the pressed button keeps focus. A
-// page restored from the back-forward cache gets its button back.
+// hello can take seconds; the pressed form's status line says so, and both
+// buttons read busy because a second press of either form is refused.
+// aria-disabled, not disabled, so the pressed button keeps focus. A page
+// restored from the back-forward cache gets its buttons back.
 // No top-level `status`: in a classic script that is window.status.
 const PENDING = `
-var form = document.getElementById("address-form");
-var button = document.getElementById("continue");
-var checking = document.getElementById("address-status");
 var pending = false;
-form.addEventListener("submit", function (event) {
-	if (pending) return event.preventDefault();
-	pending = true;
-	button.setAttribute("aria-disabled", "true");
-	checking.textContent = "Checking your address…";
-});
+var buttons = [document.getElementById("sign-in"), document.getElementById("continue")];
+var lines = [];
+function hold(formId, lineId, said) {
+	var line = document.getElementById(lineId);
+	lines.push(line);
+	document.getElementById(formId).addEventListener("submit", function (event) {
+		if (pending) return event.preventDefault();
+		pending = true;
+		buttons.forEach(function (button) {
+			button.setAttribute("aria-disabled", "true");
+		});
+		line.textContent = said;
+	});
+}
 addEventListener("pageshow", function () {
 	pending = false;
-	button.removeAttribute("aria-disabled");
-	checking.textContent = "";
+	buttons.forEach(function (button) {
+		button.removeAttribute("aria-disabled");
+	});
+	lines.forEach(function (line) {
+		line.textContent = "";
+	});
 });
+hold("sign-in-form", "sign-in-status", "Opening better.giving…");
+hold("address-form", "address-status", "Checking your address…");
 `;
 
+/** What the sign-in button submits as the address. */
+const PLATFORM_ADDRESS = "better.giving";
+
+/** The sign-in form's `via`, which tells its post from the typed address's. */
+export const VIA_SIGN_IN = "sign-in";
+
+const SIGN_IN_ERROR_ID = "sign-in-error";
 const ERROR_ID = "address-error";
 const HINT_ID = "address-hint";
-const STATUS_ID = "address-status";
 
 /**
- * The address form. `action` is the request's own path and query: the signed
- * login request rides in it from GET to POST.
+ * The connect page: one button signs in at better.giving; "Use a different
+ * site" opens the address form for a site of the operator's own. Both forms
+ * post to `action`, the request's own path and query: the signed login
+ * request rides in it from GET to POST. The sign-in form also posts `via`.
+ * `error` is the address field's; `signInError` is the sign-in button's.
  */
 export function AddressPage(props: {
 	action: string;
@@ -89,20 +113,23 @@ export function AddressPage(props: {
 	cancel: string;
 	value?: string;
 	error?: string;
+	signInError?: string;
 	/** Whether the verified login request asks for `read_only`. */
 	readOnly?: boolean;
 }) {
-	const { action, cancel, value, error, readOnly } = props;
+	const { action, cancel, value, error, signInError, readOnly } = props;
 	const invalid = error !== undefined;
+	const signInFailed = signInError !== undefined;
 	return (
 		<Page
 			heading="Connect Better Giving"
-			title={invalid ? "Error: Connect Better Giving" : undefined}
+			title={
+				invalid || signInFailed ? "Error: Connect Better Giving" : undefined
+			}
 		>
 			<p>
-				Sign in to your Better Giving account at better.giving. To use your own
-				Better Giving site's address instead, type that address. You'll sign in
-				and press Allow, then return to your AI assistant.
+				Sign in to Better Giving and press Allow. Then you'll return to your AI
+				assistant.
 			</p>
 			{readOnly && (
 				<p>
@@ -110,38 +137,58 @@ export function AddressPage(props: {
 					your Better Giving account and site but not change anything.
 				</p>
 			)}
-			<form id="address-form" method="post" action={action}>
-				<label for="address">Your Better Giving address</label>
-				<input
-					id="address"
-					name="address"
-					type="text"
-					inputmode="url"
-					autocomplete="url"
-					autocapitalize="none"
-					spellcheck={false}
-					required
-					placeholder="better.giving"
-					value={value}
-					autofocus={invalid}
-					aria-invalid={invalid ? "true" : undefined}
-					aria-describedby={invalid ? `${ERROR_ID} ${HINT_ID}` : HINT_ID}
-				/>
-				{invalid && (
-					<p id={ERROR_ID} class="error" role="alert">
-						{error}
+			<form id="sign-in-form" method="post" action={action}>
+				<input type="hidden" name="address" value={PLATFORM_ADDRESS} />
+				<input type="hidden" name="via" value={VIA_SIGN_IN} />
+				<button
+					id="sign-in"
+					type="submit"
+					autofocus={signInFailed}
+					aria-describedby={signInFailed ? SIGN_IN_ERROR_ID : undefined}
+				>
+					Sign in with better.giving
+				</button>
+				{signInFailed && (
+					<p id={SIGN_IN_ERROR_ID} class="error" role="alert">
+						{signInError}
 					</p>
 				)}
-				<p id={HINT_ID} class="hint">
-					better.giving, or your own Better Giving site's address. Not your
-					organization's main website.
-				</p>
-				<button id="continue" type="submit">
-					Continue
-				</button>
 				{/* present from the start: a live region added later isn't announced */}
-				<p id={STATUS_ID} role="status" class="status"></p>
+				<p id="sign-in-status" role="status" class="status"></p>
 			</form>
+			<details open={invalid}>
+				<summary>Use a different site</summary>
+				<form id="address-form" method="post" action={action}>
+					<label for="address">Your Better Giving site's address</label>
+					<input
+						id="address"
+						name="address"
+						type="text"
+						inputmode="url"
+						autocomplete="url"
+						autocapitalize="none"
+						spellcheck={false}
+						required
+						value={value}
+						autofocus={invalid}
+						aria-invalid={invalid ? "true" : undefined}
+						aria-describedby={invalid ? `${ERROR_ID} ${HINT_ID}` : HINT_ID}
+					/>
+					{invalid && (
+						<p id={ERROR_ID} class="error" role="alert">
+							{error}
+						</p>
+					)}
+					<p id={HINT_ID} class="hint">
+						Only if your organization runs its own Better Giving site. Not its
+						main website.
+					</p>
+					<button id="continue" type="submit">
+						Continue
+					</button>
+					<p id="address-status" role="status" class="status"></p>
+				</form>
+			</details>
 			<script dangerouslySetInnerHTML={{ __html: PENDING }} />
 			<WayOut action={cancel} label="Cancel" />
 		</Page>
