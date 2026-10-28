@@ -27,13 +27,13 @@ function html(c: Context, body: string | Promise<string>) {
 const DEMO_CAPTIONS = `WEBVTT
 
 00:00:00.000 --> 00:00:08.000
-MCP test client. Connect a site, then five tools and three refusals.
+MCP test client. Connect, then five tools and three refusals.
 
 00:00:08.000 --> 00:00:20.000
-Connect. Enter the donation site and continue.
+Connect. Start the connection and continue.
 
 00:00:20.000 --> 00:00:30.000
-Sign in at better.giving, or on your own Better Giving site.
+Sign in at better.giving.
 
 00:00:30.000 --> 00:00:36.000
 Allow the connector for this organisation.

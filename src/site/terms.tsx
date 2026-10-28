@@ -69,8 +69,7 @@ export function TermsPage() {
 
 			<h2>6. Your site and your data</h2>
 			<p>
-				You connect a Better Giving account at better.giving, or your own Better
-				Giving site's address. The{" "}
+				You connect a Better Giving account by signing in at better.giving. The{" "}
 				<a href="https://github.com/better-giving/better-giving-connector">
 					Better Giving connector
 				</a>{" "}
@@ -148,8 +147,10 @@ export function TermsPage() {
 			<ul>
 				<li>
 					Version {TERMS_VERSION.version}, effective {TERMS_VERSION.effective}:
-					first published version.
+					connecting always goes through better.giving; removes the option to
+					connect your own site's address.
 				</li>
+				<li>Version 1.0, effective 2026-10-25: first published version.</li>
 			</ul>
 		</Page>
 	);
