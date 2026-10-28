@@ -28,8 +28,9 @@ export function PrivacyPage() {
 				handles personal data in the Better Giving Connector (the "Connector"),
 				available at https://app.connect.better.giving. The Connector lets a
 				nonprofit manage its Better Giving account from your AI assistant. You
-				sign in at better.giving, or you connect your own Better Giving site's
-				address.
+				connect by signing in at better.giving and pressing Allow. Connections
+				made earlier to another Better Giving site keep working until you
+				disconnect them.
 			</p>
 
 			<h2>1. Who we are and how to contact us</h2>
@@ -81,7 +82,10 @@ export function PrivacyPage() {
 						<tr>
 							<td>Connected site details</td>
 							<td>Site origin (URL) and organization name</td>
-							<td>You, when you connect a site</td>
+							<td>
+								Set by the Connector (better.giving) and your Better Giving
+								account, when you connect
+							</td>
 						</tr>
 						<tr>
 							<td>Site connection key</td>
@@ -220,7 +224,7 @@ export function PrivacyPage() {
 						<tr>
 							<td>Your Better Giving account</td>
 							<td>Destination of your requests</td>
-							<td>Where that account runs</td>
+							<td>better.giving</td>
 						</tr>
 						<tr>
 							<td>Your AI assistant</td>
@@ -263,8 +267,9 @@ export function PrivacyPage() {
 					revoke the key, and still deletes its copy if that request fails.
 				</li>
 				<li>
-					The Better Giving Standalone site you connect to revokes a connection
-					key after 90 days without use, and deletes revoked keys 30 days later.
+					Better Giving revokes a connection key after 90 days without use.
+					Revoked keys can no longer be used and are kept until your account is
+					deleted.
 				</li>
 				<li>
 					<strong>Access and refresh tokens</strong> are stored as one-way
@@ -402,8 +407,10 @@ export function PrivacyPage() {
 			<ul>
 				<li>
 					Version {PRIVACY_VERSION.version}, effective{" "}
-					{PRIVACY_VERSION.effective}: adds read-only access.
+					{PRIVACY_VERSION.effective}: new connections always go through
+					better.giving; removes the option to connect your own site's address.
 				</li>
+				<li>Version 1.1, effective 2026-10-27: adds read-only access.</li>
 				<li>Version 1.0, effective 2026-10-25: first published version.</li>
 			</ul>
 		</Page>
