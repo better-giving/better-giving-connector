@@ -489,8 +489,9 @@ export const ACTIONS = toolSpecs([
 	},
 ]);
 
-type Tool = (typeof ACTIONS)[number]["tool"];
-const specOf = (tool: Tool) => {
+/** Every tool name the connector can register. */
+export type ToolName = (typeof ACTIONS)[number]["tool"];
+const specOf = (tool: ToolName) => {
 	const spec = ACTIONS.find((s) => s.tool === tool);
 	if (!spec) throw new Error(`no ${tool} spec`);
 	return spec;
@@ -499,7 +500,9 @@ const specOf = (tool: Tool) => {
 // What Platform's writes add to the specs above: a campaign's version guard,
 // create_form's warning against a second call, updated_at on a form, and photo
 // links for a campaign's hero alone.
-const PLATFORM_CHANGES: Partial<Record<Tool, Partial<ActionSpec<Tool>>>> = {
+const PLATFORM_CHANGES: Partial<
+	Record<ToolName, Partial<ActionSpec<ToolName>>>
+> = {
 	update_campaign_blocks: {
 		description: `${specOf("update_campaign_blocks").description} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null.`,
 		input: specOf("update_campaign_blocks").input.extend({
