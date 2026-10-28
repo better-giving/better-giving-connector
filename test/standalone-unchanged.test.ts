@@ -17,7 +17,7 @@ import { freshDb } from "./support";
 // is tools/list and the instructions as d1a35fb served them to a
 // Standalone connection serving every action, plus each tool's title in its
 // annotations, destructiveHint true on every tool that overwrites, and
-// openWorldHint true on publish, end, and reset. A deliberate Standalone
+// openWorldHint true on every tool that writes. A deliberate Standalone
 // change edits the entry it changes; re-dumping the whole list would hide one
 // that isn't.
 

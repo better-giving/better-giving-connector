@@ -98,15 +98,14 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		readOnlyHint: false,
 		destructiveHint: false,
 		idempotentHint: false,
-		openWorldHint: false,
+		openWorldHint: true,
 	};
 	const DESTRUCTIVE = {
 		readOnlyHint: false,
 		destructiveHint: true,
 		idempotentHint: true,
-		openWorldHint: false,
+		openWorldHint: true,
 	};
-	const PUBLIC = { ...DESTRUCTIVE, openWorldHint: true };
 
 	test("tools/list offers one tool per action, each with its annotations", async () => {
 		const tools = await listTools();
@@ -132,12 +131,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			update_campaign_blocks: DESTRUCTIVE,
 			update_campaign_content: DESTRUCTIVE,
 			update_campaign_settings: DESTRUCTIVE,
-			publish_campaign: PUBLIC,
-			end_campaign: PUBLIC,
+			publish_campaign: DESTRUCTIVE,
+			end_campaign: DESTRUCTIVE,
 			get_donation_page: READ,
 			update_donation_page_blocks: DESTRUCTIVE,
 			update_donation_page_content: DESTRUCTIVE,
-			reset_donation_page: PUBLIC,
+			reset_donation_page: DESTRUCTIVE,
 			get_block_catalog: READ,
 			get_content_catalog: READ,
 			list_forms: READ,
@@ -245,18 +244,21 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		}
 	});
 
-	test("only the tools that change what the public sees immediately are open-world", async () => {
+	test("exactly the tools that write are open-world", async () => {
 		const tools: {
 			name: string;
-			annotations: { openWorldHint?: boolean };
+			annotations: { readOnlyHint?: boolean; openWorldHint?: boolean };
 		}[] = await listTools();
-
-		expect(
+		const names = (keep: (t: (typeof tools)[number]) => boolean) =>
 			tools
-				.filter((t) => t.annotations.openWorldHint)
+				.filter(keep)
 				.map((t) => t.name)
-				.toSorted(),
-		).toEqual(["end_campaign", "publish_campaign", "reset_donation_page"]);
+				.toSorted();
+
+		expect(names((t) => t.annotations.openWorldHint === true)).toEqual(
+			names((t) => t.annotations.readOnlyHint === false),
+		);
+		expect(names((t) => t.annotations.readOnlyHint === false)).not.toEqual([]);
 	});
 
 	test("each tool's input schema requires what its contract body needs", async () => {
