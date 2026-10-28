@@ -124,8 +124,12 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"Tool requests and results are held in memory only while a request runs. They are not written to our database or logs.",
 	);
 	expect(flat).toContain(
-		"Better Giving revokes a connection key after 90 days without use.",
+		"Better Giving revokes a connection key after 90 days without use. Revoked keys can no longer be used and are kept until your account is deleted.",
 	);
+	expect(flat).toContain(
+		"You connect by signing in at better.giving and pressing Allow. Connections made earlier to another Better Giving site keep working until you disconnect them.",
+	);
+	expect(flat).not.toContain("30 days later");
 	expect(flat).toContain(
 		"stored as one-way (SHA-256) hashes, not the tokens themselves.",
 	);
@@ -199,7 +203,7 @@ test("privacy and terms use the filled wording and the version", async () => {
 	expect(privacy).not.toContain("AngelProtocolFinance");
 	const termsFlat = terms.replace(/\s+/g, " ");
 	expect(flat).toContain(
-		"Version 1.2, effective 2026-10-28: connecting always goes through better.giving; removes the option to enter your own site&#39;s address.",
+		"Version 1.2, effective 2026-10-28: new connections always go through better.giving; removes the option to connect your own site&#39;s address.",
 	);
 	expect(flat).toContain(
 		"Version 1.1, effective 2026-10-27: adds read-only access.",
@@ -208,7 +212,7 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"Version 1.0, effective 2026-10-25: first published version.",
 	);
 	expect(termsFlat).toContain(
-		"Version 1.1, effective 2026-10-28: connecting always goes through better.giving; removes the option to connect your own site&#39;s address.",
+		"Version 1.1, effective 2026-10-28: new connections always go through better.giving; removes the option to connect your own site&#39;s address.",
 	);
 	expect(termsFlat).toContain(
 		"Version 1.0, effective 2026-10-25: first published version.",

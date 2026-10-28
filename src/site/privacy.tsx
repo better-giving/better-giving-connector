@@ -28,7 +28,9 @@ export function PrivacyPage() {
 				handles personal data in the Better Giving Connector (the "Connector"),
 				available at https://app.connect.better.giving. The Connector lets a
 				nonprofit manage its Better Giving account from your AI assistant. You
-				connect by signing in at better.giving and pressing Allow.
+				connect by signing in at better.giving and pressing Allow. Connections
+				made earlier to another Better Giving site keep working until you
+				disconnect them.
 			</p>
 
 			<h2>1. Who we are and how to contact us</h2>
@@ -266,6 +268,8 @@ export function PrivacyPage() {
 				</li>
 				<li>
 					Better Giving revokes a connection key after 90 days without use.
+					Revoked keys can no longer be used and are kept until your account is
+					deleted.
 				</li>
 				<li>
 					<strong>Access and refresh tokens</strong> are stored as one-way
@@ -403,8 +407,8 @@ export function PrivacyPage() {
 			<ul>
 				<li>
 					Version {PRIVACY_VERSION.version}, effective{" "}
-					{PRIVACY_VERSION.effective}: connecting always goes through
-					better.giving; removes the option to enter your own site's address.
+					{PRIVACY_VERSION.effective}: new connections always go through
+					better.giving; removes the option to connect your own site's address.
 				</li>
 				<li>Version 1.1, effective 2026-10-27: adds read-only access.</li>
 				<li>Version 1.0, effective 2026-10-25: first published version.</li>
