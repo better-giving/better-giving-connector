@@ -130,6 +130,17 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"You connect by signing in at better.giving and pressing Allow. Connections made earlier to another Better Giving site keep working until you disconnect them.",
 	);
 	expect(flat).not.toContain("30 days later");
+	// No deletion period for revoked keys, however it is worded.
+	expect(flat).not.toMatch(/revoked keys[^.]*\d+\s+days/i);
+	expect(flat).not.toMatch(/delet\w+ (the )?revoked/i);
+	expect(flat).not.toMatch(/\d+\s+days\s+(later|after)/i);
+	expect(flat).toContain(
+		"Set by the Connector (better.giving) and your Better Giving account, when you connect",
+	);
+	expect(flat).toMatch(
+		/<td>Destination of your requests<\/td>\s*<td>better\.giving<\/td>/,
+	);
+	expect(flat).not.toContain("Where that account runs");
 	expect(flat).toContain(
 		"stored as one-way (SHA-256) hashes, not the tokens themselves.",
 	);
@@ -218,15 +229,14 @@ test("privacy and terms use the filled wording and the version", async () => {
 		"Version 1.0, effective 2026-10-25: first published version.",
 	);
 
-	expect(flat).toContain(
-		"You connect by signing in at better.giving and pressing Allow.",
-	);
 	expect(termsFlat).toContain(
-		"You connect a Better Giving account by signing in at better.giving.",
+		"You connect a Better Giving account by signing in at better.giving. Connections made earlier to another Better Giving site keep working until you disconnect them.",
 	);
 	// The changelogs name the removed option, so only the bodies above them are checked.
 	const ownSite =
-		/own Better Giving site|site&#39;s address|Standalone site you connect to/;
+		/\bown (Better Giving )?site|site&#39;s address|Standalone site you connect to|type (your|the) [^.]*address/i;
+	expect(flat.indexOf('id="changelog"')).toBeGreaterThan(0);
+	expect(termsFlat.indexOf('id="changelog"')).toBeGreaterThan(0);
 	expect(flat.split('id="changelog"')[0]).not.toMatch(ownSite);
 	expect(termsFlat.split('id="changelog"')[0]).not.toMatch(ownSite);
 });
@@ -283,7 +293,6 @@ test("docs and support describe the connector and name the support address", asy
 	expect(docs).not.toMatch(/4 MB|15 minutes|version it read/);
 	expect(support).toContain("in cash or by check");
 	expect(privacy).toContain("your AI assistant");
-	expect(terms).toContain("signing in at better.giving");
 });
 
 test("the logo is a square svg and a 512px png", async () => {
@@ -374,7 +383,9 @@ test("the demo recording is an mp4", async () => {
 	);
 	expect(past.status).toBe(416);
 	expect(past.headers.get("content-range")).toBe(`bytes */${size}`);
+});
 
+test("the demo captions describe signing in at better.giving", async () => {
 	const captions = await get("/demo.vtt");
 	expect(captions.status).toBe(200);
 	expect(captions.headers.get("content-type")).toMatch(/text\/vtt/);
