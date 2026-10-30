@@ -8,7 +8,7 @@ test("the contract's tool names are exactly the tools' names and actions", () =>
 	);
 });
 
-test("Standalone gets the specs as they are; Platform changes five, and only their wording and inputs", () => {
+test("Standalone gets the specs as they are; Platform changes eight, and only their wording and inputs", () => {
 	expect(actionsFor(false)).toBe(ACTIONS);
 	const platform = actionsFor(true);
 	expect(platform.map((s) => [s.tool, s.action, s.annotations])).toEqual(
@@ -22,6 +22,9 @@ test("Standalone gets the specs as they are; Platform changes five, and only the
 		)
 		.map((s) => s.tool);
 	expect(changed).toEqual([
+		"list_campaigns",
+		"get_campaign",
+		"create_campaign",
 		"update_campaign_blocks",
 		"update_campaign_settings",
 		"create_form",

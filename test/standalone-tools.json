@@ -4,7 +4,7 @@
 		{
 			"name": "list_campaigns",
 			"title": "List campaigns",
-			"description": "Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results.",
+			"description": "Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -36,7 +36,7 @@
 		{
 			"name": "get_campaign",
 			"title": "Get a campaign",
-			"description": "Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it on sites with get_content_catalog, or its blocks on sites with get_block_catalog. For the amount raised, use get_results.",
+			"description": "Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it on sites with get_content_catalog, or its blocks on sites with get_block_catalog. For the amount raised, use get_results. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -61,7 +61,7 @@
 		{
 			"name": "create_campaign",
 			"title": "Create a campaign",
-			"description": "Creates a new draft campaign with the given title. Donors cannot see it until it is published.",
+			"description": "Creates a new draft campaign with the given title. Donors cannot see it until it is published. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -85,7 +85,7 @@
 		{
 			"name": "update_campaign_blocks",
 			"title": "Edit a campaign's page",
-			"description": "Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. Each block follows a schema from get_block_catalog. get_campaign returns the current content; send every block the page should keep. For sites that edit pages as blocks.",
+			"description": "Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. Each block follows a schema from get_block_catalog. get_campaign returns the current content; send every block the page should keep. For sites that edit pages as blocks. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -121,7 +121,7 @@
 		{
 			"name": "update_campaign_content",
 			"title": "Edit a campaign's page",
-			"description": "Edits the content of a campaign's page: its heading, lede, story, cover photo (hero), photos beside the cover, gift tiers, and questions (faq). Send only the keys to change: a key left out stays as it is, and null clears it. Each key's shape is in get_content_catalog, and get_campaign returns the current content. Donors see the change once the campaign is published. The site arranges the page from its content, so this tool sets no design, colors, blocks, or share buttons.",
+			"description": "Edits the content of a campaign's page: its heading, lede, story, cover photo (hero), photos beside the cover, gift tiers, and questions (faq). Send only the keys to change: a key left out stays as it is, and null clears it. Each key's shape is in get_content_catalog, and get_campaign returns the current content. Donors see the change once the campaign is published. The site arranges the page from its content, so this tool sets no design, colors, blocks, or share buttons. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -283,7 +283,7 @@
 		{
 			"name": "update_campaign_settings",
 			"title": "Change a campaign's settings",
-			"description": "Sets a campaign's goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {\"message\": null}. Page content goes through update_campaign_content or update_campaign_blocks.",
+			"description": "Sets a campaign's goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {\"message\": null}. Page content goes through update_campaign_content or update_campaign_blocks. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -369,7 +369,7 @@
 		{
 			"name": "publish_campaign",
 			"title": "Publish a campaign",
-			"description": "Puts a draft campaign live at its public link. The first publish requires gifts_go_to: ask the operator where the gifts go, then send a program id, or null for the general fund. Donors see this immediately, so the operator confirms it in the chat first.",
+			"description": "Puts a draft campaign live at its public link. The first publish requires gifts_go_to: ask the operator where the gifts go, then send a program id, or null for the general fund. Donors see this immediately, so the operator confirms it in the chat first. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -397,7 +397,7 @@
 		{
 			"name": "end_campaign",
 			"title": "End a campaign",
-			"description": "Ends a campaign for good. It stops taking gifts. Donors see this immediately, so the operator confirms it in the chat first.",
+			"description": "Ends a campaign for good. It stops taking gifts. Donors see this immediately, so the operator confirms it in the chat first. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -900,7 +900,7 @@
 		{
 			"name": "create_photo_upload_link",
 			"title": "Make a photo upload link",
-			"description": "Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page on sites with get_block_catalog. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most 8 photos beside it; when all 8 are taken, ask the operator which one the new photo replaces.",
+			"description": "Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page on sites with get_block_catalog. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most 8 photos beside it; when all 8 are taken, ask the operator which one the new photo replaces. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",

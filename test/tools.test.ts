@@ -84,9 +84,14 @@ const tool = async (name: string, args: Record<string, unknown> = {}) =>
 const textOf = (result: { content: { text: string }[] }) =>
 	result.content.map((c) => c.text).join("\n");
 
-// The deployment's JSON a successful tool call answers with.
+// A successful tool call's lead line, the sentence naming the org above the JSON.
+const leadOf = (result: { content: { text: string }[] }) =>
+	textOf(result).split("\n")[0];
+
+// The deployment's JSON a successful tool call answers with: its last line,
+// below the lead (and, on a replay, the replay notice).
 const json = (result: { content: { text: string }[] }) =>
-	JSON.parse(textOf(result));
+	JSON.parse(textOf(result).split("\n").at(-1) ?? "");
 
 describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	beforeAll(() => {
@@ -437,7 +442,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		const text = textOf(await tool("get_campaign", { id: "cmp_x" }));
 
 		expect(text).not.toContain(key);
-		expect(JSON.parse(text)).toEqual({
+		expect(JSON.parse(text.split("\n").at(-1) ?? "")).toEqual({
 			id: "cmp_x",
 			echo: "[redacted]",
 			nested: { note: "prefix [redacted] suffix" },
@@ -632,6 +637,176 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(result.structuredContent).toBeUndefined();
 		expect(result.content).toHaveLength(1);
 		expect(json(result)).toEqual(answer);
+	});
+
+	test("a tool with a tailored summary leads with the org's name and the count", async () => {
+		await tool("create_campaign", { title: "Winter coats" });
+		await tool("create_campaign", { title: "Spring fund" });
+
+		expect(leadOf(await tool("list_campaigns", { status: "draft" }))).toBe(
+			"Hope Shelter: 2 drafts.",
+		);
+		expect(leadOf(await tool("list_campaigns", { limit: 1 }))).toBe(
+			"Hope Shelter: 1 campaign. More follow: pass next_cursor as cursor for the next page.",
+		);
+	});
+
+	describe("an empty range says what exists", () => {
+		const reads = (path: string) =>
+			deployment.calls.filter(
+				(c) => c.method === "GET" && c.path === `/connector/v1${path}`,
+			);
+		const GIFT_ON = (date: string) => ({
+			amount: { amount: "40.00", currency: "USD" },
+			date,
+			donor: { name: "Ada Park" },
+			method: "check",
+		});
+
+		test("get_results with gifts in range sums them with no second request", async () => {
+			await tool("record_donation", GIFT_ON("2026-10-01"));
+			const before = reads("/results").length;
+
+			const result = await tool("get_results", {
+				from: "2026-10-01",
+				to: "2026-10-31",
+			});
+
+			expect(leadOf(result)).toBe(
+				"Hope Shelter raised $40.00 from 1 gift from 2026-10-01 to 2026-10-31.",
+			);
+			expect(reads("/results")).toHaveLength(before + 1);
+		});
+
+		test("get_results with none in range reads the all-time total once and says to widen", async () => {
+			await tool("record_donation", GIFT_ON("2026-10-01"));
+			await tool("record_donation", GIFT_ON("2026-10-02"));
+			const before = reads("/results").length;
+
+			const result = await tool("get_results", {
+				from: "2025-01-01",
+				to: "2025-12-31",
+			});
+
+			expect(leadOf(result)).toBe(
+				"Hope Shelter had no gifts from 2025-01-01 to 2025-12-31. All time, it has 2 gifts totaling $80.00; widen the range or leave the filters out to see them.",
+			);
+			expect(json(result)).toMatchObject({ gift_count: 0 });
+			expect(
+				reads("/results")
+					.slice(before)
+					.map((c) => c.query),
+			).toEqual([{ from: "2025-01-01", to: "2025-12-31" }, {}]);
+		});
+
+		test("get_results with no gifts at all says none are recorded", async () => {
+			const result = await tool("get_results", { to: "2025-12-31" });
+
+			expect(leadOf(result)).toBe("Hope Shelter has no gifts recorded yet.");
+		});
+
+		test("list_donations with none in range counts them all once, with the newest date", async () => {
+			await tool("record_donation", GIFT_ON("2026-10-02"));
+			await tool("record_donation", GIFT_ON("2026-09-01"));
+			const before = reads("/donations").length;
+
+			const result = await tool("list_donations", { from: "2026-11-01" });
+
+			expect(leadOf(result)).toBe(
+				"Hope Shelter had no donations from 2026-11-01 on. It has 2 donations in all, the newest on 2026-10-02; widen the range or leave the filters out to see them.",
+			);
+			expect(json(result)).toEqual({ data: [], next_cursor: null });
+			expect(
+				reads("/donations")
+					.slice(before)
+					.map((c) => c.query),
+			).toEqual([{ from: "2026-11-01" }, { limit: "100" }]);
+		});
+
+		test("list_donations names the newest gift by its time, skipping a date that doesn't parse", async () => {
+			deployment.intercept((req) =>
+				new URL(req.url).searchParams.get("limit") === "100"
+					? Response.json({
+							data: [
+								{ id: "don_1", date: "2026-10-02T09:00:00Z" },
+								{ id: "don_2", date: "2026-10-02T08:00:00-05:00" },
+								{ id: "don_3", date: "soon" },
+							],
+							next_cursor: null,
+						})
+					: undefined,
+			);
+
+			const result = await tool("list_donations", { from: "2026-11-01" });
+
+			expect(leadOf(result)).toBe(
+				"Hope Shelter had no donations from 2026-11-01 on. It has 3 donations in all, the newest on 2026-10-02T08:00:00-05:00; widen the range or leave the filters out to see them.",
+			);
+		});
+
+		test("list_donations past 100 says more than 100", async () => {
+			deployment.intercept((req) =>
+				new URL(req.url).searchParams.get("limit") === "100"
+					? Response.json({
+							data: [{ id: "don_1", date: "2026-10-02" }],
+							next_cursor: "100",
+						})
+					: undefined,
+			);
+
+			const result = await tool("list_donations", { campaign_id: "cmp_1" });
+
+			expect(leadOf(result)).toBe(
+				"Hope Shelter had no donations for campaign cmp_1. It has more than 100 donations in all; widen the range or leave the filters out to see them.",
+			);
+		});
+
+		test("list_donations with gifts in range counts them with no second request", async () => {
+			await tool("record_donation", GIFT_ON("2026-10-02"));
+			const before = reads("/donations").length;
+
+			const result = await tool("list_donations", { to: "2026-12-31" });
+
+			expect(leadOf(result)).toBe(
+				"Hope Shelter: 1 donation through 2026-12-31.",
+			);
+			expect(reads("/donations")).toHaveLength(before + 1);
+		});
+	});
+
+	test("every campaign tool says to show only returned URLs, and no tool describes a click-path", async () => {
+		const tools: { name: string; description: string }[] = await listTools();
+
+		for (const name of [
+			"list_campaigns",
+			"get_campaign",
+			"create_campaign",
+			"update_campaign_blocks",
+			"update_campaign_content",
+			"update_campaign_settings",
+			"publish_campaign",
+			"end_campaign",
+			"create_photo_upload_link",
+		]) {
+			expect({
+				name,
+				says: tools
+					.find((t) => t.name === name)
+					?.description.endsWith(
+						"Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
+					),
+			}).toEqual({ name, says: true });
+		}
+		const text = JSON.stringify(tools);
+		expect(text).not.toContain("Not yet available");
+		expect(text).not.toContain("→");
+	});
+
+	test("a tool with no tailored summary leads with the org's name", async () => {
+		const result = await tool("get_block_catalog");
+
+		expect(leadOf(result)).toBe("From Hope Shelter's Better Giving site:");
+		expect(json(result)).toBeTypeOf("object");
 	});
 
 	test("query and body carry the tool's arguments, path ids excepted", async () => {
@@ -1414,22 +1589,23 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			note: "the second check",
 		});
 
-		expect(textOf(first).startsWith("{")).toBe(true);
-		expect(textOf(replayed).startsWith(`${REPLAY}\n`)).toBe(true);
-		expect(JSON.parse(textOf(replayed).slice(REPLAY.length + 1))).toEqual(
-			json(first),
-		);
+		expect(textOf(first)).not.toContain(REPLAY);
+		expect(textOf(replayed).split("\n")[1]).toBe(REPLAY);
+		expect(json(replayed)).toEqual(json(first));
 		expect(json(noted)).toMatchObject({ note: "the second check" });
-		expect(textOf(noted).startsWith(REPLAY)).toBe(false);
+		expect(textOf(noted)).not.toContain(REPLAY);
 	});
 
 	test("creating the same campaign again says it was already done", async () => {
 		const first = await tool("create_campaign", { title: "Winter drive" });
 		const replayed = await tool("create_campaign", { title: "Winter drive" });
 
-		expect(textOf(replayed).startsWith(`${REPLAY}\n`)).toBe(true);
-		expect(JSON.parse(textOf(replayed).slice(REPLAY.length + 1))).toEqual(
-			json(first),
+		expect(textOf(replayed)).toBe(
+			[
+				"From Hope Shelter's Better Giving site:",
+				REPLAY,
+				JSON.stringify(json(first)),
+			].join("\n"),
 		);
 	});
 

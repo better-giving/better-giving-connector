@@ -89,11 +89,12 @@ test("a tool call runs its action on the connection's deployment with its key", 
 	});
 
 	const { result } = await rpc(res);
-	expect(JSON.parse(result.content[0].text)).toEqual({
+	expect(JSON.parse(result.content[0].text.split("\n").at(-1))).toEqual({
 		data: [],
 		next_cursor: null,
 	});
-	expect(deployment.calls.at(-1)).toMatchObject({
+	// An empty filtered list is followed by an unfiltered one, for its counts.
+	expect(deployment.calls.at(-2)).toMatchObject({
 		path: "/connector/v1/campaigns",
 		query: { status: "draft" },
 		authorization: `Bearer ${key.reveal()}`,

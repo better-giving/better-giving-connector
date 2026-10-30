@@ -210,7 +210,13 @@ export function fakeNetwork(...deployments: FakeDeployment[]): typeof fetch {
 }
 
 export function fakeDeployment(
-	opts: { host?: string; name?: string; platform?: boolean } = {},
+	opts: {
+		host?: string;
+		name?: string;
+		platform?: boolean;
+		/** Platform: false for a nonprofit with no slug, whose live campaigns have no public_url. */
+		nonprofitSlug?: boolean;
+	} = {},
 ): FakeDeployment {
 	const host = opts.host ?? "give.example.org";
 	const state = newState(
@@ -218,6 +224,7 @@ export function fakeDeployment(
 		opts.name ?? "Give Example",
 		opts.platform ?? false,
 	);
+	state.nonprofitSlug = opts.nonprofitSlug ?? true;
 	const calls: RecordedCall[] = [];
 	let interceptor: Interceptor | null = null;
 	const app = deploymentApp(state);
@@ -357,6 +364,7 @@ function newState(host: string, name: string, platform: boolean) {
 		name,
 		exchangeName: name,
 		platform,
+		nonprofitSlug: true,
 		release: platform ? "0f3c2a1" : "1.0.0",
 		actions: new Set<string>(
 			platform ? Object.values(PLATFORM_ACTION_OF) : ALL_ACTIONS,
@@ -782,6 +790,12 @@ function page<T>(c: Context, items: T[]) {
 	});
 }
 
+const slugOf = (title: string) =>
+	title
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+
 const toCents = (m: Money) => Math.round(Number(m.amount) * 100);
 const fromCents = (cents: number): Money => ({
 	amount: (cents / 100).toFixed(2),
@@ -813,6 +827,10 @@ function deploymentApp(state: State) {
 		if (state.platform) {
 			view.blocks = platformBlocks(k);
 			view.version = String(k.version);
+			// Platform's campaign_url: none for a draft, nor for any campaign
+			// of a nonprofit with no slug.
+			view.slug = slugOf(k.title);
+			if (k.status === "draft" || !state.nonprofitSlug) view.public_url = null;
 		}
 		if (contentRelease()) {
 			view.settings = {
@@ -1015,8 +1033,10 @@ function deploymentApp(state: State) {
 		return page(
 			c,
 			all.map((k) => {
-				const { id, title, status, public_url } = campaignView(k);
-				return { id, title, status, public_url };
+				const { id, title, status, public_url, slug } = campaignView(k);
+				return state.platform
+					? { id, title, status, slug, public_url }
+					: { id, title, status, public_url };
 			}),
 		);
 	});

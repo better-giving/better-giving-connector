@@ -154,7 +154,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (version) => {
 		);
 
 		expect(result.isError).toBeUndefined();
-		expect(JSON.parse(result.content[0].text)).toEqual({
+		expect(JSON.parse(result.content[0].text.split("\n").at(-1))).toEqual({
 			data: [],
 			next_cursor: null,
 		});

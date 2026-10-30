@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { createApp } from "../src/app";
 import type { Db } from "../src/db";
+import { TITLE_MAX } from "../src/mcp/actions";
 import {
 	type FakeDeployment,
 	fakeDeployment,
@@ -21,9 +22,13 @@ let call: Call;
 let bearer: string;
 let rpcId = 0;
 
-beforeEach(async () => {
+async function serve(opts: { nonprofitSlug?: boolean } = {}) {
 	db = await freshDb();
-	deployment = fakeDeployment({ name: "Hope Shelter", platform: true });
+	deployment = fakeDeployment({
+		name: "Hope Shelter",
+		platform: true,
+		...opts,
+	});
 	const app = createApp({
 		env,
 		db,
@@ -33,6 +38,10 @@ beforeEach(async () => {
 	call = async (req) => app.request(req);
 	await warmUp(call);
 	bearer = `Bearer ${(await connectFlow(call, deployment, BASE).connect()).access_token}`;
+}
+
+beforeEach(async () => {
+	await serve();
 	return () => db.close();
 });
 
@@ -48,7 +57,11 @@ const tool = async (
 	(await rpc(await send("tools/call", { name, arguments: args }))).result;
 
 const textOf = (result: Result) => result.content.map((c) => c.text).join("\n");
-const json = (result: Result) => JSON.parse(textOf(result));
+/** The lead line naming the org, above the JSON. */
+const leadOf = (result: Result) => textOf(result).split("\n")[0];
+/** The deployment's JSON: the last line, below the lead. */
+const json = (result: Result) =>
+	JSON.parse(textOf(result).split("\n").at(-1) ?? "");
 
 /** The guidance line, and the deployment's problem below it. */
 const refusal = (result: Result) => {
@@ -462,7 +475,7 @@ describe("create_form", () => {
 		expect(creates()).toHaveLength(3);
 		expect(new Set(creates().map((c) => c.idempotencyKey)).size).toBe(1);
 		expect(result.isError).toBeUndefined();
-		expect(textOf(result).startsWith("{")).toBe(true);
+		expect(textOf(result)).not.toContain("Already done");
 		expect(json(result)).toMatchObject({ name: "Gala" });
 		expect(
 			forms.filter((f: { name: string }) => f.name === "Gala"),
@@ -558,5 +571,267 @@ describe("update_form", () => {
 			"Nothing was saved: this form changed after it was read. Read it again with get_form, make the change against what it shows now (with the updated_at it returns), and try again.",
 		);
 		expect(problem).toMatchObject({ code: "stale_read" });
+	});
+});
+
+describe("results lead with the org", () => {
+	test("a tool with a tailored summary, and one without", async () => {
+		await draft("Winter coats");
+
+		expect(leadOf(await tool("list_campaigns"))).toBe(
+			"Hope Shelter: 1 campaign.",
+		);
+		expect(leadOf(await tool("list_campaigns", { status: "draft" }))).toBe(
+			"Hope Shelter: 1 draft.",
+		);
+		expect(leadOf(await tool("get_block_catalog"))).toBe(
+			"From Hope Shelter's Better Giving site:",
+		);
+	});
+});
+
+describe("campaign links", () => {
+	test("create_campaign's result is the site's own, with no link the site didn't send", async () => {
+		const result = await tool("create_campaign", { title: "Winter coats" });
+		const k = json(result);
+
+		expect(k).not.toHaveProperty("edit_url");
+		expect(k.public_url).toBeNull();
+		expect(leadOf(result)).toBe(
+			`Created a draft campaign "Winter coats" for Hope Shelter. Donors can't see it until it's published.`,
+		);
+	});
+
+	test("a live campaign whose nonprofit has no slug keeps the site's null public_url", async () => {
+		db.close();
+		await serve({ nonprofitSlug: false });
+		const live = await draft("Winter Coats 2026");
+		const kept = await draft("Spring fund");
+		const published = json(
+			await tool("publish_campaign", { id: live.id, gifts_go_to: null }),
+		);
+
+		const listed = json(await tool("list_campaigns")).data;
+		const got = json(await tool("get_campaign", { id: live.id }));
+
+		for (const k of [published, got, ...listed]) {
+			expect(k.public_url).toBeNull();
+			expect(k).not.toHaveProperty("edit_url");
+		}
+		expect(listed.map((k: { id: string }) => k.id)).toEqual([live.id, kept.id]);
+	});
+
+	test("no campaign-returning write adds an edit_url", async () => {
+		const k = await draft();
+
+		const settings = json(
+			await tool("update_campaign_settings", {
+				id: k.id,
+				end_date: "2099-12-31",
+				expected_version: k.version,
+			}),
+		);
+		const blocks = json(
+			await tool("update_campaign_blocks", {
+				id: k.id,
+				blocks: blocksOf(settings, { story: "Every coat." }),
+				expected_version: settings.version,
+			}),
+		);
+		await tool("publish_campaign", { id: k.id, gifts_go_to: null });
+		const ended = json(await tool("end_campaign", { id: k.id }));
+
+		for (const answer of [settings, blocks, ended]) {
+			expect(answer).not.toHaveProperty("edit_url");
+		}
+	});
+});
+
+describe("an empty list says what exists", () => {
+	const lists = () =>
+		deployment.calls.filter(
+			(c) => c.method === "GET" && c.path === "/connector/v1/campaigns",
+		);
+
+	test("a filtered empty list counts the other statuses with one more request", async () => {
+		await draft("One");
+		await draft("Two");
+		const ended = await draft("Three");
+		await tool("publish_campaign", { id: ended.id, gifts_go_to: null });
+		await tool("end_campaign", { id: ended.id });
+		const before = lists().length;
+
+		const result = await tool("list_campaigns", { status: "published" });
+
+		expect(result.isError).toBeUndefined();
+		expect(leadOf(result)).toBe(
+			'Hope Shelter has no published campaigns. It has 2 drafts and 1 ended campaign; call list_campaigns with status "draft" or "ended" to see them.',
+		);
+		expect(json(result)).toEqual({ data: [], next_cursor: null });
+		expect(
+			lists()
+				.slice(before)
+				.map((c) => c.query),
+		).toEqual([{ status: "published" }, { limit: "100" }]);
+	});
+
+	test("past 100 campaigns it says more than 100", async () => {
+		deployment.intercept((req) =>
+			req.method === "GET" &&
+			new URL(req.url).searchParams.get("limit") === "100"
+				? Response.json({
+						data: [{ id: "cmp_1", status: "draft" }],
+						next_cursor: "100",
+					})
+				: undefined,
+		);
+
+		const result = await tool("list_campaigns", { status: "ended" });
+
+		expect(leadOf(result)).toBe(
+			"Hope Shelter has no ended campaigns. It has more than 100 campaigns in all; call list_campaigns without a status to see them.",
+		);
+	});
+
+	test("with no campaigns at all it says none yet", async () => {
+		const result = await tool("list_campaigns", { status: "draft" });
+
+		expect(leadOf(result)).toBe(
+			"Hope Shelter has no campaigns yet. create_campaign starts one as a draft.",
+		);
+	});
+
+	test("an unfiltered empty list says none yet with no second request", async () => {
+		await send("tools/list");
+		const before = lists().length;
+
+		const result = await tool("list_campaigns");
+
+		expect(leadOf(result)).toBe(
+			"Hope Shelter has no campaigns yet. create_campaign starts one as a draft.",
+		);
+		expect(lists()).toHaveLength(before + 1);
+	});
+
+	test("a failed count still answers the filtered list", async () => {
+		await draft();
+		deployment.intercept((req) =>
+			new URL(req.url).searchParams.get("limit") === "100"
+				? new Response("down", { status: 500 })
+				: undefined,
+		);
+
+		const result = await tool("list_campaigns", { status: "published" });
+
+		expect(result.isError).toBeUndefined();
+		expect(leadOf(result)).toBe("Hope Shelter has no published campaigns.");
+		expect(json(result)).toEqual({ data: [], next_cursor: null });
+	});
+
+	test("a key refused on the count still answers the filtered list", async () => {
+		await draft();
+		deployment.intercept((req) => {
+			if (new URL(req.url).searchParams.get("limit") === "100") {
+				deployment.refuseKeys();
+			}
+			return undefined;
+		});
+
+		const result = await tool("list_campaigns", { status: "published" });
+
+		expect(result.isError).toBeUndefined();
+		expect(leadOf(result)).toBe("Hope Shelter has no published campaigns.");
+		expect(json(result)).toEqual({ data: [], next_cursor: null });
+	});
+
+	test("the count never names the status the filter just found empty", async () => {
+		const counted = (data: { id: string; status: string }[]) =>
+			deployment.intercept((req) =>
+				new URL(req.url).searchParams.get("limit") === "100"
+					? Response.json({ data, next_cursor: null })
+					: undefined,
+			);
+
+		counted([
+			{ id: "cmp_1", status: "published" },
+			{ id: "cmp_2", status: "draft" },
+		]);
+		expect(leadOf(await tool("list_campaigns", { status: "published" }))).toBe(
+			'Hope Shelter has no published campaigns. It has 1 draft; call list_campaigns with status "draft" to see it.',
+		);
+
+		counted([{ id: "cmp_1", status: "published" }]);
+		expect(leadOf(await tool("list_campaigns", { status: "published" }))).toBe(
+			"Hope Shelter has no published campaigns.",
+		);
+	});
+});
+
+test("create_campaign refuses a title longer than Platform's before any request", async () => {
+	await send("tools/list");
+	const before = deployment.calls.length;
+
+	const result = await tool("create_campaign", {
+		title: "x".repeat(TITLE_MAX + 1),
+	});
+
+	expect(TITLE_MAX).toBe(200);
+	expect(result.isError).toBe(true);
+	expect(deployment.calls).toHaveLength(before);
+});
+
+describe("descriptions", () => {
+	const LINKS_ONLY =
+		"Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.";
+
+	test("every campaign tool says to show only returned URLs, and no tool describes a click-path", async () => {
+		const tools: { name: string; description: string }[] = (
+			await rpc(await send("tools/list"))
+		).result.tools;
+
+		for (const name of [
+			"list_campaigns",
+			"get_campaign",
+			"create_campaign",
+			"update_campaign_blocks",
+			"update_campaign_settings",
+			"publish_campaign",
+			"end_campaign",
+			"create_photo_upload_link",
+		]) {
+			expect({
+				name,
+				says: tools
+					.find((t) => t.name === name)
+					?.description.includes(LINKS_ONLY),
+			}).toEqual({ name, says: true });
+		}
+		const text = JSON.stringify(tools);
+		expect(text).not.toContain("Not yet available");
+		expect(text).not.toContain("→");
+	});
+
+	test("create_campaign asks once for everything, then fills in the rest without asking again", async () => {
+		const tools: { name: string; description: string }[] = (
+			await rpc(await send("tools/list"))
+		).result.tools;
+		const create = tools.find((t) => t.name === "create_campaign")?.description;
+
+		expect(create).toContain("in one message");
+		expect(create).toContain("update_campaign_settings");
+		expect(create).toContain("update_campaign_blocks");
+		expect(create).not.toContain("edit_url");
+	});
+
+	test("list and get campaign name no edit_url; an empty filtered list reports counts", async () => {
+		const tools: { name: string; description: string }[] = (
+			await rpc(await send("tools/list"))
+		).result.tools;
+		const list = tools.find((t) => t.name === "list_campaigns")?.description;
+		const get = tools.find((t) => t.name === "get_campaign")?.description;
+
+		expect(list).not.toContain("edit_url");
+		expect(list).toContain("no need to list again");
+		expect(get).not.toContain("edit_url");
 	});
 });
