@@ -45,7 +45,7 @@ export interface AuthFacade {
 	 * URL it redirected to. Null when the signature fails or has expired
 	 * (10 minutes after the chat app opened the authorize URL). `readOnly` is
 	 * whether the signed request's `scope` asks for `read_only`; `client` is
-	 * the chat app its client is registered to, or null (`chatClientOf`).
+	 * the chat app the request comes from, or null (`chatClientOf`).
 	 */
 	readLoginRequest(url: URL): Promise<{
 		oauthQuery: string;
