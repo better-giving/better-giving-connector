@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
+import { connectRoutes } from "../src/connect";
 import { connections, type Db } from "../src/db";
+import { deploymentClient } from "../src/deployment";
 import {
 	type FakeDeployment,
 	fakeDeployment,
@@ -219,6 +221,53 @@ test("opening the login request hands the browser to the platform's Allow with a
 	expect(connectLines(lines)).toEqual([
 		{ kind: "connect", step: "open", outcome: "ok" },
 	]);
+});
+
+test.each([
+	[REDIRECT_URI, "claude"],
+	[CHATGPT_REDIRECT_URI, "chatgpt"],
+	[CHATGPT_CALLBACK_REDIRECT_URI, "chatgpt"],
+])(
+	"a client registered to %s reaches Allow named as %s",
+	async (redirectUri, client) => {
+		const chat = await flow.startSignIn(redirectUri);
+
+		const res = await flow.open(chat.login);
+
+		const allow = new URL(res.headers.get("location") ?? "");
+		expect(allow.pathname).toBe("/admin/connector/allow");
+		expect(allow.searchParams.getAll("client")).toEqual([client]);
+	},
+);
+
+test("a login request from no known chat app reaches Allow with no client param", async () => {
+	// The live service registers only the chat apps' callbacks, so a request
+	// naming no chat app gets here only past that check: stand in for it.
+	const app = connectRoutes({
+		auth: {
+			readLoginRequest: async (url) => ({
+				oauthQuery: url.search.slice(1),
+				readOnly: false,
+				client: null,
+			}),
+			completeConnection: async () => new Response(null, { status: 500 }),
+			denyConnection: async () => new Response(null, { status: 500 }),
+		},
+		client: deploymentClient({ fetch: deployment.fetch }),
+		stateSecret: "a-state-secret-for-this-test-only",
+		publicUrl: BASE,
+		platformOrigin: deployment.origin,
+	});
+
+	const res = await app.request(
+		`${BASE}/?client_id=x&redirect_uri=https%3A%2F%2Fevilchatgpt.com%2Fcb`,
+	);
+
+	expect(res.status).toBe(302);
+	const allow = new URL(res.headers.get("location") ?? "");
+	expect(allow.pathname).toBe("/admin/connector/allow");
+	expect(allow.searchParams.has("state")).toBe(true);
+	expect(allow.searchParams.has("client")).toBe(false);
 });
 
 test.each([

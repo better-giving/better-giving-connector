@@ -239,6 +239,7 @@ test("authorize with no session sends the browser to /connect with a request rea
 	expect(await auth.readLoginRequest(login)).toEqual({
 		oauthQuery: login.search.slice(1),
 		readOnly: false,
+		client: "claude",
 	});
 });
 

@@ -194,6 +194,27 @@ test("allowUrl sends the browser to the deployment's Allow screen with the state
 	);
 });
 
+test.each([
+	["chatgpt", "&client=chatgpt"],
+	["claude", "&client=claude"],
+	[null, ""],
+	[undefined, ""],
+] as const)(
+	"allowUrl with client %s names it, or leaves the param out",
+	(client, tail) => {
+		const dep = fakeDeployment();
+		const url = deploymentClient({ fetch: dep.fetch }).allowUrl(
+			dep.origin,
+			"st",
+			client,
+		);
+
+		expect(url.href).toBe(
+			`https://give.example.org/admin/connector/allow?state=st${tail}`,
+		);
+	},
+);
+
 describe("idempotency key", () => {
 	test("is stable for the same details in any key order, and changes when they change", () => {
 		const left = { b: 1, a: { d: true, c: "x" } };

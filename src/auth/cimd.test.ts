@@ -135,6 +135,15 @@ test("authorization-server metadata advertises CIMD, the none auth method and S2
 
 // --- the full CIMD flow -----------------------------------------------------
 
+test("a CIMD login request names Claude by its client_id's host", async () => {
+	const a = authorization(ep, CIMD_CLIENT_ID);
+	const login = redirectTarget(await navigate(a), a.url);
+
+	expect(await auth.readLoginRequest(login)).toMatchObject({
+		client: "claude",
+	});
+});
+
 async function cimdConnect(
 	clientId = CIMD_CLIENT_ID,
 	redirectUri = REDIRECT_URI,
