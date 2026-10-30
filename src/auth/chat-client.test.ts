@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { chatClientOf } from "./chat-client";
+import { CHAT_APP_REDIRECT_URIS } from "./redirect-uris";
 
 test.each([
 	["https://chatgpt.com/connector_platform_oauth_redirect", "chatgpt"],
@@ -16,6 +17,15 @@ test.each([
 ] as const)("a redirect_uri at %s is %s", (redirectUri, client) => {
 	expect(chatClientOf("a-dcr-client-id", redirectUri)).toBe(client);
 });
+
+test.each(CHAT_APP_REDIRECT_URIS)(
+	"the allow-listed callback %s names a client",
+	(callback) => {
+		const redirectUri = callback.replace("{callback_id}", "AbC_12-x");
+
+		expect(chatClientOf("a-dcr-client-id", redirectUri)).not.toBeNull();
+	},
+);
 
 test.each([
 	"https://evilchatgpt.com/cb",

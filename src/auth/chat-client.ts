@@ -25,9 +25,10 @@ const clientOfHost = (host: string): ChatClient | null =>
 /**
  * Which chat app an authorize request comes from, for Allow's label and logo:
  * a CIMD `client_id` (an https URL) by its own host, any other client by its
- * `redirect_uri`, which oauth-provider has matched to the client's
- * registration before the request is signed. Null for any other host, or one
- * that doesn't parse.
+ * `redirect_uri`. The label stays honest because a signed request's
+ * `redirect_uri` is one of the callbacks in redirect-uris.ts, and a CIMD
+ * `client_id` has passed cimd-hosts.ts. Null for any other host, or one that
+ * doesn't parse.
  */
 export function chatClientOf(
 	clientId: string | null,

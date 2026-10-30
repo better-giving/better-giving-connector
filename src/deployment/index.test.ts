@@ -187,7 +187,7 @@ describe("hello", () => {
 test("allowUrl sends the browser to the deployment's Allow screen with the state", () => {
 	const dep = fakeDeployment();
 	const client = deploymentClient({ fetch: dep.fetch });
-	const url = client.allowUrl(dep.origin, "st/1&x");
+	const url = client.allowUrl(dep.origin, "st/1&x", null);
 
 	expect(url.href).toBe(
 		"https://give.example.org/admin/connector/allow?state=st%2F1%26x",
@@ -198,7 +198,6 @@ test.each([
 	["chatgpt", "&client=chatgpt"],
 	["claude", "&client=claude"],
 	[null, ""],
-	[undefined, ""],
 ] as const)(
 	"allowUrl with client %s names it, or leaves the param out",
 	(client, tail) => {

@@ -67,10 +67,10 @@ export type DeploymentClient = {
 	hello(origin: Origin): Promise<Hello>;
 	/**
 	 * The deployment's Allow screen; it returns the browser to an address fixed
-	 * in its own code. `client` only picks the chat app's name and logo there;
-	 * null leaves the param out.
+	 * in its own code. `client` picks the chat app's name and logo there and
+	 * grants nothing; null leaves the param out.
 	 */
-	allowUrl(origin: Origin, state: string, client?: ChatClient | null): URL;
+	allowUrl(origin: Origin, state: string, client: ChatClient | null): URL;
 	exchange(origin: Origin, code: string): Promise<Exchanged>;
 	/**
 	 * Runs one contract action with the connection's key. Path params (`:id`)

@@ -13,7 +13,7 @@ import { z } from "zod";
 
 export const BASE_PATH = "/connector/v1";
 export const ALLOW_PATH = "/admin/connector/allow";
-/** The chat app Allow names in its optional `client` param: a label and logo only, it grants nothing. */
+/** The chat app named in Allow's optional `client` param; it picks the label and logo and grants nothing. */
 export type ChatClient = "chatgpt" | "claude";
 
 export const ROUTES = {
