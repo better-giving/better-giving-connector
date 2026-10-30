@@ -1,11 +1,9 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { Connection } from "../db";
 import {
-	type CallAnswer,
 	type DeploymentClient,
 	DeploymentFailed,
 	DeploymentRejected,
-	isKeyedAction,
 	isPerCallKeyed,
 	KeyRefused,
 	Moved,
@@ -17,6 +15,7 @@ import {
 import { log, type ToolOutcome } from "../log";
 import type { Secret } from "../secret";
 import type { ActionSpec } from "./actions";
+import { answerText } from "./answer";
 
 export type RunToolContext = {
 	client: Pick<DeploymentClient, "call">;
@@ -71,10 +70,8 @@ async function settle(
 ): Promise<Settled> {
 	try {
 		const answer = await ctx.client.call(connection, spec.action, input);
-		return {
-			outcome: "ok",
-			result: { content: [{ type: "text", text: answerText(spec, answer) }] },
-		};
+		const text = await answerText(spec, connection, input, answer, ctx);
+		return { outcome: "ok", result: { content: [{ type: "text", text }] } };
 	} catch (error) {
 		// A throw out of here would reach the chat as its message, so whatever
 		// `failure` can't word (its own drop included) is answered by `unexpected`.
@@ -228,17 +225,6 @@ const unconfirmed = ({ checkWith }: ActionSpec, org: string) =>
 	checkWith
 		? `${org}'s donation site didn't confirm this. It may have gone through. Check with ${checkWith} before trying again.`
 		: undefined;
-
-const REPLAY_PREFIX =
-	"Already done: this matches an earlier call with the same details, so nothing new was recorded. The original result follows.";
-
-function answerText(spec: ActionSpec, answer: CallAnswer): string {
-	const json = JSON.stringify(answer.body);
-	if (isKeyedAction(spec.action) && answer.status === 200) {
-		return `${REPLAY_PREFIX}\n${json}`;
-	}
-	return json;
-}
 
 const said = (outcome: ToolOutcome, text: string): Settled => ({
 	outcome,

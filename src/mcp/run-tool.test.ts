@@ -30,6 +30,9 @@ test("an empty connection key is not used as a redaction pattern", async () => {
 	);
 
 	expect(result.content).toEqual([
-		{ type: "text", text: JSON.stringify(answer) },
+		{
+			type: "text",
+			text: `From Give's Better Giving site:\n${JSON.stringify(answer)}`,
+		},
 	]);
 });

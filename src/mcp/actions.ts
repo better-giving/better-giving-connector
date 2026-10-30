@@ -39,6 +39,8 @@ const expectedVersion = z
 	);
 /** The longest note Standalone keeps on a gift (its `MAX_NOTE`); a longer one is refused there. */
 export const MAX_NOTE = 2_000;
+/** The longest campaign title Platform takes (its `TITLE_MAX`); a longer one is refused there. */
+export const TITLE_MAX = 200;
 const isIanaTimeZone = (zone: string) => {
 	try {
 		Intl.DateTimeFormat("en-US", { timeZone: zone });
@@ -177,8 +179,13 @@ const DESTRUCTIVE = {
 
 const CONFIRMED =
 	"Donors see this immediately, so the operator confirms it in the chat first.";
+// Ends every campaign tool's description: a chat app otherwise guesses a
+// dashboard path or a link the site never returned.
+const LINKS_ONLY =
+	"Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.";
 const editsContent = (read: string) =>
 	`Each block follows a schema from get_block_catalog. ${read} returns the current content; send every block the page should keep. For sites that edit pages as blocks.`;
+const EDITS_CAMPAIGN_BLOCKS = `Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. ${editsContent("get_campaign")}`;
 // Standalone picks how a page is drawn from its content, so a content edit
 // sets none of it; the deployment refuses a key that tries.
 const DRAWN_FROM_CONTENT =
@@ -193,8 +200,7 @@ export const ACTIONS = toolSpecs([
 		tool: "list_campaigns",
 		action: "campaigns.list",
 		title: "List campaigns",
-		description:
-			"Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results.",
+		description: `Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results. ${LINKS_ONLY}`,
 		input: z.strictObject({
 			status: z.enum(["draft", "published", "ended"]).optional(),
 			...page,
@@ -205,7 +211,7 @@ export const ACTIONS = toolSpecs([
 		tool: "get_campaign",
 		action: "campaigns.get",
 		title: "Get a campaign",
-		description: `Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it ${CONTENT_SITES}, or its blocks ${BLOCK_SITES}. For the amount raised, use get_results.`,
+		description: `Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it ${CONTENT_SITES}, or its blocks ${BLOCK_SITES}. For the amount raised, use get_results. ${LINKS_ONLY}`,
 		input: z.strictObject({ id }),
 		annotations: READ,
 	},
@@ -213,8 +219,7 @@ export const ACTIONS = toolSpecs([
 		tool: "create_campaign",
 		action: "campaigns.create",
 		title: "Create a campaign",
-		description:
-			"Creates a new draft campaign with the given title. Donors cannot see it until it is published.",
+		description: `Creates a new draft campaign with the given title. Donors cannot see it until it is published. ${LINKS_ONLY}`,
 		input: z.strictObject({ title: z.string().trim().min(1) }),
 		annotations: REPLAYS,
 		checkWith: "list_campaigns",
@@ -223,7 +228,7 @@ export const ACTIONS = toolSpecs([
 		tool: "update_campaign_blocks",
 		action: "campaigns.update_blocks",
 		title: "Edit a campaign's page",
-		description: `Edits the content of a campaign's page, such as its title, story, hero photo, and goal bar. ${editsContent("get_campaign")}`,
+		description: `${EDITS_CAMPAIGN_BLOCKS} ${LINKS_ONLY}`,
 		input: z.strictObject({ id, blocks }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
@@ -232,7 +237,7 @@ export const ACTIONS = toolSpecs([
 		tool: "update_campaign_content",
 		action: "campaigns.update_content",
 		title: "Edit a campaign's page",
-		description: `Edits the content of a campaign's page: its heading, lede, story, cover photo (hero), photos beside the cover, gift tiers, and questions (faq). Send only the keys to change: a key left out stays as it is, and null clears it. Each key's shape is in get_content_catalog, and get_campaign returns the current content. Donors see the change once the campaign is published. ${DRAWN_FROM_CONTENT}`,
+		description: `Edits the content of a campaign's page: its heading, lede, story, cover photo (hero), photos beside the cover, gift tiers, and questions (faq). Send only the keys to change: a key left out stays as it is, and null clears it. Each key's shape is in get_content_catalog, and get_campaign returns the current content. Donors see the change once the campaign is published. ${DRAWN_FROM_CONTENT} ${LINKS_ONLY}`,
 		input: z
 			.strictObject({ id, ...campaignContent })
 			.refine(
@@ -249,8 +254,7 @@ export const ACTIONS = toolSpecs([
 		tool: "update_campaign_settings",
 		action: "campaigns.update_settings",
 		title: "Change a campaign's settings",
-		description:
-			'Sets a campaign\'s goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {"message": null}. Page content goes through update_campaign_content or update_campaign_blocks.',
+		description: `Sets a campaign's goal, end date, time zone, or the message shown when it is shared. A field left out stays as it is. Null clears a field; sharing is cleared with {"message": null}. Page content goes through update_campaign_content or update_campaign_blocks. ${LINKS_ONLY}`,
 		input: z.strictObject({
 			id,
 			goal: money.nullable().optional(),
@@ -280,7 +284,7 @@ export const ACTIONS = toolSpecs([
 		tool: "publish_campaign",
 		action: "campaigns.publish",
 		title: "Publish a campaign",
-		description: `Puts a draft campaign live at its public link. The first publish requires gifts_go_to: ask the operator where the gifts go, then send a program id, or null for the general fund. ${CONFIRMED}`,
+		description: `Puts a draft campaign live at its public link. The first publish requires gifts_go_to: ask the operator where the gifts go, then send a program id, or null for the general fund. ${CONFIRMED} ${LINKS_ONLY}`,
 		input: z.strictObject({
 			id,
 			gifts_go_to: z.string().nullable().optional(),
@@ -292,7 +296,7 @@ export const ACTIONS = toolSpecs([
 		tool: "end_campaign",
 		action: "campaigns.end",
 		title: "End a campaign",
-		description: `Ends a campaign for good. It stops taking gifts. ${CONFIRMED}`,
+		description: `Ends a campaign for good. It stops taking gifts. ${CONFIRMED} ${LINKS_ONLY}`,
 		input: z.strictObject({ id }),
 		annotations: DESTRUCTIVE,
 		checkWith: "get_campaign",
@@ -472,7 +476,7 @@ export const ACTIONS = toolSpecs([
 		tool: "create_photo_upload_link",
 		action: "photos.upload_link",
 		title: "Make a photo upload link",
-		description: `Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page ${BLOCK_SITES}. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most ${PHOTOS_MAX} photos beside it; when all ${PHOTOS_MAX} are taken, ask the operator which one the new photo replaces.`,
+		description: `Returns a short-lived, single-use link for adding a photo to a campaign, or to the donation page ${BLOCK_SITES}. The operator opens the link and chooses the photo. This connector does not upload the file. On sites with get_content_catalog, a campaign holds a cover photo and at most ${PHOTOS_MAX} photos beside it; when all ${PHOTOS_MAX} are taken, ask the operator which one the new photo replaces. ${LINKS_ONLY}`,
 		input: z.strictObject({
 			target: z.discriminatedUnion("kind", [
 				z.strictObject({ kind: z.literal("campaign"), id }),
@@ -498,21 +502,32 @@ const specOf = (tool: ToolName) => {
 };
 
 // What Platform's writes add to the specs above: a campaign's version guard,
-// create_form's warning against a second call, updated_at on a form, and photo
-// links for a campaign's hero alone.
+// create_form's warning against a second call, updated_at on a form, photo
+// links for a campaign's hero alone, when public_url is null, and a create
+// that takes a title alone.
 const PLATFORM_CHANGES: Partial<
 	Record<ToolName, Partial<ActionSpec<ToolName>>>
 > = {
+	list_campaigns: {
+		description: `Lists the site's campaigns with their status, public link, and id. public_url is null for a draft, and for every campaign while the nonprofit has no public profile address. When a list filtered by status comes back empty, the result says how many campaigns the other statuses hold, so there is no need to list again. For the amount raised, use get_results. ${LINKS_ONLY}`,
+	},
+	get_campaign: {
+		description: `Reads one campaign: settings, status, public link, and its blocks. public_url is null for a draft, and while the nonprofit has no public profile address. For the amount raised, use get_results. ${LINKS_ONLY}`,
+	},
+	// Platform refuses any key but the title.
+	create_campaign: {
+		description: `Creates a new draft campaign. Before calling, ask the operator in one message for the campaign's name (required), a fundraising goal in USD, an end date, and a few sentences of story; skip what they don't know. Confirm once with a one-line summary and wait for their yes, then create it. Then, without asking again, set the goal and end date with update_campaign_settings, then the story with update_campaign_blocks, giving each call the version the call before it returned. Reply in one sentence. Donors can't see the draft, and it has no public link, until it is published. ${LINKS_ONLY}`,
+		input: z.strictObject({ title: z.string().trim().min(1).max(TITLE_MAX) }),
+	},
 	update_campaign_blocks: {
-		description: `${specOf("update_campaign_blocks").description} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null.`,
+		description: `${EDITS_CAMPAIGN_BLOCKS} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null. ${LINKS_ONLY}`,
 		input: specOf("update_campaign_blocks").input.extend({
 			expected_version: expectedVersion,
 		}),
 	},
 	// Platform keeps no time zone or share message of its own, and refuses a change to either.
 	update_campaign_settings: {
-		description:
-			"Sets a campaign's goal or end date. A field left out stays as it is, and null clears it. Page content goes through update_campaign_blocks.",
+		description: `Sets a campaign's goal or end date. A field left out stays as it is, and null clears it. Page content goes through update_campaign_blocks. ${LINKS_ONLY}`,
 		input: specOf("update_campaign_settings")
 			.input.omit({ time_zone: true, sharing: true })
 			.extend({ expected_version: expectedVersion }),
@@ -525,8 +540,7 @@ const PLATFORM_CHANGES: Partial<
 			"Changes a donation form. Only the fields sent are changed, in the shape get_form returns; send the updated_at get_form returned, so a change made since is refused rather than overwritten. On a live form, a change donors would see needs confirm set to true, and only after the operator agrees.",
 	},
 	create_photo_upload_link: {
-		description:
-			"Returns a single-use link, good for 15 minutes, for adding a campaign's hero photo. The operator opens the link and chooses a JPEG, PNG or WebP of at most 4 MB; expires_at says when the link stops working. This connector does not upload the file. An ended campaign takes no new photo. The uploaded photo becomes the campaign's hero: read the campaign again with get_campaign before editing its blocks.",
+		description: `Returns a single-use link, good for 15 minutes, for adding a campaign's hero photo. The operator opens the link and chooses a JPEG, PNG or WebP of at most 4 MB; expires_at says when the link stops working. This connector does not upload the file. An ended campaign takes no new photo. The uploaded photo becomes the campaign's hero: read the campaign again with get_campaign before editing its blocks. ${LINKS_ONLY}`,
 		input: z.strictObject({
 			target: z.strictObject({ kind: z.literal("campaign"), id }),
 			slot: z

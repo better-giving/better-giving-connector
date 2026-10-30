@@ -299,9 +299,9 @@ const callTool = async (
 		)
 	).result;
 const textOf = (r: ToolResult) => r.content.map((c) => c.text).join("\n");
-// A success carries the deployment's JSON as its text.
+// A success carries the deployment's JSON as its text's last line, below the lead.
 const answerOf = (r: ToolResult): Record<string, unknown> =>
-	JSON.parse(textOf(r));
+	JSON.parse(textOf(r).split("\n").at(-1) ?? "");
 
 // Plants the keys the deployments minted, then scans this scenario's slice.
 function expectCleanScenario() {
@@ -718,6 +718,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			const planted = sentinels.length;
 			const args = build(ids);
 			const mine = sentinels.slice(planted).map((s) => s.value);
+			const sent = world.dep.calls.length;
 
 			const result = await callTool(bearer, name, args);
 
@@ -730,7 +731,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 				name,
 				probe: RESULT,
 			});
-			const reached = JSON.stringify(world.dep.calls.at(-1));
+			// The tool's own request, not an empty result's unfiltered follow-up.
+			const reached = JSON.stringify(world.dep.calls[sent]);
 			for (const value of mine)
 				expect({ name, reached: reached.includes(value) }).toEqual({
 					name,

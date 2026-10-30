@@ -252,7 +252,7 @@ function outcomeOf(
 	text: string,
 	isError: boolean | undefined,
 ): LiveRow["outcome"] {
-	if (text.startsWith(REPLAY)) return "replay";
+	if (text.split("\n").includes(REPLAY)) return "replay";
 	if (text.includes(UNKNOWN)) return "unknown_action";
 	if (text.includes(REFUSED)) return "key_refused";
 	if (isError === true) return "error";
@@ -278,8 +278,8 @@ function stringField(
 ): string {
 	let parsed: unknown;
 	try {
-		const json = text.startsWith(REPLAY) ? text.slice(REPLAY.length + 1) : text;
-		parsed = JSON.parse(json);
+		// The JSON is the last line, below the lead and any replay notice.
+		parsed = JSON.parse(text.split("\n").at(-1) ?? "");
 	} catch {
 		throw new Error(`${label} was not json`);
 	}
