@@ -232,15 +232,23 @@ async function startAuthorization(
 	return { a, login: await open(a) };
 }
 
-test("authorize with no session sends the browser to /connect with a request readLoginRequest accepts", async () => {
-	const { login } = await startAuthorization();
+test.each([
+	[REDIRECT_URI, "claude"],
+	[CHATGPT_REDIRECT_URI, "chatgpt"],
+	[CHATGPT_CALLBACK_REDIRECT_URI, "chatgpt"],
+] as const)(
+	"authorize to %s with no session sends the browser to /connect with a request readLoginRequest accepts as %s",
+	async (redirectUri, client) => {
+		const { login } = await startAuthorization({ redirectUri });
 
-	expect(login.origin + login.pathname).toBe(`${BASE}/connect`);
-	expect(await auth.readLoginRequest(login)).toEqual({
-		oauthQuery: login.search.slice(1),
-		readOnly: false,
-	});
-});
+		expect(login.origin + login.pathname).toBe(`${BASE}/connect`);
+		expect(await auth.readLoginRequest(login)).toEqual({
+			oauthQuery: login.search.slice(1),
+			readOnly: false,
+			client,
+		});
+	},
+);
 
 test.each([
 	["offline_access read_only", true],

@@ -207,7 +207,7 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 		);
 		log({ kind: "connect", step: "open", outcome: "ok" });
 		return c.redirect(
-			deps.client.allowUrl(state.origin, state.nonce).href,
+			deps.client.allowUrl(state.origin, state.nonce, login.client).href,
 			302,
 		);
 	});

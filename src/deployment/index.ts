@@ -4,6 +4,7 @@ import {
 	type ActionName,
 	ALLOW_PATH,
 	BASE_PATH,
+	type ChatClient,
 	exchangeBody,
 	helloBody,
 	type Problem,
@@ -24,6 +25,7 @@ import { type Origin, parseOrigin } from "./origin";
 
 export {
 	type ActionName,
+	type ChatClient,
 	isActionName,
 	knownActions,
 	replacementOf,
@@ -63,8 +65,12 @@ export type DeploymentClient = {
 	 * answers; the answering origin comes back in `Hello.origin`.
 	 */
 	hello(origin: Origin): Promise<Hello>;
-	/** The deployment's Allow screen; it returns the browser to an address fixed in its own code. */
-	allowUrl(origin: Origin, state: string): URL;
+	/**
+	 * The deployment's Allow screen; it returns the browser to an address fixed
+	 * in its own code. `client` picks the chat app's name and logo there and
+	 * grants nothing; null leaves the param out.
+	 */
+	allowUrl(origin: Origin, state: string, client: ChatClient | null): URL;
 	exchange(origin: Origin, code: string): Promise<Exchanged>;
 	/**
 	 * Runs one contract action with the connection's key. Path params (`:id`)
@@ -189,9 +195,10 @@ export function deploymentClient(deps: {
 			};
 		},
 
-		allowUrl(origin, state) {
+		allowUrl(origin, state, client) {
 			const url = new URL(ALLOW_PATH, origin);
 			url.searchParams.set("state", state);
+			if (client) url.searchParams.set("client", client);
 			return url;
 		},
 

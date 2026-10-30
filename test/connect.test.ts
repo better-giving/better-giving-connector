@@ -222,6 +222,23 @@ test("opening the login request hands the browser to the platform's Allow with a
 });
 
 test.each([
+	[REDIRECT_URI, "claude"],
+	[CHATGPT_REDIRECT_URI, "chatgpt"],
+	[CHATGPT_CALLBACK_REDIRECT_URI, "chatgpt"],
+])(
+	"a client registered to %s reaches Allow named as %s",
+	async (redirectUri, client) => {
+		const chat = await flow.startSignIn(redirectUri);
+
+		const res = await flow.open(chat.login);
+
+		const allow = new URL(res.headers.get("location") ?? "");
+		expect(allow.pathname).toBe("/admin/connector/allow");
+		expect(allow.searchParams.getAll("client")).toEqual([client]);
+	},
+);
+
+test.each([
 	["Standalone", false],
 	["Platform", true],
 ])(

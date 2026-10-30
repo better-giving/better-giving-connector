@@ -8,11 +8,12 @@ import { APIError } from "better-auth/api";
 import { applySetCookies } from "better-auth/cookies";
 import { Kysely } from "kysely";
 import type { Connections, Db } from "../db";
-import type { ActionName, DeploymentClient } from "../deployment";
+import type { ActionName, ChatClient, DeploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import type { Env } from "../env";
 import { log } from "../log";
 import type { Secret } from "../secret";
+import { chatClientOf } from "./chat-client";
 import { isCimdClientIdAllowed } from "./cimd-hosts";
 import { connectionPlugin, storedToken } from "./connection-plugin";
 import { libsqlDialect } from "./libsql-dialect";
@@ -43,11 +44,14 @@ export interface AuthFacade {
 	 * Reads the authorization request better-auth signed into the `/connect`
 	 * URL it redirected to. Null when the signature fails or has expired
 	 * (10 minutes after the chat app opened the authorize URL). `readOnly` is
-	 * whether the signed request's `scope` asks for `read_only`.
+	 * whether the signed request's `scope` asks for `read_only`; `client` is
+	 * the chat app the request comes from, or null (`chatClientOf`).
 	 */
-	readLoginRequest(
-		url: URL,
-	): Promise<{ oauthQuery: string; readOnly: boolean } | null>;
+	readLoginRequest(url: URL): Promise<{
+		oauthQuery: string;
+		readOnly: boolean;
+		client: ChatClient | null;
+	} | null>;
 	/**
 	 * Makes the connection the deployment just allowed: a new user, its
 	 * connection row, then the authorize request resumed for that user. The
@@ -427,8 +431,12 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 		async readLoginRequest(url) {
 			const oauthQuery = url.search.slice(1);
 			if (!(await verifies(oauthQuery))) return null;
-			const scope = new URLSearchParams(oauthQuery).get("scope");
-			return { oauthQuery, readOnly: isReadOnly(scope) };
+			const query = new URLSearchParams(oauthQuery);
+			return {
+				oauthQuery,
+				readOnly: isReadOnly(query.get("scope")),
+				client: chatClientOf(query.get("client_id"), query.get("redirect_uri")),
+			};
 		},
 		dropConnection,
 		async sweep() {
