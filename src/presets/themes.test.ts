@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { THEME_NAMES, THEMES, storyDocument } from "./themes";
+import { storyDocument, THEME_NAMES, THEMES } from "./themes";
 
 test("each theme's defaults: goal, run length and suggested amounts", () => {
 	expect(

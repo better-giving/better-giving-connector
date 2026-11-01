@@ -40,6 +40,32 @@ const campaign = campaignItem.extend({
 	content: z.record(z.string(), z.unknown()).optional(),
 	layout: z.string().optional(),
 });
+// A plain create answers with the campaign; one with a preset, with what each
+// of its steps did.
+const campaignCreated = z.looseObject({
+	...campaign.partial().shape,
+	campaign: z
+		.looseObject({
+			id: z.string(),
+			title: z.string(),
+			version: z.string().optional(),
+			status: z.string(),
+		})
+		.optional(),
+	steps: z
+		.array(
+			z.looseObject({
+				step: z.enum(["create", "settings", "form", "page"]),
+				status: z.enum(["done", "failed", "skipped"]),
+				detail: z.string().optional(),
+			}),
+		)
+		.optional(),
+	failedStep: z
+		.enum(["create", "settings", "form", "page"])
+		.nullable()
+		.optional(),
+});
 const donationPage = z.looseObject({
 	public_url: z.string().nullable(),
 	blocks: z.array(z.looseObject({ type: z.string() })).optional(),
@@ -89,7 +115,10 @@ const STATUS: Record<string, string> = { published: "live" };
 const statusOf = (status: string) => STATUS[status] ?? status;
 
 // ", goal $5,000.00, ends Dec 31, 2026": what is set of a campaign's settings.
-function goalAndEnd(k: z.output<typeof campaign>, locale: string): string {
+function goalAndEnd(
+	k: Pick<z.output<typeof campaign>, "settings">,
+	locale: string,
+): string {
 	const parts: string[] = [];
 	const goal = k.settings?.goal;
 	if (goal) parts.push(`goal ${shown(goal, locale)}`);
@@ -138,9 +167,12 @@ export const OUTPUTS = {
 		(k, { locale }) =>
 			`${k.title}: ${statusOf(k.status)}${goalAndEnd(k, locale)}`,
 	),
-	create_campaign: output(campaign, (k, { replayed }) =>
-		replayed ? `Already created: ${k.title}` : `Draft created: ${k.title}`,
-	),
+	create_campaign: output(campaignCreated, (k, { replayed }) => {
+		const title = k.campaign?.title ?? k.title;
+		if (k.failedStep)
+			return `Partly created: ${title}, ${k.failedStep} step failed`;
+		return replayed ? `Already created: ${title}` : `Draft created: ${title}`;
+	}),
 	update_campaign_blocks: output(campaign, (k) => `Page saved: ${k.title}`),
 	update_campaign_content: output(campaign, (k) => `Page saved: ${k.title}`),
 	update_campaign_settings: output(
@@ -218,5 +250,63 @@ export const OUTPUTS = {
 				minute: "2-digit",
 				timeZoneName: "short",
 			})}`,
+	),
+};
+
+const DRAFT_PARTS = z.enum(["settings", "page"]);
+// What an edit to a live Platform campaign answers in place of the campaign:
+// the edit kept as the connector's draft.
+const campaignOrSaved = z.looseObject({
+	...campaign.partial().shape,
+	saved: z.literal("draft").optional(),
+	campaign_id: z.string().optional(),
+	base_version: z.string().nullable().optional(),
+});
+const savedOr = (
+	saved: (k: z.output<typeof campaignOrSaved>, locale: string) => string,
+) =>
+	output(campaignOrSaved, (k, { locale }) =>
+		k.saved === "draft"
+			? "Saved as a draft: goes live when the campaign is published"
+			: saved(k, locale),
+	);
+
+/** Platform's outputs where its campaign tools answer for the connector's drafts of a live campaign. */
+export const PLATFORM_OUTPUTS = {
+	get_campaign: output(
+		campaign.extend({
+			pendingDraft: z
+				.looseObject({
+					settings: z.record(z.string(), z.unknown()).nullable(),
+					page: z.unknown(),
+					page_kind: z.enum(["blocks", "content"]).nullable(),
+					base_version: z.string().nullable(),
+					updated_at: z.string(),
+				})
+				.optional(),
+		}),
+		(k, { locale }) =>
+			`${k.title}: ${statusOf(k.status)}${goalAndEnd(k, locale)}${k.pendingDraft ? ", draft edits pending" : ""}`,
+	),
+	update_campaign_blocks: savedOr((k) => `Page saved: ${k.title}`),
+	update_campaign_content: savedOr((k) => `Page saved: ${k.title}`),
+	update_campaign_settings: savedOr(
+		(k, locale) => `Settings saved: ${k.title}${goalAndEnd(k, locale)}`,
+	),
+	publish_campaign: output(
+		campaign.extend({
+			draft: z
+				.looseObject({
+					applied: z.array(DRAFT_PARTS),
+					pending: z.array(DRAFT_PARTS),
+				})
+				.optional(),
+		}),
+		(k) => {
+			if (!k.draft) return `${k.title} is live`;
+			if (k.draft.pending.length > 0) return `${k.title}: draft partly applied`;
+			if (k.draft.applied.length > 0) return `${k.title}: draft edits live`;
+			return `${k.title} is already live`;
+		},
 	),
 };

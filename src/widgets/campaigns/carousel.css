@@ -1,0 +1,77 @@
+.campaigns {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.carousel {
+	display: grid;
+	grid-auto-columns: minmax(240px, 280px);
+	grid-auto-flow: column;
+	gap: 12px;
+	margin: 0;
+	padding: 2px 2px 8px;
+	list-style: none;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scroll-snap-type: x mandatory;
+	scroll-padding-inline: 2px;
+	scrollbar-width: thin;
+	border-radius: var(--widget-radius);
+}
+
+.campaign-slot {
+	display: flex;
+	min-width: 0;
+	scroll-snap-align: start;
+}
+
+.campaign {
+	flex: 1;
+}
+
+.campaign .card-body {
+	gap: 6px;
+}
+
+.campaign-title {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	font-size: var(--text-base);
+	font-weight: 700;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.campaign-amounts {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.campaign-meta {
+	font-size: var(--text-xs);
+}
+
+.campaign-action {
+	align-self: stretch;
+	margin-top: auto;
+}
+
+.notice:empty {
+	display: none;
+}
+
+.notice {
+	color: var(--gray-11);
+	font-size: var(--text-xs);
+}
+
+@media (max-width: 480px) {
+	.carousel {
+		/* the next card peeks in, so the row reads as scrollable */
+		grid-auto-columns: 82%;
+	}
+}

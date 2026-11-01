@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { memoryDrafts } from "../../test/memory-drafts";
 import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
 import { ACTIONS } from "./actions";
@@ -36,6 +37,7 @@ test("a count that never answers falls back to the plain lead after 3 seconds an
 		{ status: 200, body: empty },
 		{
 			client: { call: () => new Promise(() => {}) },
+			drafts: memoryDrafts(),
 			dropConnection: async () => {},
 		},
 		"en-US",
@@ -67,6 +69,7 @@ test("a count that answers leaves no timer behind", async () => {
 					body: { data: [{ status: "draft" }], next_cursor: null },
 				}),
 			},
+			drafts: memoryDrafts(),
 			dropConnection: async () => {},
 		},
 		"en-US",

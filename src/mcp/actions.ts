@@ -1,6 +1,25 @@
 import { z } from "zod";
-import { type ActionSpec, type Hints, statusLines } from "./spec";
-import { OUTPUTS } from "./summary";
+import { THEME_NAMES } from "../presets/themes";
+import {
+	createCampaignWithPreset,
+	type Preset,
+	presetCreatedText,
+} from "./campaign-presets";
+import {
+	BLOCKS_EDIT,
+	CONTENT_EDIT,
+	composeGetCampaign,
+	composeLiveEdit,
+	composePublish,
+	SETTINGS_EDIT,
+} from "./draft-tools";
+import {
+	type ActionSpec,
+	type Hints,
+	type LocalCall,
+	statusLines,
+} from "./spec";
+import { OUTPUTS, PLATFORM_OUTPUTS } from "./summary";
 
 export type { ActionSpec } from "./spec";
 
@@ -50,6 +69,33 @@ const money = z
 	.describe(
 		'An object with a decimal-string amount and a currency, such as {"amount": "100.00", "currency": "USD"}. A plain number is refused.',
 	);
+/** The most suggested amounts a preset sets on a campaign's form. */
+export const MAX_SUGGESTED_AMOUNTS = 6;
+const preset = z
+	.strictObject({
+		theme: z.enum(THEME_NAMES),
+		goal: money,
+		end_date: date,
+		suggested_amounts: z.array(money).min(1).max(MAX_SUGGESTED_AMOUNTS),
+	})
+	.optional()
+	.describe(
+		`Sets up the new draft in the same call: its goal and end date, its donation form's suggested amounts (at most ${MAX_SUGGESTED_AMOUNTS}), and the theme's starter story for the operator to replace. recommend_campaign_presets suggests the values. Left out, only the draft is created.`,
+	);
+// With a preset, the create is the first of the writes that dress the draft.
+async function composePreset({ connection, client, input, locale }: LocalCall) {
+	if (input.preset === undefined) return null;
+	const chosen = input.preset as Preset;
+	const created = await createCampaignWithPreset(
+		{ connection, client },
+		input.title as string,
+		chosen,
+	);
+	return {
+		text: presetCreatedText(created, chosen, connection.orgName, locale),
+		structured: created,
+	};
+}
 const page = {
 	cursor: z
 		.string()
@@ -176,6 +222,9 @@ const DESTRUCTIVE: Hints = {
 	destructiveHint: true,
 };
 
+// Platform applies an edit to a live campaign at once, so the connector keeps it.
+const LIVE_EDITS_DRAFT =
+	"On a live campaign the change is saved as a draft donors don't see, and goes live when publish_campaign is called again.";
 const CONFIRMED =
 	"Donors see this immediately, so the operator confirms it in the chat first.";
 // Ends every campaign tool's description: a chat app otherwise guesses a
@@ -223,11 +272,12 @@ export const ACTIONS = toolSpecs([
 		action: "campaigns.create",
 		title: "Create a campaign",
 		description: `Creates a new draft campaign with the given title. Donors cannot see it until it is published. ${LINKS_ONLY}`,
-		input: z.strictObject({ title: z.string().trim().min(1) }),
+		input: z.strictObject({ title: z.string().trim().min(1), preset }),
 		output: OUTPUTS.create_campaign,
 		annotations: REPLAYS,
 		_meta: statusLines("Creating campaign…", "Draft created"),
 		checkWith: "list_campaigns",
+		compose: composePreset,
 	},
 	{
 		tool: "update_campaign_blocks",
@@ -564,25 +614,43 @@ const PLATFORM_CHANGES: Partial<
 		description: `Lists the site's campaigns with their status, public link, and id. public_url is null for a draft, and for every campaign while the nonprofit has no public profile address. When a list filtered by status comes back empty, the result says how many campaigns the other statuses hold, so there is no need to list again. For the amount raised, use get_results. ${LINKS_ONLY}`,
 	},
 	get_campaign: {
-		description: `Reads one campaign: settings, status, public link, and its blocks. public_url is null for a draft, and while the nonprofit has no public profile address. For the amount raised, use get_results. ${LINKS_ONLY}`,
+		description: `Reads one campaign: settings, status, public link, and its blocks. public_url is null for a draft, and while the nonprofit has no public profile address. A live campaign's edits not yet published are under pendingDraft. For the amount raised, use get_results. ${LINKS_ONLY}`,
+		output: PLATFORM_OUTPUTS.get_campaign,
+		compose: composeGetCampaign,
 	},
 	// Platform refuses any key but the title.
 	create_campaign: {
 		description: `Creates a new draft campaign. Before calling, ask the operator in one message for the campaign's name (required), a fundraising goal in USD, an end date, and a few sentences of story; skip what they don't know. Confirm once with a one-line summary and wait for their yes, then create it. Then, without asking again, set the goal and end date with update_campaign_settings, then the story with update_campaign_blocks, giving each call the version the call before it returned. Reply in one sentence. Donors can't see the draft, and it has no public link, until it is published. ${LINKS_ONLY}`,
-		input: z.strictObject({ title: z.string().trim().min(1).max(TITLE_MAX) }),
+		input: z.strictObject({
+			title: z.string().trim().min(1).max(TITLE_MAX),
+			preset,
+		}),
 	},
 	update_campaign_blocks: {
-		description: `${EDITS_CAMPAIGN_BLOCKS} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null. ${LINKS_ONLY}`,
+		description: `${EDITS_CAMPAIGN_BLOCKS} A hero photo is one uploaded for this campaign through create_photo_upload_link, as get_campaign shows it, or null. ${LIVE_EDITS_DRAFT} ${LINKS_ONLY}`,
 		input: specOf("update_campaign_blocks").input.extend({
 			expected_version: expectedVersion,
 		}),
+		output: PLATFORM_OUTPUTS.update_campaign_blocks,
+		compose: composeLiveEdit(BLOCKS_EDIT),
+	},
+	update_campaign_content: {
+		output: PLATFORM_OUTPUTS.update_campaign_content,
+		compose: composeLiveEdit(CONTENT_EDIT),
 	},
 	// Platform keeps no time zone or share message of its own, and refuses a change to either.
 	update_campaign_settings: {
-		description: `Sets a campaign's goal or end date. A field left out stays as it is, and null clears it. Page content goes through update_campaign_blocks. ${LINKS_ONLY}`,
+		description: `Sets a campaign's goal or end date. A field left out stays as it is, and null clears it. Page content goes through update_campaign_blocks. ${LIVE_EDITS_DRAFT} ${LINKS_ONLY}`,
 		input: specOf("update_campaign_settings")
 			.input.omit({ time_zone: true, sharing: true })
 			.extend({ expected_version: expectedVersion }),
+		output: PLATFORM_OUTPUTS.update_campaign_settings,
+		compose: composeLiveEdit(SETTINGS_EDIT),
+	},
+	publish_campaign: {
+		description: `Puts a draft campaign live at its public link. The first publish requires gifts_go_to: ask the operator where the gifts go, then send a program id, or null for the general fund. On a campaign that is already live, it sends the edits saved as its draft instead, and nothing else. ${CONFIRMED} ${LINKS_ONLY}`,
+		output: PLATFORM_OUTPUTS.publish_campaign,
+		compose: composePublish,
 	},
 	create_form: {
 		description: `${specOf("create_form").description} Each call makes a new form, so after an unclear answer check with list_forms before calling again.`,

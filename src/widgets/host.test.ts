@@ -1,62 +1,8 @@
 // @vitest-environment happy-dom
-import type { App } from "@modelcontextprotocol/ext-apps";
-import {
-	AppBridge,
-	type McpUiHostCapabilities,
-	type McpUiHostContext,
-} from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { connectHost, type OpenAiGlobals } from "./host";
-
-type Transport = NonNullable<Parameters<App["connect"]>[0]>;
-type Message = Parameters<Transport["send"]>[0];
-
-/** Two transports wired to each other, delivering each message on a later task as postMessage does. */
-function linkedPair(): [Transport, Transport] {
-	const make = (): Transport & { peer?: Transport } => ({
-		async start() {},
-		async close() {
-			this.onclose?.();
-		},
-		async send(message: Message) {
-			const peer = this.peer;
-			setTimeout(() => peer?.onmessage?.(structuredClone(message)), 0);
-		},
-	});
-	const a = make();
-	const b = make();
-	a.peer = b;
-	b.peer = a;
-	return [a, b];
-}
-
-const ALL_CAPS: McpUiHostCapabilities = {
-	openLinks: {},
-	serverTools: {},
-	message: { text: {} },
-};
-
-async function start(
-	opts: {
-		context?: McpUiHostContext;
-		caps?: McpUiHostCapabilities;
-		openai?: Partial<OpenAiGlobals>;
-	} = {},
-) {
-	const [viewSide, hostSide] = linkedPair();
-	const bridge = new AppBridge(
-		null,
-		{ name: "test-host", version: "1.0.0" },
-		opts.caps ?? ALL_CAPS,
-		{ hostContext: opts.context ?? {} },
-	);
-	await bridge.connect(hostSide);
-	const host = await connectHost({
-		transport: viewSide,
-		openai: opts.openai as OpenAiGlobals | undefined,
-	});
-	return { bridge, host };
-}
+import type { OpenAiGlobals } from "./host";
+import { startHost as start } from "./test-dom";
 
 /** Let queued transport messages land. */
 const settle = () => new Promise((r) => setTimeout(r, 10));
@@ -319,7 +265,9 @@ describe("file uploads", () => {
 		const getFileDownloadUrl = vi.fn(async () => ({
 			downloadUrl: "https://files.example/file_1",
 		}));
-		const { host } = await start({ openai: { uploadFile, getFileDownloadUrl } });
+		const { host } = await start({
+			openai: { uploadFile, getFileDownloadUrl },
+		});
 		expect(host.canUploadFiles).toBe(true);
 		const file = new File(["x"], "a.png", { type: "image/png" });
 		expect(await host.uploadFile(file)).toEqual({

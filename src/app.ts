@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { createAuth } from "./auth";
 import { connectRoutes } from "./connect";
 import { cronRoutes } from "./cron";
-import { connections as connectionStore, type Db } from "./db";
+import { campaignDrafts, connections as connectionStore, type Db } from "./db";
 import { deploymentClient } from "./deployment";
 import type { Origin } from "./deployment/origin";
 import type { Env } from "./env";
@@ -53,6 +53,7 @@ export function createApp(deps: AppDeps): Hono {
 			auth,
 			connections,
 			client,
+			drafts: campaignDrafts(deps.db),
 			resource: new URL("/mcp", deps.env.PUBLIC_URL),
 		}),
 	);

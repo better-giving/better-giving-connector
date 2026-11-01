@@ -5,6 +5,7 @@ import {
 	fakeDeployment,
 } from "../../test/fake-deployment";
 import { mcpRequest, rpc } from "../../test/harness";
+import { memoryDrafts } from "../../test/memory-drafts";
 import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
 import { advance, freshDb, MINUTE } from "../../test/support";
 import { type Connections, connections, type Db } from "../db";
@@ -68,6 +69,7 @@ beforeEach(async () => {
 			},
 		},
 		connections: store,
+		drafts: memoryDrafts(),
 		client,
 		resource: new URL("https://connect.example/mcp"),
 	});
@@ -466,6 +468,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 			dropConnection: async () => {},
 		},
 		connections: store,
+		drafts: memoryDrafts(),
 		client: {
 			...client,
 			hello: async (origin) => {

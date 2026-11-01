@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import type { AuthFacade } from "../auth";
 import { OFFLINE_ACCESS_SCOPE } from "../auth/scopes";
 import {
+	type CampaignDrafts,
 	type Connection,
 	ConnectionKeyUnreadable,
 	type Connections,
@@ -28,6 +29,7 @@ export type McpDeps = {
 	auth: Pick<AuthFacade, "authenticateMcp" | "dropConnection">;
 	connections: Connections;
 	client: DeploymentClient;
+	drafts: CampaignDrafts;
 	/** This endpoint's own URL, the resource its tokens are issued for. */
 	resource: URL;
 };
@@ -79,6 +81,7 @@ export function mcpRoute(deps: McpDeps): Hono {
 			() =>
 				connectionServer(session, who.readOnly, {
 					client: deps.client,
+					drafts: deps.drafts,
 					dropConnection: deps.auth.dropConnection,
 				}),
 			{ onerror: logError },

@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { memoryDrafts } from "../../test/memory-drafts";
 import type { CallAnswer } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
@@ -36,6 +37,7 @@ const answering = (answer: CallAnswer | Error) => ({
 			return answer;
 		},
 	},
+	drafts: memoryDrafts(),
 	dropConnection: async () => {},
 });
 
@@ -202,7 +204,11 @@ test("get_profile answers with the connection's user id and org name, as structu
 		specOf("get_profile"),
 		connection(),
 		{},
-		{ client: { call }, dropConnection: async () => {} },
+		{
+			client: { call },
+			drafts: memoryDrafts(),
+			dropConnection: async () => {},
+		},
 		"en-US",
 	);
 

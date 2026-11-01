@@ -74,10 +74,10 @@ export interface Host {
 }
 
 // Shown when a call never reached a tool, so there is no tool sentence to show.
-export const UNREACHABLE =
+const UNREACHABLE =
 	"Couldn't reach Better Giving just now. Try again in a moment.";
 
-export function outcomeOf(result: CallToolResult): ToolOutcome {
+function outcomeOf(result: CallToolResult): ToolOutcome {
 	const text = result.content
 		.flatMap((block) => (block.type === "text" ? [block.text] : []))
 		.join("\n");
@@ -120,7 +120,8 @@ export async function connectHost(
 		openai?.toolOutput == null
 			? undefined
 			: { ok: true, data: openai.toolOutput, text: "" };
-	let memoryState: unknown;
+	// mirrors what this view last set, so a read never waits on the host's echo
+	let state: unknown = openai?.widgetState;
 
 	const bridgeContext = (): McpUiHostContext => app.getHostContext() ?? {};
 	const context = (): HostContext => {
@@ -206,10 +207,13 @@ export async function connectHost(
 		},
 		reportSize() {
 			const root = document.documentElement;
-			void app.sendSizeChanged({
-				width: Math.ceil(root.getBoundingClientRect().width),
-				height: Math.ceil(root.scrollHeight),
-			});
+			app
+				.sendSizeChanged({
+					width: Math.ceil(root.getBoundingClientRect().width),
+					height: Math.ceil(root.scrollHeight),
+				})
+				// the bridge re-reports on the next resize; a lost one changes nothing
+				.catch(() => {});
 		},
 		async openLink(url) {
 			if (app.getHostCapabilities()?.openLinks) {
@@ -221,15 +225,13 @@ export async function connectHost(
 			}
 		},
 		getState<T>() {
-			return (openai?.setWidgetState ? openai.widgetState : memoryState) as
-				| T
-				| undefined;
+			return state as T | undefined;
 		},
-		setState(state) {
+		setState(next) {
+			state = next;
 			if (openai?.setWidgetState) {
-				void openai.setWidgetState(state);
-			} else {
-				memoryState = state;
+				// ChatGPT keeps it for the next render; this view already holds it
+				Promise.resolve(openai.setWidgetState(next)).catch(() => {});
 			}
 		},
 		canUploadFiles:

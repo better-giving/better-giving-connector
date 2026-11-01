@@ -10,6 +10,7 @@ import {
 	type ToolConnection,
 } from "../../src/mcp/run-tool";
 import { MVP_ACTIONS } from "../fake-deployment";
+import { memoryDrafts } from "../memory-drafts";
 
 const REPLAY =
 	"Already done: this matches an earlier call with the same details, so nothing new was recorded. The original result follows.";
@@ -59,6 +60,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		let dropped = false;
 		const ctx: RunToolContext = {
 			client,
+			drafts: memoryDrafts(),
 			dropConnection: async () => {
 				dropped = true;
 			},

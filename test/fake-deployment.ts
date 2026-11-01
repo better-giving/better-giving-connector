@@ -154,6 +154,8 @@ export type FakeDeployment = {
 	 * spent, expired or unknown.
 	 */
 	uploadPhoto(link: string): string | null;
+	/** Whether a new campaign comes with a form of its own (the default), or has none until one is made for it. */
+	setCampaignForms(on: boolean): void;
 };
 
 export type LostAnswer = "dropped" | "timeout" | "502";
@@ -280,6 +282,9 @@ export function fakeDeployment(
 			state.retryAfter = seconds;
 		},
 		uploadPhoto: (link) => uploadPhoto(state, link),
+		setCampaignForms: (on) => {
+			state.campaignForms = on;
+		},
 	};
 	return fake;
 }
@@ -416,6 +421,7 @@ function newState(host: string, name: string, platform: boolean) {
 		// A stalled create's connection drops before it answers.
 		dropStalled: false,
 		retryAfter: "5",
+		campaignForms: true,
 	};
 }
 
@@ -1059,21 +1065,36 @@ function deploymentApp(state: State) {
 			);
 		}
 		const id = nextId("cmp");
-		const form: Form = {
-			id: nextId("frm"),
-			name: `${parsed.data.title} form`,
-			amounts: ["25.00", "50.00", "100.00"],
-			currency: "USD",
-			allow_recurring: true,
-			campaign_id: id,
-		};
-		state.forms.set(form.id, form);
+		const formId = nextId("frm");
+		const name = `${parsed.data.title} form`;
+		if (state.campaignForms) {
+			state.forms.set(
+				formId,
+				state.platform
+					? {
+							id: formId,
+							name,
+							campaign_id: id,
+							status: "live",
+							suggested_amounts: [],
+							updated_at: "2026-10-01T00:00:00.000Z",
+						}
+					: {
+							id: formId,
+							name,
+							amounts: ["25.00", "50.00", "100.00"],
+							currency: "USD",
+							allow_recurring: true,
+							campaign_id: id,
+						},
+			);
+		}
 		const k: Campaign = {
 			id,
 			title: parsed.data.title,
 			status: "draft",
 			everPublished: false,
-			blocks: startingBlocks(form.id),
+			blocks: startingBlocks(formId),
 			content: { heading: "" },
 			settings: {
 				goal: null,
@@ -1884,7 +1905,20 @@ function platformWrites(
 			return c.json(claim.form, 200);
 		}
 		const issues: Issue[] = [];
-		unknownKeys(body, FORM_WRITABLE, issues);
+		// campaign_id is taken on create, as the release brief states; unverified on real Platform
+		unknownKeys(body, [...FORM_WRITABLE, "campaign_id"], issues);
+		if (
+			Object.hasOwn(body, "campaign_id") &&
+			!(
+				body.campaign_id === null ||
+				(typeof body.campaign_id === "string" &&
+					state.campaigns.has(body.campaign_id))
+			)
+		)
+			issues.push({
+				path: "campaign_id",
+				message: "is the id of one of this nonprofit's campaigns, or null",
+			});
 		if (!Object.hasOwn(body, "name"))
 			issues.push({
 				path: "name",
