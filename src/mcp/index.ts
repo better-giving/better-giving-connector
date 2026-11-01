@@ -17,9 +17,12 @@ import {
 	type Connections,
 } from "../db";
 import type { ActionName, DeploymentClient } from "../deployment";
+import { localeOf } from "../format";
 import { log } from "../log";
-import { type ActionSpec, actionsFor } from "./actions";
+import { actionsFor } from "./actions";
+import { LOCAL_TOOLS } from "./local";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
+import { loggedName, type ToolSpec } from "./spec";
 
 export type McpDeps = {
 	auth: Pick<AuthFacade, "authenticateMcp" | "dropConnection">;
@@ -144,13 +147,7 @@ function connectionServer(
 	readOnly: boolean,
 	ctx: RunToolContext,
 ): McpServer {
-	// null `actions` (a connection made before this was stored, or a hello that
-	// didn't state them) keeps every tool; otherwise only the actions the
-	// deployment serves, so the chat is never offered one that can only fail.
-	const served = actionsFor(connection.platform).filter(
-		(spec) =>
-			connection.actions === null || connection.actions.includes(spec.action),
-	);
+	const served = servedSpecs(connection);
 	const specs = readOnly ? served.filter(isRead) : served;
 	const server = new McpServer(
 		{ name: "Better Giving", version: "1.0.0" },
@@ -160,61 +157,81 @@ function connectionServer(
 		},
 	);
 	for (const spec of specs) {
+		// No outputSchema here: the SDK fails a call whose result has none, and
+		// a body its schema refuses is answered as text. runTool checks it;
+		// tools/list below lists it.
 		server.registerTool(
 			spec.tool,
-			{
-				title: spec.title,
-				description: spec.description,
-				inputSchema: loggedInput(spec),
-				annotations: { ...spec.annotations, title: spec.title },
-			},
-			(input) => runTool(spec, connection, input, ctx),
+			{ title: spec.title, inputSchema: loggedInput(spec) },
+			(input, request) =>
+				runTool(spec, connection, input, ctx, localeOf(request.mcpReq._meta)),
 		);
 	}
 	if (readOnly)
 		refuseWrites(
 			server,
-			specs,
 			served.filter((s) => !isRead(s)),
 		);
+	server.server.setRequestHandler("tools/list", () => ({
+		tools: specs.map(listed),
+	}));
 	return server;
 }
 
-const isRead = (spec: ActionSpec) => spec.annotations.readOnlyHint === true;
+// null `actions` (a connection made before this was stored, or a hello that
+// didn't state them) keeps every tool; otherwise only the tools whose actions
+// the deployment serves, so the chat is never offered one that can only fail.
+function servedSpecs(connection: ToolConnection): ToolSpec[] {
+	const serves = (action: ActionName) =>
+		connection.actions === null || connection.actions.includes(action);
+	return [
+		...actionsFor(connection.platform).filter((spec) => serves(spec.action)),
+		...LOCAL_TOOLS.filter((spec) => spec.needs.every(serves)),
+	];
+}
 
-// McpServer lists every tool it can call, and answers a call to one it doesn't
-// have with a bare "not found". So a read-only token's writes are registered,
-// each answering with why it can't run, and tools/list is answered from the
-// read tools alone, each listed as McpServer lists a registered tool.
-function refuseWrites(
-	server: McpServer,
-	reads: readonly ActionSpec[],
-	writes: readonly ActionSpec[],
-): void {
+const isRead = (spec: ToolSpec) => spec.annotations.readOnlyHint;
+
+// A tool as tools/list shows it, its schemas converted as McpServer converts
+// a registered tool's.
+function listed(spec: ToolSpec) {
+	const target = { target: "draft-2020-12" } as const;
+	return {
+		name: spec.tool,
+		title: spec.title,
+		description: spec.description,
+		inputSchema: {
+			type: "object" as const,
+			...spec.input["~standard"].jsonSchema.input(target),
+		},
+		outputSchema: {
+			type: "object" as const,
+			...spec.output.schema["~standard"].jsonSchema.output(target),
+		},
+		annotations: { ...spec.annotations, title: spec.title },
+		_meta: spec._meta,
+	};
+}
+
+// McpServer answers a call to a tool it doesn't have with a bare "not found".
+// So a read-only token's writes are registered, each answering with why it
+// can't run, and left out of tools/list.
+function refuseWrites(server: McpServer, writes: readonly ToolSpec[]): void {
 	for (const spec of writes) {
 		// no inputSchema: the arguments are never read, so never logged
 		server.registerTool(spec.tool, { title: spec.title }, () => {
-			log({ kind: "tool", tool: spec.action, outcome: "read_only", ms: 0 });
+			log({
+				kind: "tool",
+				tool: loggedName(spec),
+				outcome: "read_only",
+				ms: 0,
+			});
 			return {
 				isError: true,
 				content: [{ type: "text", text: readOnlyRefusal(spec.tool) }],
 			};
 		});
 	}
-	server.server.setRequestHandler("tools/list", () => ({
-		tools: reads.map((spec) => ({
-			name: spec.tool,
-			title: spec.title,
-			description: spec.description,
-			inputSchema: {
-				type: "object" as const,
-				...spec.input["~standard"].jsonSchema.input({
-					target: "draft-2020-12",
-				}),
-			},
-			annotations: { ...spec.annotations, title: spec.title },
-		})),
-	}));
 }
 
 const readOnlyRefusal = (tool: string) =>
@@ -227,7 +244,7 @@ const logError = (error: Error) =>
 // The SDK answers a call its schema refuses before runTool runs, so that
 // refusal is logged here, where the schema runs.
 function loggedInput(
-	spec: ActionSpec,
+	spec: ToolSpec,
 ): StandardSchemaWithJSON<Record<string, unknown>> {
 	const schema = spec.input["~standard"];
 	return {
@@ -240,7 +257,7 @@ function loggedInput(
 					const ms = Math.round(performance.now() - started);
 					log({
 						kind: "tool",
-						tool: spec.action,
+						tool: loggedName(spec),
 						outcome: "invalid_input",
 						ms,
 					});
@@ -258,7 +275,7 @@ const WAITS_FOR_YES = "operator confirms it in the chat first";
 
 function instructionsFor(
 	orgName: string,
-	specs: readonly ActionSpec[],
+	specs: readonly ToolSpec[],
 	readOnly: boolean,
 ): string {
 	const lines = [

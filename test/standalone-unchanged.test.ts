@@ -16,8 +16,9 @@ import { freshDb } from "./support";
 // Standalone connection sees and sends what it did before them. The snapshot
 // is tools/list and the instructions as d1a35fb served them to a
 // Standalone connection serving every action, plus each tool's title in its
-// annotations, destructiveHint true on every tool that overwrites, and
-// openWorldHint true on every tool that writes. A deliberate Standalone
+// annotations, destructiveHint true only on publish, end and reset,
+// openWorldHint true on every tool that writes, each tool's outputSchema and
+// _meta, and get_profile. A deliberate Standalone
 // change edits the entry it changes; re-dumping the whole list would hide one
 // that isn't.
 

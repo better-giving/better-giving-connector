@@ -4,6 +4,7 @@ import {
 	type DeploymentClient,
 	DeploymentFailed,
 	DeploymentRejected,
+	isKeyedAction,
 	isPerCallKeyed,
 	KeyRefused,
 	Moved,
@@ -14,8 +15,14 @@ import {
 } from "../deployment";
 import { log, type ToolOutcome } from "../log";
 import type { Secret } from "../secret";
-import type { ActionSpec } from "./actions";
 import { answerText } from "./answer";
+import {
+	type ActionSpec,
+	isActionSpec,
+	loggedName,
+	type SummaryContext,
+	type ToolSpec,
+} from "./spec";
 
 export type RunToolContext = {
 	client: Pick<DeploymentClient, "call">;
@@ -28,50 +35,99 @@ export type ToolConnection = Connection & { platform: boolean };
 type Settled = { outcome: ToolOutcome; result: CallToolResult };
 
 /**
- * Runs one tool call on the connection's deployment. The one place a
- * deployment's failure becomes the sentence the chat shows; it never throws.
+ * Runs one tool call: an action on the connection's deployment, or a local
+ * tool's own run. The one place a deployment's failure becomes the sentence
+ * the chat shows; it never throws. `locale` formats the money and dates the
+ * answer prints, never its currency.
  */
 export async function runTool(
-	spec: ActionSpec,
+	spec: ToolSpec,
 	connection: ToolConnection,
 	input: Record<string, unknown>,
 	ctx: RunToolContext,
+	locale: string,
 ): Promise<CallToolResult> {
 	const started = performance.now();
-	const { outcome, result } = await settle(spec, connection, input, ctx);
+	const { outcome, result } = await settle(
+		spec,
+		connection,
+		input,
+		ctx,
+		locale,
+	);
 	const ms = Math.round(performance.now() - started);
-	log({ kind: "tool", tool: spec.action, outcome, ms });
+	log({ kind: "tool", tool: loggedName(spec), outcome, ms });
 	return redactConnectionKey(result, connection.key);
 }
 
-// A deployment that echoes the connection key must not hand it to the chat.
-// An empty key is not a pattern: splitting on it would rewrite the whole text.
+// A deployment that echoes the connection key must not hand it to the chat,
+// in the text or the structured result. An empty key is not a pattern:
+// splitting on it would rewrite the whole text.
 function redactConnectionKey(
 	result: CallToolResult,
 	key: Secret,
 ): CallToolResult {
 	const value = key.reveal();
 	if (value.length === 0) return result;
-	return {
+	const redact = (text: string) => text.replaceAll(value, "[redacted]");
+	const redacted: CallToolResult = {
 		...result,
 		content: result.content.map((part) =>
 			part.type === "text" && part.text.includes(value)
-				? { ...part, text: part.text.replaceAll(value, "[redacted]") }
+				? { ...part, text: redact(part.text) }
 				: part,
 		),
 	};
+	if (result.structuredContent !== undefined) {
+		redacted.structuredContent = redactStrings(
+			result.structuredContent,
+			redact,
+		) as Record<string, unknown>;
+	}
+	return redacted;
+}
+
+// Every string in a JSON value, object keys included, through `redact`.
+function redactStrings(
+	value: unknown,
+	redact: (text: string) => string,
+): unknown {
+	if (typeof value === "string") return redact(value);
+	if (Array.isArray(value)) return value.map((v) => redactStrings(v, redact));
+	if (typeof value === "object" && value !== null) {
+		return Object.fromEntries(
+			Object.entries(value).map(([k, v]) => [
+				redact(k),
+				redactStrings(v, redact),
+			]),
+		);
+	}
+	return value;
 }
 
 async function settle(
-	spec: ActionSpec,
+	spec: ToolSpec,
 	connection: ToolConnection,
 	input: Record<string, unknown>,
 	ctx: RunToolContext,
+	locale: string,
 ): Promise<Settled> {
 	try {
+		if (!isActionSpec(spec)) {
+			const answer = await spec.run({
+				connection,
+				locale,
+				input,
+				client: ctx.client,
+			});
+			const cx = { locale, input, replayed: false };
+			return ok(present(spec, answer.text, answer.structured, cx));
+		}
 		const answer = await ctx.client.call(connection, spec.action, input);
-		const text = await answerText(spec, connection, input, answer, ctx);
-		return { outcome: "ok", result: { content: [{ type: "text", text }] } };
+		const replayed = isKeyedAction(spec.action) && answer.status === 200;
+		const text = await answerText(spec, connection, input, answer, ctx, locale);
+		const cx = { locale, input, replayed };
+		return ok(present(spec, text, answer.body, cx));
 	} catch (error) {
 		// A throw out of here would reach the chat as its message, so whatever
 		// `failure` can't word (its own drop included) is answered by `unexpected`.
@@ -81,9 +137,47 @@ async function settle(
 	}
 }
 
+const ok = (result: CallToolResult): Settled => ({ outcome: "ok", result });
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A successful answer as the chat gets it: the text first, then, for a body
+ * the tool's output schema accepts, its summary line, with the body as the
+ * structured result. A body the schema refuses, or whose summary can't be
+ * worded, never fails the call: it is logged by tool name alone and answered
+ * as text.
+ */
+function present(
+	spec: ToolSpec,
+	text: string,
+	body: unknown,
+	cx: SummaryContext,
+): CallToolResult {
+	const textOnly: CallToolResult = { content: [{ type: "text", text }] };
+	if (!isObject(body)) return textOnly;
+	const parsed = spec.output.schema.safeParse(body);
+	let summary: string | undefined;
+	try {
+		if (!parsed.success) throw parsed.error;
+		summary = spec.output.summary?.(parsed.data, cx);
+	} catch {
+		log({ kind: "output_invalid", tool: loggedName(spec) });
+		return textOnly;
+	}
+	return {
+		content:
+			summary === undefined
+				? textOnly.content
+				: [...textOnly.content, { type: "text", text: summary }],
+		structuredContent: body,
+	};
+}
+
 async function failure(
 	error: unknown,
-	spec: ActionSpec,
+	spec: ToolSpec,
 	connection: ToolConnection,
 	ctx: RunToolContext,
 ): Promise<Settled> {
@@ -119,9 +213,13 @@ async function failure(
 		);
 	}
 	if (error instanceof DeploymentRejected) {
-		const replaced = replacedText(error, spec, connection);
-		if (replaced !== null) return said("replaced", replaced);
-		const next = connection.platform ? platformNextStep(error, spec) : null;
+		// What a refusal says to do next is worded for the action that was
+		// refused; a local tool's refusal is the problem alone.
+		const action = isActionSpec(spec) ? spec : null;
+		const replaced = action && replacedText(error, action, connection);
+		if (replaced) return said("replaced", replaced);
+		const next =
+			action && connection.platform ? platformNextStep(error, action) : null;
 		if (next !== null && error.problem) {
 			return said("rejected", `${next}\n\n${JSON.stringify(error.problem)}`);
 		}
@@ -208,7 +306,7 @@ function platformNextStep(
 
 function unexpected(
 	error: unknown,
-	spec: ActionSpec,
+	spec: ToolSpec,
 	connection: Connection,
 ): Settled {
 	const errorName = error instanceof Error ? error.name : "unknown";
@@ -221,7 +319,7 @@ function unexpected(
 }
 
 // A write whose answer was lost may still have landed on the deployment.
-const unconfirmed = ({ checkWith }: ActionSpec, org: string) =>
+const unconfirmed = ({ checkWith }: ToolSpec, org: string) =>
 	checkWith
 		? `${org}'s donation site didn't confirm this. It may have gone through. Check with ${checkWith} before trying again.`
 		: undefined;

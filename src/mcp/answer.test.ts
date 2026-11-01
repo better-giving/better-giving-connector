@@ -38,6 +38,7 @@ test("a count that never answers falls back to the plain lead after 3 seconds an
 			client: { call: () => new Promise(() => {}) },
 			dropConnection: async () => {},
 		},
+		"en-US",
 	);
 	await vi.advanceTimersByTimeAsync(2_999);
 	const early = await Promise.race([text, Promise.resolve("pending")]);
@@ -68,6 +69,7 @@ test("a count that answers leaves no timer behind", async () => {
 			},
 			dropConnection: async () => {},
 		},
+		"en-US",
 	);
 
 	expect(vi.getTimerCount()).toBe(0);

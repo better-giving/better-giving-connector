@@ -5,6 +5,16 @@ import { type ActionName, isActionName } from "./deployment";
 // reaches it; a tool name outside the contract's actions is written as
 // "unknown". `errorName` is the one free string: pass `err.name`, never a message.
 
+/** The tools the connector answers itself, beside the contract's actions; a tool's log line names one or the other. */
+export const LOCAL_TOOL_NAMES = ["get_profile"] as const;
+export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
+type LoggedTool = ActionName | LocalToolName;
+
+const toolName = (tool: string): LoggedTool | "unknown" =>
+	isActionName(tool) || LOCAL_TOOL_NAMES.some((name) => name === tool)
+		? (tool as LoggedTool)
+		: "unknown";
+
 export type ToolOutcome =
 	| "ok"
 	| "invalid_input"
@@ -38,7 +48,9 @@ export type ConnectOutcome =
 	| "failed";
 
 export type LogEvent =
-	| { kind: "tool"; tool: ActionName; outcome: ToolOutcome; ms: number }
+	| { kind: "tool"; tool: LoggedTool; outcome: ToolOutcome; ms: number }
+	// a successful call whose body its output schema refused, answered as text alone
+	| { kind: "output_invalid"; tool: LoggedTool }
 	| { kind: "connect"; step: ConnectStep; outcome: ConnectOutcome }
 	| { kind: "sweep"; connections: number; ms: number }
 	| {
@@ -51,8 +63,12 @@ export function log(event: LogEvent): void {
 	switch (event.kind) {
 		case "tool": {
 			const { kind, tool, outcome, ms } = event;
-			const name = isActionName(tool) ? tool : "unknown";
-			console.log(JSON.stringify({ kind, tool: name, outcome, ms }));
+			console.log(JSON.stringify({ kind, tool: toolName(tool), outcome, ms }));
+			return;
+		}
+		case "output_invalid": {
+			const { kind, tool } = event;
+			console.log(JSON.stringify({ kind, tool: toolName(tool) }));
 			return;
 		}
 		case "connect": {

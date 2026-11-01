@@ -31,6 +31,46 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"data": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"title": {
+									"type": "string"
+								},
+								"status": {
+									"type": "string"
+								},
+								"public_url": {
+									"type": ["string", "null"]
+								},
+								"slug": {
+									"type": "string"
+								}
+							},
+							"required": ["id", "title", "status", "public_url"],
+							"additionalProperties": {}
+						}
+					},
+					"next_cursor": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["data", "next_cursor"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Listing campaigns…",
+				"openai/toolInvocation/invoked": "Campaigns listed"
 			}
 		},
 		{
@@ -56,6 +96,91 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the campaign…",
+				"openai/toolInvocation/invoked": "Campaign read"
 			}
 		},
 		{
@@ -80,6 +205,91 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Creating campaign…",
+				"openai/toolInvocation/invoked": "Draft created"
 			}
 		},
 		{
@@ -113,9 +323,94 @@
 			"annotations": {
 				"title": "Edit a campaign's page",
 				"readOnlyHint": false,
-				"destructiveHint": true,
+				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Saving the campaign page…",
+				"openai/toolInvocation/invoked": "Campaign page saved"
 			}
 		},
 		{
@@ -275,9 +570,94 @@
 			"annotations": {
 				"title": "Edit a campaign's page",
 				"readOnlyHint": false,
-				"destructiveHint": true,
+				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Saving the campaign page…",
+				"openai/toolInvocation/invoked": "Campaign page saved"
 			}
 		},
 		{
@@ -361,9 +741,94 @@
 			"annotations": {
 				"title": "Change a campaign's settings",
 				"readOnlyHint": false,
-				"destructiveHint": true,
+				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Saving campaign settings…",
+				"openai/toolInvocation/invoked": "Campaign settings saved"
 			}
 		},
 		{
@@ -392,6 +857,91 @@
 				"destructiveHint": true,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Publishing the campaign…",
+				"openai/toolInvocation/invoked": "Campaign published"
 			}
 		},
 		{
@@ -417,6 +967,91 @@
 				"destructiveHint": true,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"slug": {
+						"type": "string"
+					},
+					"settings": {
+						"type": "object",
+						"properties": {
+							"goal": {
+								"anyOf": [
+									{
+										"type": "object",
+										"properties": {
+											"amount": {
+												"type": "string"
+											},
+											"currency": {
+												"type": "string"
+											}
+										},
+										"required": ["amount", "currency"],
+										"additionalProperties": {}
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"end_date": {
+								"type": ["string", "null"]
+							},
+							"time_zone": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					},
+					"version": {
+						"type": ["string", "number"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string"
+						},
+						"additionalProperties": {}
+					},
+					"layout": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "title", "status", "public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Ending the campaign…",
+				"openai/toolInvocation/invoked": "Campaign ended"
 			}
 		},
 		{
@@ -435,6 +1070,43 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"properties": {
+							"heading": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					}
+				},
+				"required": ["public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the donation page…",
+				"openai/toolInvocation/invoked": "Donation page read"
 			}
 		},
 		{
@@ -463,9 +1135,46 @@
 			"annotations": {
 				"title": "Edit the donation page",
 				"readOnlyHint": false,
-				"destructiveHint": true,
+				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"properties": {
+							"heading": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					}
+				},
+				"required": ["public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Saving the donation page…",
+				"openai/toolInvocation/invoked": "Donation page saved"
 			}
 		},
 		{
@@ -487,9 +1196,46 @@
 			"annotations": {
 				"title": "Edit the donation page",
 				"readOnlyHint": false,
-				"destructiveHint": true,
+				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"properties": {
+							"heading": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					}
+				},
+				"required": ["public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Saving the donation page heading…",
+				"openai/toolInvocation/invoked": "Donation page heading saved"
 			}
 		},
 		{
@@ -514,6 +1260,43 @@
 				"destructiveHint": true,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"public_url": {
+						"type": ["string", "null"]
+					},
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					},
+					"content": {
+						"type": "object",
+						"properties": {
+							"heading": {
+								"type": ["string", "null"]
+							}
+						},
+						"additionalProperties": {}
+					}
+				},
+				"required": ["public_url"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Resetting the donation page…",
+				"openai/toolInvocation/invoked": "Donation page reset"
 			}
 		},
 		{
@@ -532,6 +1315,31 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"blocks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								}
+							},
+							"required": ["type"],
+							"additionalProperties": {}
+						}
+					}
+				},
+				"required": ["blocks"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the block catalog…",
+				"openai/toolInvocation/invoked": "Block catalog read"
 			}
 		},
 		{
@@ -550,6 +1358,35 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"content": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"description": {
+									"type": "string"
+								}
+							},
+							"additionalProperties": {}
+						}
+					},
+					"layout": {
+						"type": "object",
+						"properties": {},
+						"additionalProperties": {}
+					}
+				},
+				"required": ["content"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the content catalog…",
+				"openai/toolInvocation/invoked": "Content catalog read"
 			}
 		},
 		{
@@ -578,6 +1415,46 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"data": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"name": {
+									"type": "string"
+								},
+								"campaign_id": {
+									"type": ["string", "null"]
+								},
+								"status": {
+									"type": "string"
+								},
+								"updated_at": {
+									"type": "string"
+								}
+							},
+							"required": ["id", "name"],
+							"additionalProperties": {}
+						}
+					},
+					"next_cursor": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["data", "next_cursor"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Listing donation forms…",
+				"openai/toolInvocation/invoked": "Donation forms listed"
 			}
 		},
 		{
@@ -603,6 +1480,33 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"campaign_id": {
+						"type": ["string", "null"]
+					},
+					"status": {
+						"type": "string"
+					},
+					"updated_at": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "name"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the donation form…",
+				"openai/toolInvocation/invoked": "Donation form read"
 			}
 		},
 		{
@@ -627,6 +1531,33 @@
 				"destructiveHint": false,
 				"idempotentHint": false,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"campaign_id": {
+						"type": ["string", "null"]
+					},
+					"status": {
+						"type": "string"
+					},
+					"updated_at": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "name"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Creating donation form…",
+				"openai/toolInvocation/invoked": "Donation form created"
 			}
 		},
 		{
@@ -657,9 +1588,36 @@
 			"annotations": {
 				"title": "Edit a donation form",
 				"readOnlyHint": false,
-				"destructiveHint": true,
+				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"campaign_id": {
+						"type": ["string", "null"]
+					},
+					"status": {
+						"type": "string"
+					},
+					"updated_at": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "name"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Saving the donation form…",
+				"openai/toolInvocation/invoked": "Donation form saved"
 			}
 		},
 		{
@@ -694,6 +1652,66 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"total": {
+						"type": "object",
+						"properties": {
+							"amount": {
+								"type": "string"
+							},
+							"currency": {
+								"type": "string"
+							}
+						},
+						"required": ["amount", "currency"],
+						"additionalProperties": {}
+					},
+					"gift_count": {
+						"type": "number"
+					},
+					"donor_count": {
+						"type": "number"
+					},
+					"campaigns": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"title": {
+									"type": "string"
+								},
+								"total": {
+									"type": "object",
+									"properties": {
+										"amount": {
+											"type": "string"
+										},
+										"currency": {
+											"type": "string"
+										}
+									},
+									"required": ["amount", "currency"],
+									"additionalProperties": {}
+								}
+							},
+							"required": ["id", "title", "total"],
+							"additionalProperties": {}
+						}
+					}
+				},
+				"required": ["total", "gift_count", "donor_count", "campaigns"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Totaling results…",
+				"openai/toolInvocation/invoked": "Results totaled"
 			}
 		},
 		{
@@ -737,6 +1755,62 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"data": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"amount": {
+									"type": "object",
+									"properties": {
+										"amount": {
+											"type": "string"
+										},
+										"currency": {
+											"type": "string"
+										}
+									},
+									"required": ["amount", "currency"],
+									"additionalProperties": {}
+								},
+								"date": {
+									"type": "string"
+								},
+								"donor_id": {
+									"type": "string"
+								},
+								"campaign_id": {
+									"type": ["string", "null"]
+								},
+								"method": {
+									"type": "string"
+								},
+								"note": {
+									"type": ["string", "null"]
+								}
+							},
+							"required": ["id", "amount", "date", "donor_id"],
+							"additionalProperties": {}
+						}
+					},
+					"next_cursor": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["data", "next_cursor"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Listing donations…",
+				"openai/toolInvocation/invoked": "Donations listed"
 			}
 		},
 		{
@@ -768,6 +1842,56 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"data": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"name": {
+									"type": "string"
+								},
+								"email": {
+									"type": ["string", "null"]
+								},
+								"total": {
+									"type": "object",
+									"properties": {
+										"amount": {
+											"type": "string"
+										},
+										"currency": {
+											"type": "string"
+										}
+									},
+									"required": ["amount", "currency"],
+									"additionalProperties": {}
+								},
+								"gift_count": {
+									"type": "number"
+								}
+							},
+							"required": ["id", "name", "total", "gift_count"],
+							"additionalProperties": {}
+						}
+					},
+					"next_cursor": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["data", "next_cursor"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Listing donors…",
+				"openai/toolInvocation/invoked": "Donors listed"
 			}
 		},
 		{
@@ -802,6 +1926,94 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"email": {
+						"type": ["string", "null"]
+					},
+					"total": {
+						"type": "object",
+						"properties": {
+							"amount": {
+								"type": "string"
+							},
+							"currency": {
+								"type": "string"
+							}
+						},
+						"required": ["amount", "currency"],
+						"additionalProperties": {}
+					},
+					"gift_count": {
+						"type": "number"
+					},
+					"gifts": {
+						"type": "object",
+						"properties": {
+							"data": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"amount": {
+											"type": "object",
+											"properties": {
+												"amount": {
+													"type": "string"
+												},
+												"currency": {
+													"type": "string"
+												}
+											},
+											"required": ["amount", "currency"],
+											"additionalProperties": {}
+										},
+										"date": {
+											"type": "string"
+										},
+										"donor_id": {
+											"type": "string"
+										},
+										"campaign_id": {
+											"type": ["string", "null"]
+										},
+										"method": {
+											"type": "string"
+										},
+										"note": {
+											"type": ["string", "null"]
+										}
+									},
+									"required": ["id", "amount", "date", "donor_id"],
+									"additionalProperties": {}
+								}
+							},
+							"next_cursor": {
+								"type": ["string", "null"]
+							}
+						},
+						"required": ["data", "next_cursor"],
+						"additionalProperties": {}
+					}
+				},
+				"required": ["id", "name", "total", "gift_count", "gifts"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the donor…",
+				"openai/toolInvocation/invoked": "Donor read"
 			}
 		},
 		{
@@ -830,6 +2042,59 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"data": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"donor_id": {
+									"type": "string"
+								},
+								"amount": {
+									"type": "object",
+									"properties": {
+										"amount": {
+											"type": "string"
+										},
+										"currency": {
+											"type": "string"
+										}
+									},
+									"required": ["amount", "currency"],
+									"additionalProperties": {}
+								},
+								"interval": {
+									"type": "string"
+								},
+								"status": {
+									"type": "string"
+								},
+								"next_date": {
+									"type": ["string", "null"]
+								}
+							},
+							"required": ["id", "donor_id", "amount"],
+							"additionalProperties": {}
+						}
+					},
+					"next_cursor": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["data", "next_cursor"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Listing monthly gifts…",
+				"openai/toolInvocation/invoked": "Monthly gifts listed"
 			}
 		},
 		{
@@ -895,6 +2160,49 @@
 				"destructiveHint": false,
 				"idempotentHint": true,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"amount": {
+						"type": "object",
+						"properties": {
+							"amount": {
+								"type": "string"
+							},
+							"currency": {
+								"type": "string"
+							}
+						},
+						"required": ["amount", "currency"],
+						"additionalProperties": {}
+					},
+					"date": {
+						"type": "string"
+					},
+					"donor_id": {
+						"type": "string"
+					},
+					"campaign_id": {
+						"type": ["string", "null"]
+					},
+					"method": {
+						"type": "string"
+					},
+					"note": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["id", "amount", "date", "donor_id"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Recording the donation…",
+				"openai/toolInvocation/invoked": "Donation recorded"
 			}
 		},
 		{
@@ -950,6 +2258,61 @@
 				"destructiveHint": false,
 				"idempotentHint": false,
 				"openWorldHint": true
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"url": {
+						"type": "string"
+					},
+					"expires_at": {
+						"type": "string"
+					}
+				},
+				"required": ["url", "expires_at"],
+				"additionalProperties": {}
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Making a photo upload link…",
+				"openai/toolInvocation/invoked": "Upload link ready"
+			}
+		},
+		{
+			"name": "get_profile",
+			"title": "Get the connected account",
+			"description": "Returns the connected Better Giving account: a stable id for it and the nonprofit's name.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "name"],
+				"additionalProperties": false
+			},
+			"annotations": {
+				"title": "Get the connected account",
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading the connected account…",
+				"openai/toolInvocation/invoked": "Account read",
+				"openai/profile": true
 			}
 		}
 	]

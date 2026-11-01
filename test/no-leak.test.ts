@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { createApp } from "../src/app";
 import { ACTIONS } from "../src/mcp/actions";
+import { LOCAL_TOOLS } from "../src/mcp/local";
 import {
 	ALL_ACTIONS,
 	type FakeDeployment,
@@ -287,7 +288,11 @@ async function startWorld() {
 	};
 }
 
-type ToolResult = { isError?: boolean; content: { text: string }[] };
+type ToolResult = {
+	isError?: boolean;
+	content: { text: string }[];
+	structuredContent?: Record<string, unknown>;
+};
 const callTool = async (
 	bearer: string,
 	name: string,
@@ -298,7 +303,8 @@ const callTool = async (
 			await world.sendAs(bearer, "tools/call", { name, arguments: args }),
 		)
 	).result;
-const textOf = (r: ToolResult) => r.content.map((c) => c.text).join("\n");
+// The text answer, the first content item; a success's summary line follows it.
+const textOf = (r: ToolResult) => r.content[0]?.text ?? "";
 // A success carries the deployment's JSON as its text's last line, below the lead.
 const answerOf = (r: ToolResult): Record<string, unknown> =>
 	JSON.parse(textOf(r).split("\n").at(-1) ?? "");
@@ -391,7 +397,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(sent?.authorization).toBe(`Bearer ${world.dep.issuedKeys[0]}`);
 		expect(result.isError).toBeUndefined();
 		expect(answerOf(result)).toMatchObject({ leak_probe: RESULT, note });
-		expect(textOf(result)).not.toContain(
+		expect(result.structuredContent).toEqual(answerOf(result));
+		expect(JSON.stringify(result)).not.toContain(
 			world.dep.issuedKeys[0] ?? "unreachable",
 		);
 		expectCleanScenario();
@@ -417,7 +424,9 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		const tools = await rpc(await world.sendAs(bearer, "tools/list"));
 
 		expect(init.result.instructions).toContain(ORG);
-		expect(tools.result.tools).toHaveLength(ACTIONS.length);
+		expect(tools.result.tools).toHaveLength(
+			ACTIONS.length + LOCAL_TOOLS.length,
+		);
 		expect(world.dep.issuedKeys).toHaveLength(1);
 		expectCleanScenario();
 	});
@@ -704,10 +713,13 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		const names = (tools: { name: string }[]) =>
 			tools.map((t) => t.name).toSorted();
-		expect(names(TOOLS.map(([name]) => ({ name })))).toEqual(names(listed));
-		expect(names(ACTIONS.map((a) => ({ name: a.tool })))).toEqual(
-			names(listed),
-		);
+		// get_profile, asking the deployment nothing, has its own scenario below.
+		expect(
+			names([...TOOLS.map(([name]) => ({ name })), { name: "get_profile" }]),
+		).toEqual(names(listed));
+		expect(
+			names([...ACTIONS, ...LOCAL_TOOLS].map((a) => ({ name: a.tool }))),
+		).toEqual(names(listed));
 	});
 
 	test("every tool succeeds with sentinel arguments against sentinel answers", async () => {
@@ -731,6 +743,15 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 				name,
 				probe: RESULT,
 			});
+			// The same JSON as the structured result, and a summary line after the text.
+			expect({ name, structured: result.structuredContent }).toEqual({
+				name,
+				structured: answer,
+			});
+			expect({ name, items: result.content.length }).toEqual({
+				name,
+				items: 2,
+			});
 			// The tool's own request, not an empty result's unfiltered follow-up.
 			const reached = JSON.stringify(world.dep.calls[sent]);
 			for (const value of mine)
@@ -743,6 +764,44 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		}
 		expect(ids.campaign).not.toBe("");
 		expect(ids.donor).not.toBe("");
+		expectCleanScenario();
+	});
+
+	test("get_profile answers the user id and org name alone, never the key or the site's address", async () => {
+		const bearer = await world.signIn();
+		const sent = world.dep.calls.length;
+
+		const result = await callTool(bearer, "get_profile", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(Object.keys(result.structuredContent ?? {})).toEqual(["id", "name"]);
+		expect(result.structuredContent?.name).toBe(ORG);
+		expect(result.content).toEqual([
+			{ type: "text", text: JSON.stringify(result.structuredContent) },
+		]);
+		expect(JSON.stringify(result)).not.toContain(world.dep.host);
+		expect(world.dep.calls.length).toBe(sent);
+		expectCleanScenario();
+	});
+
+	test("an answer its output schema refuses is logged by tool name alone and answered as text", async () => {
+		const bearer = await world.signIn();
+		world.dep.intercept((req) =>
+			new URL(req.url).pathname === "/connector/v1/results"
+				? Response.json({ total: arg("odd-total") })
+				: undefined,
+		);
+		const from = trace.length;
+
+		const result = await callTool(bearer, "get_results", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(result.structuredContent).toBeUndefined();
+		expect(answerOf(result)).toMatchObject({ leak_probe: RESULT });
+		expect(loggedLines(from)).toContainEqual({
+			kind: "output_invalid",
+			tool: "results.summary",
+		});
 		expectCleanScenario();
 	});
 
@@ -1153,7 +1212,17 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 		new Set(lines.filter((l) => l.kind === kind).map((l) => l[field]));
 	const errorSites = outcomes("error", "where");
 
-	expect(tools).toEqual(new Set(ACTIONS.map((a) => a.action)));
+	expect(tools).toEqual(
+		new Set([
+			...ACTIONS.map((a) => a.action),
+			...LOCAL_TOOLS.map((t) => t.tool),
+		]),
+	);
+	expect(
+		new Set(
+			lines.filter((l) => l.kind === "output_invalid").map((l) => l.tool),
+		),
+	).toEqual(new Set(["results.summary"]));
 	expect(outcomes("tool", "outcome")).toEqual(
 		new Set([
 			"ok",

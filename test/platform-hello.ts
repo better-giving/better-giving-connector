@@ -52,6 +52,8 @@ export const PLATFORM_TOOLS = [
 	"get_donor",
 	"list_recurring_gifts",
 	"create_photo_upload_link",
+	// the connector's own, offered whatever the hello lists
+	"get_profile",
 ];
 
 /** Each Platform tool's contract action, as the fake deployment serves it. */

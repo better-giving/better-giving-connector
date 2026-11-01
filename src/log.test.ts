@@ -38,6 +38,8 @@ test("writes error events to stderr", () => {
 
 test.each([
 	{ kind: "tool", tool: "donors.get", outcome: "ok", ms: 9 },
+	{ kind: "tool", tool: "get_profile", outcome: "ok", ms: 0 },
+	{ kind: "output_invalid", tool: "results.summary" },
 	{ kind: "connect", step: "exchange", outcome: "ok" },
 	{ kind: "error", where: "mcp", errorName: "TypeError" },
 	{ kind: "error", where: "disconnect", errorName: "Unreachable" },
@@ -54,13 +56,15 @@ test.each([
 	},
 );
 
-test("writes a tool name outside the actions as unknown", () => {
+test("writes a tool name outside the actions and local tools as unknown", () => {
 	const written = captureLines();
 	const tool = SENTINEL as ActionName;
 
 	log({ kind: "tool", tool, outcome: "failed", ms: 1 });
+	log({ kind: "output_invalid", tool });
 
 	expect(written()).toEqual([
 		'{"kind":"tool","tool":"unknown","outcome":"failed","ms":1}',
+		'{"kind":"output_invalid","tool":"unknown"}',
 	]);
 });

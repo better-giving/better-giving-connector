@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { deploymentClient } from "../../src/deployment";
 import { parseOrigin } from "../../src/deployment/origin";
+import { DEFAULT_LOCALE } from "../../src/format";
 import { ACTIONS, type ActionSpec } from "../../src/mcp/actions";
 import {
 	type RunToolContext,
@@ -229,10 +230,10 @@ async function run(
 ): Promise<string> {
 	const spec = specNamed(tool);
 	const started = performance.now();
-	const result = await runTool(spec, connection, args, ctx);
-	const text = result.content
-		.map((part) => (part.type === "text" ? part.text : ""))
-		.join("\n");
+	const result = await runTool(spec, connection, args, ctx, DEFAULT_LOCALE);
+	// the text answer; a success's summary line follows it
+	const first = result.content[0];
+	const text = first?.type === "text" ? first.text : "";
 	rows.push({
 		tool: spec.tool,
 		outcome: outcomeOf(text, result.isError),

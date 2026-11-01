@@ -81,8 +81,9 @@ const listTools = async () =>
 const tool = async (name: string, args: Record<string, unknown> = {}) =>
 	(await rpc(await send("tools/call", { name, arguments: args }))).result;
 
+// The text answer: the first content item. A success's summary line follows it.
 const textOf = (result: { content: { text: string }[] }) =>
-	result.content.map((c) => c.text).join("\n");
+	result.content[0]?.text ?? "";
 
 // A successful tool call's lead line, the sentence naming the org above the JSON.
 const leadOf = (result: { content: { text: string }[] }) =>
@@ -110,14 +111,15 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		idempotentHint: false,
 		openWorldHint: true,
 	};
-	const DESTRUCTIVE = {
+	const OVERWRITES = {
 		readOnlyHint: false,
-		destructiveHint: true,
+		destructiveHint: false,
 		idempotentHint: true,
 		openWorldHint: true,
 	};
+	const DESTRUCTIVE = { ...OVERWRITES, destructiveHint: true };
 
-	test("tools/list offers one tool per action, each with its annotations", async () => {
+	test("tools/list offers one tool per action, and the connector's own, each with its annotations", async () => {
 		const tools = await listTools();
 
 		expect(
@@ -138,21 +140,21 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			list_campaigns: READ,
 			get_campaign: READ,
 			create_campaign: { ...ADD, idempotentHint: true },
-			update_campaign_blocks: DESTRUCTIVE,
-			update_campaign_content: DESTRUCTIVE,
-			update_campaign_settings: DESTRUCTIVE,
+			update_campaign_blocks: OVERWRITES,
+			update_campaign_content: OVERWRITES,
+			update_campaign_settings: OVERWRITES,
 			publish_campaign: DESTRUCTIVE,
 			end_campaign: DESTRUCTIVE,
 			get_donation_page: READ,
-			update_donation_page_blocks: DESTRUCTIVE,
-			update_donation_page_content: DESTRUCTIVE,
+			update_donation_page_blocks: OVERWRITES,
+			update_donation_page_content: OVERWRITES,
 			reset_donation_page: DESTRUCTIVE,
 			get_block_catalog: READ,
 			get_content_catalog: READ,
 			list_forms: READ,
 			get_form: READ,
 			create_form: ADD,
-			update_form: DESTRUCTIVE,
+			update_form: OVERWRITES,
 			get_results: READ,
 			list_donations: READ,
 			list_donors: READ,
@@ -160,6 +162,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			list_recurring_gifts: READ,
 			record_donation: { ...ADD, idempotentHint: true },
 			create_photo_upload_link: ADD,
+			get_profile: READ,
 		});
 	});
 
@@ -189,7 +192,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	test("a deployment that serves every action offers every tool", async () => {
 		const names = await connectWith(ALL_ACTIONS);
 
-		expect(new Set(names).size).toBe(ALL_ACTIONS.length);
+		// and get_profile, which needs no action
+		expect(new Set(names).size).toBe(ALL_ACTIONS.length + 1);
 	});
 
 	test("the instructions name only the confirm tools the deployment serves", async () => {
@@ -229,7 +233,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(instructions).not.toContain(" or ");
 	});
 
-	test("publish, end, reset, and every overwrite are destructive", async () => {
+	test("publish, end and reset are destructive; an overwrite is not", async () => {
 		const tools: {
 			name: string;
 			annotations: { destructiveHint?: boolean; readOnlyHint?: boolean };
@@ -240,6 +244,13 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			"publish_campaign",
 			"end_campaign",
 			"reset_donation_page",
+		]) {
+			expect(byName.get(name)).toMatchObject({
+				readOnlyHint: false,
+				destructiveHint: true,
+			});
+		}
+		for (const name of [
 			"update_campaign_blocks",
 			"update_campaign_content",
 			"update_campaign_settings",
@@ -249,7 +260,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		]) {
 			expect(byName.get(name)).toMatchObject({
 				readOnlyHint: false,
-				destructiveHint: true,
+				destructiveHint: false,
 			});
 		}
 	});
@@ -305,6 +316,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			list_recurring_gifts: [],
 			record_donation: ["amount", "date", "donor", "method"],
 			create_photo_upload_link: ["target"],
+			get_profile: [],
 		});
 	});
 
@@ -364,7 +376,11 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	);
 
 	test("no tool or field description frames a page edit as a block replacement or a design change", async () => {
-		const text = JSON.stringify(await listTools());
+		// The output schemas name the fields the site sends, layout among them.
+		const tools: { outputSchema: unknown }[] = await listTools();
+		const text = JSON.stringify(
+			tools.map(({ outputSchema: _, ...described }) => described),
+		);
 
 		for (const phrase of [
 			"in order",
@@ -416,11 +432,15 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		return out;
 	}
 
-	test("no tool input schema has a connection key or other secret field", async () => {
-		const tools: { name: string; inputSchema: unknown }[] = await listTools();
+	test("no tool input or output schema has a connection key or other secret field", async () => {
+		const tools: {
+			name: string;
+			inputSchema: unknown;
+			outputSchema: unknown;
+		}[] = await listTools();
 
 		const found = tools.flatMap((t) =>
-			propertyNames(t.inputSchema)
+			[...propertyNames(t.inputSchema), ...propertyNames(t.outputSchema)]
 				.filter((name) => SECRET_FIELDS.includes(name))
 				.map((name) => `${t.name}.${name}`),
 		);

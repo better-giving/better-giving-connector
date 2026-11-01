@@ -1,17 +1,8 @@
-import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { ActionName } from "../deployment";
+import { type ActionSpec, type Hints, statusLines } from "./spec";
+import { OUTPUTS } from "./summary";
 
-export type ActionSpec<Tool extends string = string> = {
-	tool: Tool;
-	action: ActionName;
-	title: string;
-	description: string;
-	input: z.ZodObject;
-	annotations: ToolAnnotations;
-	/** A write's read tool: what shows whether it went through when its answer was lost. */
-	checkWith?: NoInfer<Tool>;
-};
+export type { ActionSpec } from "./spec";
 
 // Tool is inferred from the specs' `tool` names alone, so a `checkWith`
 // naming no tool is a type error.
@@ -146,16 +137,17 @@ const CONTENT_KEYS = Object.keys(campaignContent);
 // A write changes data on the operator's site, a separate system, so every
 // write is open-world. A read changes nothing there and is closed-world.
 // OpenAI's app review flags a write marked closed-world.
+// Every hint is stated: a client reads a missing destructiveHint as true.
 // destructiveHint false on a read matches the directory packet; the spec
 // treats it as meaningful only when readOnlyHint is false.
-const READ = {
+export const READ: Hints = {
 	readOnlyHint: true,
 	destructiveHint: false,
 	idempotentHint: true,
 	openWorldHint: false,
 };
 // Creates a new record or link. Calling it again adds another.
-const ADD = {
+const ADD: Hints = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	idempotentHint: false,
@@ -163,18 +155,25 @@ const ADD = {
 };
 // The deployment replays these two when the arguments match, so a retry
 // does not add a second campaign or gift.
-const REPLAYS = {
+const REPLAYS: Hints = {
 	...ADD,
 	idempotentHint: true,
 };
-// Overwrites what is there now: a page, a form, or a campaign's settings or
-// state. The same call again does not stack: the fields hold the values
-// sent, or the campaign is in that state.
-const DESTRUCTIVE = {
+// Overwrites the fields sent: a page, a form, or a campaign's settings. The
+// same call again does not stack: the fields hold the values sent. What it
+// replaced is an edit the operator asked for, so it is not destructive.
+const OVERWRITES: Hints = {
 	readOnlyHint: false,
-	destructiveHint: true,
+	destructiveHint: false,
 	idempotentHint: true,
 	openWorldHint: true,
+};
+// Changes what donors can do or see past a plain edit: puts a campaign live,
+// ends it for good, or discards a page's content. Again it does not stack:
+// the campaign is in that state, the page at its default.
+const DESTRUCTIVE: Hints = {
+	...OVERWRITES,
+	destructiveHint: true,
 };
 
 const CONFIRMED =
@@ -205,7 +204,9 @@ export const ACTIONS = toolSpecs([
 			status: z.enum(["draft", "published", "ended"]).optional(),
 			...page,
 		}),
+		output: OUTPUTS.list_campaigns,
 		annotations: READ,
+		_meta: statusLines("Listing campaigns…", "Campaigns listed"),
 	},
 	{
 		tool: "get_campaign",
@@ -213,7 +214,9 @@ export const ACTIONS = toolSpecs([
 		title: "Get a campaign",
 		description: `Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it ${CONTENT_SITES}, or its blocks ${BLOCK_SITES}. For the amount raised, use get_results. ${LINKS_ONLY}`,
 		input: z.strictObject({ id }),
+		output: OUTPUTS.get_campaign,
 		annotations: READ,
+		_meta: statusLines("Reading the campaign…", "Campaign read"),
 	},
 	{
 		tool: "create_campaign",
@@ -221,7 +224,9 @@ export const ACTIONS = toolSpecs([
 		title: "Create a campaign",
 		description: `Creates a new draft campaign with the given title. Donors cannot see it until it is published. ${LINKS_ONLY}`,
 		input: z.strictObject({ title: z.string().trim().min(1) }),
+		output: OUTPUTS.create_campaign,
 		annotations: REPLAYS,
+		_meta: statusLines("Creating campaign…", "Draft created"),
 		checkWith: "list_campaigns",
 	},
 	{
@@ -230,7 +235,9 @@ export const ACTIONS = toolSpecs([
 		title: "Edit a campaign's page",
 		description: `${EDITS_CAMPAIGN_BLOCKS} ${LINKS_ONLY}`,
 		input: z.strictObject({ id, blocks }),
-		annotations: DESTRUCTIVE,
+		output: OUTPUTS.update_campaign_blocks,
+		annotations: OVERWRITES,
+		_meta: statusLines("Saving the campaign page…", "Campaign page saved"),
 		checkWith: "get_campaign",
 	},
 	{
@@ -247,7 +254,9 @@ export const ACTIONS = toolSpecs([
 					),
 				`Send at least one content key: ${CONTENT_KEYS.join(", ")}.`,
 			),
-		annotations: DESTRUCTIVE,
+		output: OUTPUTS.update_campaign_content,
+		annotations: OVERWRITES,
+		_meta: statusLines("Saving the campaign page…", "Campaign page saved"),
 		checkWith: "get_campaign",
 	},
 	{
@@ -277,7 +286,9 @@ export const ACTIONS = toolSpecs([
 				})
 				.optional(),
 		}),
-		annotations: DESTRUCTIVE,
+		output: OUTPUTS.update_campaign_settings,
+		annotations: OVERWRITES,
+		_meta: statusLines("Saving campaign settings…", "Campaign settings saved"),
 		checkWith: "get_campaign",
 	},
 	{
@@ -289,7 +300,9 @@ export const ACTIONS = toolSpecs([
 			id,
 			gifts_go_to: z.string().nullable().optional(),
 		}),
+		output: OUTPUTS.publish_campaign,
 		annotations: DESTRUCTIVE,
+		_meta: statusLines("Publishing the campaign…", "Campaign published"),
 		checkWith: "get_campaign",
 	},
 	{
@@ -298,7 +311,9 @@ export const ACTIONS = toolSpecs([
 		title: "End a campaign",
 		description: `Ends a campaign for good. It stops taking gifts. ${CONFIRMED} ${LINKS_ONLY}`,
 		input: z.strictObject({ id }),
+		output: OUTPUTS.end_campaign,
 		annotations: DESTRUCTIVE,
+		_meta: statusLines("Ending the campaign…", "Campaign ended"),
 		checkWith: "get_campaign",
 	},
 	{
@@ -307,7 +322,9 @@ export const ACTIONS = toolSpecs([
 		title: "Get the donation page",
 		description: `Reads the site's main donation page and its public link. The page is its content ${CONTENT_SITES}, where only its heading can be edited, or its blocks ${BLOCK_SITES}.`,
 		input: z.strictObject({}),
+		output: OUTPUTS.get_donation_page,
 		annotations: READ,
+		_meta: statusLines("Reading the donation page…", "Donation page read"),
 	},
 	{
 		tool: "update_donation_page_blocks",
@@ -315,7 +332,9 @@ export const ACTIONS = toolSpecs([
 		title: "Edit the donation page",
 		description: `Edits the content of the site's main donation page, such as its title, story, and hero photo. ${editsContent("get_donation_page")}`,
 		input: z.strictObject({ blocks }),
-		annotations: DESTRUCTIVE,
+		output: OUTPUTS.update_donation_page_blocks,
+		annotations: OVERWRITES,
+		_meta: statusLines("Saving the donation page…", "Donation page saved"),
 		checkWith: "get_donation_page",
 	},
 	{
@@ -329,7 +348,12 @@ export const ACTIONS = toolSpecs([
 				.nullable()
 				.describe("The page's title, or null for the default."),
 		}),
-		annotations: DESTRUCTIVE,
+		output: OUTPUTS.update_donation_page_content,
+		annotations: OVERWRITES,
+		_meta: statusLines(
+			"Saving the donation page heading…",
+			"Donation page heading saved",
+		),
 		checkWith: "get_donation_page",
 	},
 	{
@@ -338,7 +362,9 @@ export const ACTIONS = toolSpecs([
 		title: "Reset the donation page",
 		description: `Puts the main donation page back to its default content, discarding what is there now. ${CONFIRMED}`,
 		input: z.strictObject({ confirm: z.literal(true) }),
+		output: OUTPUTS.reset_donation_page,
 		annotations: DESTRUCTIVE,
+		_meta: statusLines("Resetting the donation page…", "Donation page reset"),
 		checkWith: "get_donation_page",
 	},
 	{
@@ -348,7 +374,9 @@ export const ACTIONS = toolSpecs([
 		description:
 			"Lists every block type a page can hold, with what it is for and its JSON Schema. For sites that edit pages as blocks.",
 		input: z.strictObject({}),
+		output: OUTPUTS.get_block_catalog,
 		annotations: READ,
+		_meta: statusLines("Reading the block catalog…", "Block catalog read"),
 	},
 	{
 		tool: "get_content_catalog",
@@ -357,7 +385,9 @@ export const ACTIONS = toolSpecs([
 		description:
 			"Lists every content key a page can hold (heading, lede, story, hero, photos, tiers, faq) with what each shows donors and its JSON Schema, and says how the site arranges a campaign from its content. A campaign holds every key; the donation page holds its heading alone.",
 		input: z.strictObject({}),
+		output: OUTPUTS.get_content_catalog,
 		annotations: READ,
+		_meta: statusLines("Reading the content catalog…", "Content catalog read"),
 	},
 	{
 		tool: "list_forms",
@@ -366,7 +396,9 @@ export const ACTIONS = toolSpecs([
 		description:
 			"Lists the site's donation forms (suggested amounts, currency, monthly giving), including each form's id. The list includes the donation page's form and each campaign's form; a campaign's form carries that campaign's campaign_id, and any other form has campaign_id null.",
 		input: z.strictObject({ ...page }),
+		output: OUTPUTS.list_forms,
 		annotations: READ,
+		_meta: statusLines("Listing donation forms…", "Donation forms listed"),
 	},
 	{
 		tool: "get_form",
@@ -374,7 +406,9 @@ export const ACTIONS = toolSpecs([
 		title: "Get a donation form",
 		description: "Reads one donation form in full.",
 		input: z.strictObject({ id }),
+		output: OUTPUTS.get_form,
 		annotations: READ,
+		_meta: statusLines("Reading the donation form…", "Donation form read"),
 	},
 	{
 		tool: "create_form",
@@ -383,7 +417,9 @@ export const ACTIONS = toolSpecs([
 		description:
 			"Creates a donation form. The name is required. Other fields match the shape get_form returns.",
 		input: z.looseObject({ name: z.string().trim().min(1) }),
+		output: OUTPUTS.create_form,
 		annotations: ADD,
+		_meta: statusLines("Creating donation form…", "Donation form created"),
 		checkWith: "list_forms",
 	},
 	{
@@ -397,7 +433,9 @@ export const ACTIONS = toolSpecs([
 			name: z.string().trim().min(1).optional(),
 			confirm: z.literal(true).optional(),
 		}),
-		annotations: DESTRUCTIVE,
+		output: OUTPUTS.update_form,
+		annotations: OVERWRITES,
+		_meta: statusLines("Saving the donation form…", "Donation form saved"),
 		checkWith: "get_form",
 	},
 	{
@@ -411,7 +449,9 @@ export const ACTIONS = toolSpecs([
 			from: date.optional(),
 			to: date.optional(),
 		}),
+		output: OUTPUTS.get_results,
 		annotations: READ,
+		_meta: statusLines("Totaling results…", "Results totaled"),
 	},
 	{
 		tool: "list_donations",
@@ -425,7 +465,9 @@ export const ACTIONS = toolSpecs([
 			to: date.optional(),
 			...page,
 		}),
+		output: OUTPUTS.list_donations,
 		annotations: READ,
+		_meta: statusLines("Listing donations…", "Donations listed"),
 	},
 	{
 		tool: "list_donors",
@@ -434,7 +476,9 @@ export const ACTIONS = toolSpecs([
 		description:
 			"Lists donors with their totals. q matches names and emails. Includes each donor's id.",
 		input: z.strictObject({ q: z.string().optional(), ...page }),
+		output: OUTPUTS.list_donors,
 		annotations: READ,
+		_meta: statusLines("Listing donors…", "Donors listed"),
 	},
 	{
 		tool: "get_donor",
@@ -442,7 +486,9 @@ export const ACTIONS = toolSpecs([
 		title: "Get a donor",
 		description: "Reads one donor and a page of the gifts they have given.",
 		input: z.strictObject({ id, ...page }),
+		output: OUTPUTS.get_donor,
 		annotations: READ,
+		_meta: statusLines("Reading the donor…", "Donor read"),
 	},
 	{
 		tool: "list_recurring_gifts",
@@ -451,7 +497,9 @@ export const ACTIONS = toolSpecs([
 		description:
 			"Lists recurring gifts. This connector cannot change a monthly gift.",
 		input: z.strictObject({ ...page }),
+		output: OUTPUTS.list_recurring_gifts,
 		annotations: READ,
+		_meta: statusLines("Listing monthly gifts…", "Monthly gifts listed"),
 	},
 	{
 		tool: "record_donation",
@@ -469,7 +517,9 @@ export const ACTIONS = toolSpecs([
 			method: z.enum(["cash", "check"]),
 			note: z.string().trim().max(MAX_NOTE).optional(),
 		}),
+		output: OUTPUTS.record_donation,
 		annotations: REPLAYS,
+		_meta: statusLines("Recording the donation…", "Donation recorded"),
 		checkWith: "list_donations",
 	},
 	{
@@ -489,7 +539,9 @@ export const ACTIONS = toolSpecs([
 					`Where the photo goes. On sites with get_content_catalog: "cover" for the cover, "new" to add it after the other photos, or the position of a photo beside the cover to replace it ("0" is the first). Left out, or a position with no photo, it becomes the cover when there is none and otherwise goes after the other photos. On sites with get_block_catalog: the id of the photo block it fills; left out, the first empty one.`,
 				),
 		}),
+		output: OUTPUTS.create_photo_upload_link,
 		annotations: ADD,
+		_meta: statusLines("Making a photo upload link…", "Upload link ready"),
 	},
 ]);
 
