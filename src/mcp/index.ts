@@ -20,7 +20,7 @@ import {
 import type { ActionName, DeploymentClient } from "../deployment";
 import { localeOf } from "../format";
 import { log } from "../log";
-import { actionsFor } from "./actions";
+import { actionsFor, LIVE_EDITS_DRAFT } from "./actions";
 import { LOCAL_TOOLS } from "./local";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 import { loggedName, type ToolSpec } from "./spec";
@@ -189,7 +189,11 @@ function servedSpecs(connection: ToolConnection): ToolSpec[] {
 		connection.actions === null || connection.actions.includes(action);
 	return [
 		...actionsFor(connection.platform).filter((spec) => serves(spec.action)),
-		...LOCAL_TOOLS.filter((spec) => spec.needs.every(serves)),
+		...LOCAL_TOOLS.filter(
+			(spec) =>
+				spec.needs.every(serves) &&
+				(spec.platformOnly !== true || connection.platform),
+		),
 	];
 }
 
@@ -287,6 +291,11 @@ function instructionsFor(
 	if (readOnly) {
 		lines.push(
 			"This connection is read-only: it can view the site but not change anything.",
+		);
+	}
+	if (specs.some((spec) => spec.description.includes(LIVE_EDITS_DRAFT))) {
+		lines.push(
+			"An edit to a live campaign is saved as a draft donors don't see until publish_campaign sends it; get_campaign shows it under pendingDraft.",
 		);
 	}
 	const waiting = specs

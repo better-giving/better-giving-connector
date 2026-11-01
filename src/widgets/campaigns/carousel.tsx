@@ -52,7 +52,8 @@ function useMeta() {
 function CampaignTile(props: {
 	campaign: CampaignCard;
 	imageOrigins: readonly string[];
-	onFollowUp: (prompt: string, done: () => void) => void;
+	/** Never rejects: a failure shows as the carousel's notice. */
+	onFollowUp: (prompt: string) => Promise<void>;
 }) {
 	const { campaign } = props;
 	const money = useMoney();
@@ -90,9 +91,10 @@ function CampaignTile(props: {
 					variant="secondary"
 					class="campaign-action"
 					busy={busy}
-					onClick={() => {
+					onClick={async () => {
 						setBusy(true);
-						props.onFollowUp(action.prompt, () => setBusy(false));
+						await props.onFollowUp(action.prompt);
+						setBusy(false);
 					}}
 				>
 					{action.label}
@@ -105,13 +107,13 @@ function CampaignTile(props: {
 export function Campaigns(props: { data: CampaignsData }) {
 	const { host } = useSession();
 	const [notice, setNotice] = useState<string | null>(null);
-	const ask = (prompt: string, done = () => {}) => {
-		host
-			.sendFollowUp(prompt)
-			.then(() => setNotice(null))
-			.catch(() => setNotice(NOT_SENT))
-			.finally(done)
-			.catch(() => {});
+	const ask = async (prompt: string) => {
+		try {
+			await host.sendFollowUp(prompt);
+			setNotice(null);
+		} catch {
+			setNotice(NOT_SENT);
+		}
 	};
 	const { campaigns, imageOrigins } = props.data;
 

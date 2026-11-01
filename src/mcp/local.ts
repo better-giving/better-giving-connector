@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { READ } from "./actions";
+import { DISCARD_CAMPAIGN_DRAFT } from "./discard-draft";
+import { RECOMMEND_CAMPAIGN_PRESETS } from "./recommend-tool";
 import { type LocalSpec, statusLines } from "./spec";
 
 const profile = z.strictObject({ id: z.string(), name: z.string() });
@@ -28,4 +30,6 @@ export const LOCAL_TOOLS: readonly LocalSpec[] = [
 			return { text: JSON.stringify(structured), structured };
 		},
 	},
+	DISCARD_CAMPAIGN_DRAFT,
+	RECOMMEND_CAMPAIGN_PRESETS,
 ];

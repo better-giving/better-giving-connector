@@ -266,17 +266,19 @@ describe("campaign writes", () => {
 			id: k.id,
 			gifts_go_to: null,
 		});
+		deployment.calls.length = 0;
 		const moved = await tool("publish_campaign", {
 			id: k.id,
 			gifts_go_to: "prog_1",
 		});
 
 		expect(json(published)).toMatchObject({ status: "published" });
-		const { next, problem } = refusal(moved);
-		expect(next).toBe(
-			"This campaign is already live, so where its gifts go can't be changed here. The operator changes it in the Better Giving dashboard.",
-		);
-		expect(problem).toMatchObject({ code: "already_published" });
+		expect(moved.isError).toBeUndefined();
+		expect(textOf(moved).split("\n").slice(0, 2)).toEqual([
+			"Winter coats is already live, with no draft edits pending, so nothing changed.",
+			"Where its gifts go was left as it is: that is set at a campaign's first publish, and the operator changes it in the Better Giving dashboard.",
+		]);
+		expect(deployment.calls.filter((c) => c.method !== "GET")).toEqual([]);
 	});
 
 	test("end_campaign ends it, and every later write says an ended campaign stays ended", async () => {

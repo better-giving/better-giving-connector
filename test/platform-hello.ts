@@ -54,6 +54,7 @@ export const PLATFORM_TOOLS = [
 	"create_photo_upload_link",
 	// the connector's own, offered whatever the hello lists
 	"get_profile",
+	"discard_campaign_draft",
 ];
 
 /** Each Platform tool's contract action, as the fake deployment serves it. */

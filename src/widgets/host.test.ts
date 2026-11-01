@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenAiGlobals } from "./host";
 import { startHost as start } from "./test-dom";

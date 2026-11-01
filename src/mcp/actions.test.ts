@@ -10,7 +10,7 @@ test("the contract's tool names are exactly the tools' names and actions", () =>
 	);
 });
 
-test("Standalone gets the specs as they are; Platform changes eight, and only their wording and inputs", () => {
+test("Standalone gets the specs as they are; Platform changes nine, and only their wording and inputs", () => {
 	expect(actionsFor(false)).toBe(ACTIONS);
 	const platform = actionsFor(true);
 	expect(platform.map((s) => [s.tool, s.action, s.annotations])).toEqual(
@@ -29,6 +29,7 @@ test("Standalone gets the specs as they are; Platform changes eight, and only th
 		"create_campaign",
 		"update_campaign_blocks",
 		"update_campaign_settings",
+		"publish_campaign",
 		"create_form",
 		"update_form",
 		"create_photo_upload_link",
@@ -51,13 +52,14 @@ test("every spec, Platform's and the connector's own included, sets readOnlyHint
 	}
 });
 
-test("only publishing, ending and resetting are destructive; a read never is", () => {
+test("only publishing, ending, resetting and discarding a draft are destructive; a read never is", () => {
 	const destructive = EVERY_SPEC.filter((s) => s.annotations.destructiveHint);
 
 	expect([...new Set(destructive.map((s) => s.tool))]).toEqual([
 		"publish_campaign",
 		"end_campaign",
 		"reset_donation_page",
+		"discard_campaign_draft",
 	]);
 	for (const spec of EVERY_SPEC.filter((s) => s.annotations.readOnlyHint)) {
 		expect(spec.annotations.destructiveHint, spec.tool).toBe(false);

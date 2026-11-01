@@ -1,6 +1,6 @@
 /** @jsxImportSource hono/jsx/dom */
 import type { Child } from "hono/jsx";
-import { type KeyboardEvent, useRef } from "hono/jsx/dom";
+import { type KeyboardEvent, useId, useRef } from "hono/jsx/dom";
 
 /** The option a key moves to from `index` of `count`, or null for a key that doesn't move. */
 function target(key: string, index: number, count: number): number | null {
@@ -21,7 +21,8 @@ function target(key: string, index: number, count: number): number | null {
 }
 
 /**
- * A radio group as one tab stop: the checked option takes focus, arrows (and
+ * A radio group as one tab stop: native radio inputs, each inside a label the
+ * option draws as a card. The checked option takes focus; arrows (and
  * Home/End) check and focus the next, Space or a click checks.
  */
 export function RadioGroup<T extends string>(props: {
@@ -32,7 +33,10 @@ export function RadioGroup<T extends string>(props: {
 	renderOption: (value: T, checked: boolean) => Child;
 	class?: string;
 }) {
+	const name = useId();
 	const group = useRef<HTMLDivElement>(null);
+	// handled here rather than left to the browser, so wrapping, Home/End and
+	// the focus move behave the same in every host frame
 	const onKeyDown = (event: KeyboardEvent, index: number) => {
 		if (event.key === " ") {
 			event.preventDefault();
@@ -44,7 +48,7 @@ export function RadioGroup<T extends string>(props: {
 		event.preventDefault();
 		props.onChange(props.options[next] as T);
 		group.current
-			?.querySelectorAll<HTMLElement>('[role="radio"]')
+			?.querySelectorAll<HTMLInputElement>('input[type="radio"]')
 			[next]?.focus();
 	};
 	return (
@@ -57,17 +61,19 @@ export function RadioGroup<T extends string>(props: {
 			{props.options.map((option, index) => {
 				const checked = option === props.value;
 				return (
-					<div
-						key={option}
-						role="radio"
-						class="radio"
-						aria-checked={checked ? "true" : "false"}
-						tabindex={checked ? 0 : -1}
-						onClick={() => props.onChange(option)}
-						onKeyDown={(event: KeyboardEvent) => onKeyDown(event, index)}
-					>
+					<label key={option} class="radio">
+						<input
+							type="radio"
+							class="radio-input"
+							name={name}
+							value={option}
+							checked={checked}
+							tabindex={checked ? 0 : -1}
+							onChange={() => props.onChange(option)}
+							onKeyDown={(event: KeyboardEvent) => onKeyDown(event, index)}
+						/>
 						{props.renderOption(option, checked)}
-					</div>
+					</label>
 				);
 			})}
 		</div>

@@ -194,17 +194,64 @@
 					"title": {
 						"type": "string",
 						"minLength": 1
+					},
+					"preset": {
+						"description": "Sets up the new draft in the same call: its goal and end date, its donation form's suggested amounts (at most 6), and the theme's starter story for the operator to replace. recommend_campaign_presets suggests the values. Left out, only the draft is created.",
+						"type": "object",
+						"properties": {
+							"theme": {
+								"type": "string",
+								"enum": ["emergency", "year_end", "capital", "giving_day"]
+							},
+							"goal": {
+								"type": "object",
+								"properties": {
+									"amount": {
+										"type": "string",
+										"pattern": "^\\d+(\\.\\d{1,2})?$"
+									},
+									"currency": {
+										"type": "string",
+										"const": "USD"
+									}
+								},
+								"required": ["amount", "currency"],
+								"additionalProperties": false,
+								"description": "An object with a decimal-string amount and a currency, such as {\"amount\": \"100.00\", \"currency\": \"USD\"}. A plain number is refused."
+							},
+							"end_date": {
+								"type": "string",
+								"format": "date",
+								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+							},
+							"suggested_amounts": {
+								"minItems": 1,
+								"maxItems": 6,
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"amount": {
+											"type": "string",
+											"pattern": "^\\d+(\\.\\d{1,2})?$"
+										},
+										"currency": {
+											"type": "string",
+											"const": "USD"
+										}
+									},
+									"required": ["amount", "currency"],
+									"additionalProperties": false,
+									"description": "An object with a decimal-string amount and a currency, such as {\"amount\": \"100.00\", \"currency\": \"USD\"}. A plain number is refused."
+								}
+							}
+						},
+						"required": ["theme", "goal", "end_date", "suggested_amounts"],
+						"additionalProperties": false
 					}
 				},
 				"required": ["title"],
 				"additionalProperties": false
-			},
-			"annotations": {
-				"title": "Create a campaign",
-				"readOnlyHint": false,
-				"destructiveHint": false,
-				"idempotentHint": true,
-				"openWorldHint": true
 			},
 			"outputSchema": {
 				"type": "object",
@@ -282,10 +329,67 @@
 					},
 					"layout": {
 						"type": "string"
+					},
+					"campaign": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"title": {
+								"type": "string"
+							},
+							"version": {
+								"type": "string"
+							},
+							"status": {
+								"type": "string"
+							}
+						},
+						"required": ["id", "title", "status"],
+						"additionalProperties": {}
+					},
+					"steps": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"step": {
+									"type": "string",
+									"enum": ["create", "settings", "form", "page"]
+								},
+								"status": {
+									"type": "string",
+									"enum": ["done", "failed", "skipped"]
+								},
+								"detail": {
+									"type": "string"
+								}
+							},
+							"required": ["step", "status"],
+							"additionalProperties": {}
+						}
+					},
+					"failedStep": {
+						"anyOf": [
+							{
+								"type": "string",
+								"enum": ["create", "settings", "form", "page"]
+							},
+							{
+								"type": "null"
+							}
+						]
 					}
 				},
-				"required": ["id", "title", "status", "public_url"],
 				"additionalProperties": {}
+			},
+			"annotations": {
+				"readOnlyHint": false,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": true,
+				"title": "Create a campaign"
 			},
 			"_meta": {
 				"openai/toolInvocation/invoking": "Creating campaign…",

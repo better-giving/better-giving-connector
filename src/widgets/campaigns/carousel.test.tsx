@@ -3,6 +3,7 @@
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { describe, expect, it } from "vitest";
 import { CAMPAIGNS } from "../../../test/widget-host/fixtures";
+import { formatMoney } from "../../format";
 import { CampaignsData } from "../model";
 import { flush, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
@@ -119,7 +120,11 @@ describe("campaign carousel", () => {
 		expect(
 			card(root, "Spring gala 2026").querySelector(".campaign-amounts")
 				?.textContent,
-		).toBe("12.300,00 $ of 10.000,00 $ · 123%");
+		).toBe(
+			`${formatMoney("12300.00", "USD", "de-DE")} of ${formatMoney("10000.00", "USD", "de-DE")} · 123%`,
+		);
+		// the dollar stays a dollar: German separators, never a conversion to euro
+		expect(formatMoney("12300.00", "USD", "de-DE")).toMatch(/^12\.300,00\s\$$/);
 	});
 
 	it("is one keyboard-scrollable, labelled list", async () => {

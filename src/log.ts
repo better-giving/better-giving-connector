@@ -6,7 +6,11 @@ import { type ActionName, isActionName } from "./deployment";
 // "unknown". `errorName` is the one free string: pass `err.name`, never a message.
 
 /** The tools the connector answers itself, beside the contract's actions; a tool's log line names one or the other. */
-export const LOCAL_TOOL_NAMES = ["get_profile"] as const;
+export const LOCAL_TOOL_NAMES = [
+	"get_profile",
+	"discard_campaign_draft",
+	"recommend_campaign_presets",
+] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 type LoggedTool = ActionName | LocalToolName;
 

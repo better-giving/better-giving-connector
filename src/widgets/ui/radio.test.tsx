@@ -21,11 +21,15 @@ function Harness(props: { initial: string }) {
 }
 
 const radios = (root: HTMLElement) => [
-	...root.querySelectorAll<HTMLElement>('[role="radio"]'),
+	...root.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
 ];
-const checked = (root: HTMLElement) =>
-	radios(root).find((r) => r.getAttribute("aria-checked") === "true")
-		?.textContent;
+const optionText = (radio: Element | null | undefined) =>
+	radio?.closest("label")?.textContent;
+const checked = (root: HTMLElement) => {
+	const on = radios(root).filter((r) => r.checked);
+	expect(on).toHaveLength(1);
+	return optionText(on[0]);
+};
 const press = async (root: HTMLElement, key: string) => {
 	document.activeElement?.dispatchEvent(
 		new KeyboardEvent("keydown", { key, bubbles: true }),
@@ -35,18 +39,21 @@ const press = async (root: HTMLElement, key: string) => {
 };
 
 describe("RadioGroup", () => {
-	it("is one named group with one tab stop, on the checked option", () => {
+	it("is one named group of native radios, one tab stop on the checked option", () => {
 		const root = mount(<Harness initial="Capital" />);
 		const group = root.querySelector('[role="radiogroup"]');
 		expect(group?.getAttribute("aria-label")).toBe("Campaign preset");
 		expect(radios(root).map((r) => r.tabIndex)).toEqual([-1, -1, 0, -1]);
+		expect(new Set(radios(root).map((r) => r.name)).size).toBe(1);
+		expect(radios(root).map(optionText)).toEqual(THEMES);
+		expect(checked(root)).toBe("Capital");
 	});
 
 	it("moves the choice and the focus with the arrow keys, wrapping at the ends", async () => {
 		const root = mount(<Harness initial="Capital" />);
 		radios(root)[2]?.focus();
 		expect(checked(await press(root, "ArrowRight"))).toBe("Giving day");
-		expect(document.activeElement?.textContent).toBe("Giving day");
+		expect(optionText(document.activeElement)).toBe("Giving day");
 		expect(checked(await press(root, "ArrowDown"))).toBe("Emergency");
 		expect(checked(await press(root, "ArrowLeft"))).toBe("Giving day");
 		expect(checked(await press(root, "ArrowUp"))).toBe("Capital");
@@ -60,9 +67,9 @@ describe("RadioGroup", () => {
 		expect(checked(await press(root, "Home"))).toBe("Emergency");
 	});
 
-	it("checks an option on click or Space", async () => {
+	it("checks an option on a click on its card, or Space", async () => {
 		const root = mount(<Harness initial="Emergency" />);
-		radios(root)[3]?.click();
+		radios(root)[3]?.closest("label")?.click();
 		await flush();
 		expect(checked(root)).toBe("Giving day");
 		radios(root)[1]?.focus();

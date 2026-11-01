@@ -72,7 +72,9 @@ const readTools = (platform: boolean) =>
 const expected = (platform: boolean) =>
 	platform
 		? [...PLATFORM_TOOLS].sort()
-		: [...actionsFor(false), ...LOCAL_TOOLS].map((s) => s.tool).sort();
+		: [...actionsFor(false), ...LOCAL_TOOLS.filter((s) => !s.platformOnly)]
+				.map((s) => s.tool)
+				.sort();
 
 describe.each([
 	["Standalone", false],

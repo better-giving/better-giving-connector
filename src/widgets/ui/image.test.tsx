@@ -63,6 +63,16 @@ describe("ImageWithPlaceholder", () => {
 		}
 	});
 
+	it("hides the placeholder from screen readers when it has no alt text", () => {
+		const root = mount(
+			<ImageWithPlaceholder src={null} alt="" origins={ORIGINS} />,
+		);
+		const box = root.querySelector(".image-placeholder");
+		expect(box?.getAttribute("aria-hidden")).toBe("true");
+		expect(box?.hasAttribute("role")).toBe(false);
+		expect(box?.hasAttribute("aria-label")).toBe(false);
+	});
+
 	it("falls back to the placeholder when the image fails to load", async () => {
 		const root = mount(
 			<ImageWithPlaceholder

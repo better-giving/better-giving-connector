@@ -12,6 +12,8 @@ export type ToolReply =
 
 export type Fixture = {
 	result: ToolReply;
+	/** How the host first shows the widget; inline unless the render tool opens fullscreen. */
+	displayMode?: "inline" | "fullscreen";
 	toolInput?: Record<string, unknown>;
 	/** Scripted answers to `callServerTool`, by tool name. */
 	calls?: Record<string, (args: Record<string, unknown>) => ToolReply>;

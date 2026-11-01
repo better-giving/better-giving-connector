@@ -217,13 +217,13 @@ const OVERWRITES: Hints = {
 // Changes what donors can do or see past a plain edit: puts a campaign live,
 // ends it for good, or discards a page's content. Again it does not stack:
 // the campaign is in that state, the page at its default.
-const DESTRUCTIVE: Hints = {
+export const DESTRUCTIVE: Hints = {
 	...OVERWRITES,
 	destructiveHint: true,
 };
 
 // Platform applies an edit to a live campaign at once, so the connector keeps it.
-const LIVE_EDITS_DRAFT =
+export const LIVE_EDITS_DRAFT =
 	"On a live campaign the change is saved as a draft donors don't see, and goes live when publish_campaign is called again.";
 const CONFIRMED =
 	"Donors see this immediately, so the operator confirms it in the chat first.";

@@ -156,6 +156,10 @@ export type FakeDeployment = {
 	uploadPhoto(link: string): string | null;
 	/** Whether a new campaign comes with a form of its own (the default), or has none until one is made for it. */
 	setCampaignForms(on: boolean): void;
+	/** Puts a campaign in place as if it had run, with no form of its own; its id. */
+	seedCampaign(title: string, status: CampaignStatus): string;
+	/** Puts a gift in place, to a campaign or to none, as if a donor had given it. */
+	seedGift(gift: { amount: string; date: string; campaign_id?: string }): void;
 };
 
 export type LostAnswer = "dropped" | "timeout" | "502";
@@ -285,6 +289,8 @@ export function fakeDeployment(
 		setCampaignForms: (on) => {
 			state.campaignForms = on;
 		},
+		seedCampaign: (title, status) => seedCampaign(state, title, status),
+		seedGift: (gift) => seedGift(state, gift),
 	};
 	return fake;
 }
@@ -442,6 +448,56 @@ function uploadPhoto(state: State, link: string): string | null {
 	k.hero = url;
 	k.version++;
 	return url;
+}
+
+function seedCampaign(
+	state: State,
+	title: string,
+	status: CampaignStatus,
+): string {
+	const id = `cmp_${state.seq++}`;
+	state.campaigns.set(id, {
+		id,
+		title,
+		status,
+		everPublished: status !== "draft",
+		blocks: startingBlocks("frm_1"),
+		content: { heading: "" },
+		settings: {
+			goal: null,
+			end_date: null,
+			time_zone: null,
+			sharing: { message: null, channels: null },
+		},
+		created_at: "2024-01-01T00:00:00.000Z",
+		version: 1,
+		story: "",
+		hero: null,
+		uploads: [],
+	});
+	return id;
+}
+
+function seedGift(
+	state: State,
+	gift: { amount: string; date: string; campaign_id?: string },
+): void {
+	const donor: Donor = {
+		id: `dnr_${state.seq++}`,
+		name: "Seeded donor",
+		email: null,
+	};
+	state.donors.set(donor.id, donor);
+	const id = `don_${state.seq++}`;
+	state.donations.set(id, {
+		id,
+		amount: { amount: gift.amount, currency: "USD" },
+		date: gift.date,
+		donor_id: donor.id,
+		campaign_id: gift.campaign_id ?? null,
+		method: "card",
+		note: null,
+	});
 }
 
 const CODE_TTL_MS = 10 * 60_000;

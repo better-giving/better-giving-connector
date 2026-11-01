@@ -145,6 +145,8 @@ test("the sign-in challenge names offline_access as the scope to request", async
 	);
 });
 
+const STANDALONE_LOCAL = LOCAL_TOOLS.filter((s) => s.platformOnly !== true);
+
 const toolNames = async (): Promise<string[]> =>
 	(await rpc(await send("tools/list"))).result.tools.map(
 		(t: { name: string }) => t.name,
@@ -155,7 +157,7 @@ test("a connection with no stated actions offers every tool", async () => {
 
 	const names = await toolNames();
 
-	expect(names).toHaveLength(ACTIONS.length + LOCAL_TOOLS.length);
+	expect(names).toHaveLength(ACTIONS.length + STANDALONE_LOCAL.length);
 	expect(names).toContain("get_profile");
 });
 
@@ -168,7 +170,7 @@ test("tools/list offers only the tools whose action the deployment serves", asyn
 	expect(names).not.toContain("create_photo_upload_link");
 	expect(names).toContain("publish_campaign");
 	expect(names).toContain("list_campaigns");
-	expect(names).toHaveLength(serves.length + LOCAL_TOOLS.length);
+	expect(names).toHaveLength(serves.length + STANDALONE_LOCAL.length);
 });
 
 test("tools/list offers a Platform deployment's tools from the tool names its hello lists", async () => {
@@ -263,7 +265,7 @@ test("every Standalone tool carries its title in its annotations", async () => {
 
 	const { tools } = (await rpc(await send("tools/list"))).result;
 
-	expect(tools).toHaveLength(ACTIONS.length + LOCAL_TOOLS.length);
+	expect(tools).toHaveLength(ACTIONS.length + STANDALONE_LOCAL.length);
 	for (const t of tools as ListedTool[]) {
 		expect(t.title).toMatch(/\S/);
 		expect(t.annotations.title).toBe(t.title);
