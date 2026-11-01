@@ -1,6 +1,7 @@
 import type { z } from "zod";
+import type { CampaignDrafts } from "../db";
 import type { ActionName, DeploymentClient } from "../deployment";
-import type { LocalToolName } from "../log";
+import type { LocalToolName, ToolOutcome } from "../log";
 import type { ToolConnection } from "./run-tool";
 
 /** A tool's hints, every one stated: a client reads a missing hint as its riskiest default. */
@@ -54,6 +55,12 @@ export type ActionSpec<Tool extends string = string> = Common & {
 	action: ActionName;
 	/** A write's read tool: what shows whether it went through when its answer was lost. */
 	checkWith?: NoInfer<Tool>;
+	/**
+	 * Answers the call in place of the plain action when it returns an answer,
+	 * composing actions and the connector's own store; null runs the action as
+	 * usual. A throw is worded as this tool's own failure is.
+	 */
+	compose?: (call: LocalCall) => Promise<LocalAnswer | null>;
 };
 
 /** What a local tool answers: the text the chat reads, and the structured result beside it. */
@@ -67,7 +74,19 @@ export type LocalCall = {
 	locale: string;
 	input: Record<string, unknown>;
 	client: Pick<DeploymentClient, "call">;
+	drafts: CampaignDrafts;
 };
+
+/** A refusal a composed tool words itself: answered as an error with `text`, logged under `outcome`. */
+export class ToolRefusal extends Error {
+	override readonly name = "ToolRefusal";
+	constructor(
+		readonly outcome: ToolOutcome,
+		readonly text: string,
+	) {
+		super("The tool refused the call.");
+	}
+}
 
 /**
  * A tool the connector answers itself, or composes from actions. It is
@@ -77,6 +96,8 @@ export type LocalCall = {
 export type LocalSpec = Common & {
 	tool: LocalToolName;
 	needs: readonly ActionName[];
+	/** Offered on Platform connections alone. */
+	platformOnly?: true;
 	checkWith?: string;
 	run(call: LocalCall): Promise<LocalAnswer>;
 };

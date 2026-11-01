@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
-import type { Connection } from "../db";
+import type { CampaignDrafts, Connection } from "../db";
 import {
 	type DeploymentClient,
 	DeploymentFailed,
@@ -19,13 +19,16 @@ import { answerText } from "./answer";
 import {
 	type ActionSpec,
 	isActionSpec,
+	type LocalAnswer,
 	loggedName,
 	type SummaryContext,
+	ToolRefusal,
 	type ToolSpec,
 } from "./spec";
 
 export type RunToolContext = {
 	client: Pick<DeploymentClient, "call">;
+	drafts: CampaignDrafts;
 	dropConnection(userId: string): Promise<void>;
 };
 
@@ -113,16 +116,18 @@ async function settle(
 	locale: string,
 ): Promise<Settled> {
 	try {
-		if (!isActionSpec(spec)) {
-			const answer = await spec.run({
-				connection,
-				locale,
-				input,
-				client: ctx.client,
-			});
-			const cx = { locale, input, replayed: false };
-			return ok(present(spec, answer.text, answer.structured, cx));
-		}
+		const call = {
+			connection,
+			locale,
+			input,
+			client: ctx.client,
+			drafts: ctx.drafts,
+		};
+		const answered = ({ text, structured }: LocalAnswer) =>
+			ok(present(spec, text, structured, { locale, input, replayed: false }));
+		if (!isActionSpec(spec)) return answered(await spec.run(call));
+		const composed = await spec.compose?.(call);
+		if (composed) return answered(composed);
 		const answer = await ctx.client.call(connection, spec.action, input);
 		const replayed = isKeyedAction(spec.action) && answer.status === 200;
 		const text = await answerText(spec, connection, input, answer, ctx, locale);
@@ -182,6 +187,7 @@ async function failure(
 	ctx: RunToolContext,
 ): Promise<Settled> {
 	const org = connection.orgName;
+	if (error instanceof ToolRefusal) return said(error.outcome, error.text);
 	if (error instanceof KeyRefused) {
 		await ctx.dropConnection(connection.userId);
 		return said(
