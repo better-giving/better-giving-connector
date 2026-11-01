@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { defineConfig, type Plugin } from "vitest/config";
+import {
+	buildWidget,
+	moduleSource,
+	WIDGET_QUERY,
+	widgetEntry,
+} from "./scripts/widget-html.mjs";
 
 const BINARY = /\.(mp4|png|woff2)$/;
 
@@ -22,8 +29,33 @@ function binaryBytes(): Plugin {
 	};
 }
 
+const WIDGET_PREFIX = "\0widget:";
+
+/** `./x.tsx?widget` is the widget's HTML document, matching the esbuild plugin. */
+function widgetHtml(): Plugin {
+	return {
+		name: "widget-html",
+		enforce: "pre",
+		resolveId(source, importer) {
+			if (!source.endsWith(WIDGET_QUERY)) return null;
+			const from = importer
+				? dirname(importer.split("?")[0] ?? importer)
+				: process.cwd();
+			return WIDGET_PREFIX + widgetEntry(source, from);
+		},
+		async load(id) {
+			if (!id.startsWith(WIDGET_PREFIX)) return null;
+			const { html, inputs } = await buildWidget(
+				id.slice(WIDGET_PREFIX.length),
+			);
+			for (const input of inputs) this.addWatchFile(input);
+			return moduleSource(html);
+		},
+	};
+}
+
 export default defineConfig({
-	plugins: [binaryBytes()],
+	plugins: [binaryBytes(), widgetHtml()],
 	test: {
 		include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
 	},

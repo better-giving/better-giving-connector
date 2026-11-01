@@ -1,0 +1,46 @@
+import { describe, expect, it } from "vitest";
+import html from "./fixtures/widget/entry.tsx?widget";
+
+const count = (haystack: string, needle: RegExp) =>
+	haystack.match(needle)?.length ?? 0;
+
+describe("?widget import", () => {
+	it("is one complete HTML document", () => {
+		expect(typeof html).toBe("string");
+		expect(html.startsWith("<!doctype html>")).toBe(true);
+		expect(html).toContain('<meta charset="utf-8">');
+		expect(html).toContain('<meta name="viewport"');
+		expect(html).toContain('<div id="root"></div>');
+		expect(count(html, /<style>/g)).toBe(1);
+		expect(count(html, /<script>/g)).toBe(1);
+	});
+
+	it("inlines the bundle's CSS and its data-URL asset", () => {
+		const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+		expect(style).toContain("color:#639");
+		expect(style).toContain("url(data:image/png;base64,");
+	});
+
+	it("bundles the render call into the script", () => {
+		const script = html.slice(
+			html.indexOf("<script>"),
+			html.lastIndexOf("</script>"),
+		);
+		expect(script).toContain("hello widget");
+		expect(script).toContain("(()=>{");
+	});
+
+	it("loads nothing from outside the document", () => {
+		expect(html).not.toMatch(/<link\b/i);
+		expect(html).not.toMatch(/<(script|img|iframe)\b[^>]*\bsrc=/i);
+		expect(html).not.toMatch(/@import/);
+		expect(html).not.toMatch(/url\((?!data:)/);
+	});
+
+	it("cannot be ended early by the bundle's own text", () => {
+		expect(count(html, /<\/script/gi)).toBe(1);
+		expect(count(html, /<script/gi)).toBe(1);
+		expect(html).not.toContain("<!--");
+		expect(html).toContain("<\\/script>\\x3C!-- \\x3Cscript>");
+	});
+});

@@ -113,6 +113,66 @@ const fixtures: Record<string, { source: string; fires: Rule[] }> = {
 		source: 'import "../db/connections";\n',
 		fires: [],
 	},
+	"src/mcp/ext-apps.ts": {
+		source:
+			'import "@modelcontextprotocol/ext-apps";\nimport "@modelcontextprotocol/ext-apps/app-bridge";\n',
+		fires: ["restricted-import"],
+	},
+	"src/db/ext-apps.ts": {
+		source: 'import "@modelcontextprotocol/ext-apps";\n',
+		fires: ["restricted-import"],
+	},
+	"src/api/ext-apps.ts": {
+		source: 'import "@modelcontextprotocol/ext-apps/react";\n',
+		fires: ["restricted-import"],
+	},
+	"src/mcp/uses-widgets.ts": {
+		source:
+			'import "../widgets/schema";\nimport html from "../widgets/editor/index.tsx?widget";\n',
+		fires: [],
+	},
+	"src/widgets/inside.ts": {
+		source:
+			'import "@modelcontextprotocol/ext-apps";\nimport "@modelcontextprotocol/ext-apps/app-bridge";\n',
+		fires: [],
+	},
+	"src/widgets/vendor.ts": {
+		source:
+			'import "@modelcontextprotocol/server";\nimport "@modelcontextprotocol/server/stdio";\nimport "better-auth/plugins/oauth";\nimport "@better-auth/oauth-provider/client";\nimport "@libsql/client";\nimport "@libsql/client/web";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/reaches-in.ts": {
+		source: [
+			'import "../db/connections";',
+			'import "../auth";',
+			'import "../mcp/run-tool";',
+			'import "../deployment/client";',
+			'import "../connect/page";',
+			'import "../site/page";',
+			'import "../env";',
+			'import "../log";',
+			'import "../secret";',
+			"",
+		].join("\n"),
+		fires: ["restricted-import"],
+	},
+	"src/widgets/editor/reaches-in-deep.ts": {
+		source: 'import "../../db/connections";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/editor/reaches-in-env.ts": {
+		source: 'import "../../env";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/clean.ts": {
+		source:
+			'import "./schema";\nimport "../widgets/schema";\nimport "zod";\nimport "hono/jsx/dom";\n',
+		fires: [],
+	},
+	"src/widgets/reaches-in.test.ts": {
+		source: 'import "../db/connections";\n',
+		fires: [],
+	},
 	"src/console-use.ts": {
 		source: 'console.log("x");\n',
 		fires: ["console"],

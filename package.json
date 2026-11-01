@@ -10,7 +10,7 @@
 	"scripts": {
 		"dev": "tsx watch --import ./scripts/binary-register.mjs --env-file-if-exists=.env.local src/dev.ts",
 		"build": "tsx scripts/build.ts",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.widgets.json",
 		"lint": "biome check .",
 		"format": "sh -c '[ $# -gt 0 ] || { echo \"format: pass the paths to format; pnpm lint checks the whole tree\" >&2; exit 1; }; biome format --write \"$@\"' --",
 		"test": "vitest run",
@@ -32,8 +32,10 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.15",
+		"@modelcontextprotocol/ext-apps": "2.0.4",
 		"@types/node": "24.19.2",
 		"esbuild": "0.28.2",
+		"playwright-core": "1.64.1",
 		"tsx": "4.23.15",
 		"typescript": "7.0.2",
 		"vitest": "5.0.3"

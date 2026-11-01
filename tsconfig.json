@@ -15,6 +15,7 @@
 		"skipLibCheck": true,
 		"noEmit": true
 	},
+	"exclude": ["src/widgets", "test/fixtures/widget"],
 	"include": [
 		"src",
 		"test",
