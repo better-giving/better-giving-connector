@@ -293,6 +293,22 @@ type ToolResult = {
 	content: { text: string }[];
 	structuredContent?: Record<string, unknown>;
 };
+const WIDGET_TOOL_NAMES = [
+	"show_campaign_create",
+	"show_campaigns",
+	"show_campaign_results",
+	"open_campaign_editor",
+	"show_photo",
+	"set_campaign_photo",
+	"app_create_campaign",
+	"app_publish_campaign",
+	"app_end_campaign",
+	"app_get_campaign_editor",
+	"app_save_campaign_edit",
+	"app_set_campaign_photo",
+	"app_photo_upload_link",
+];
+
 const callTool = async (
 	bearer: string,
 	name: string,
@@ -720,6 +736,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 				...TOOLS.map(([name]) => ({ name })),
 				{ name: "get_profile" },
 				{ name: "recommend_campaign_presets" },
+				...WIDGET_TOOL_NAMES.map((name) => ({ name })),
 			]),
 		).toEqual(names(listed));
 		expect(
@@ -833,15 +850,96 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			end_date: day(19),
 		});
 		const dropped = await callTool(bearer, "discard_campaign_draft", { id });
+		const droppedFromCard = await callTool(
+			bearer,
+			"app_discard_campaign_draft",
+			{
+				id,
+			},
+		);
 
 		expect(edited.structuredContent?.saved).toBe("draft");
 		expect(dropped.structuredContent).toEqual({ discarded: true });
+		expect(droppedFromCard.isError).toBeUndefined();
 		// the draft held back from the deployment, then dropped
 		expect(
 			world.dep.calls
 				.slice(sent)
 				.filter((c) => c.method !== "GET")
 				.map((c) => c.path),
+		).toEqual([]);
+		expectCleanScenario();
+	});
+
+	test("the widget tools read, save, publish, end and set a photo without a deployment answer, an argument or a photo address reaching a log line", async () => {
+		const bearer = await world.signIn();
+		const live = world.dep.seedCampaign(arg("widget-live"), "published");
+		const drafted = world.dep.seedCampaign(arg("widget-draft"), "draft");
+		world.dep.seedGift({
+			amount: "40.00",
+			date: "2031-04-02",
+			campaign_id: live,
+		});
+		const photo = {
+			download_url: plant(
+				"arg:photo-url",
+				"https://files.example.org/leak-photo-url-8e3d.png",
+				true,
+			),
+			file_id: arg("photo-file"),
+		};
+		const calls: [string, Record<string, unknown>][] = [
+			["show_campaign_create", {}],
+			["show_campaigns", {}],
+			["show_campaign_results", { id: live }],
+			["open_campaign_editor", { id: live }],
+			["show_photo", { campaign_id: live }],
+			["set_campaign_photo", { campaign_id: drafted, photo }],
+			[
+				"app_create_campaign",
+				{
+					title: arg("preset-title"),
+					theme: "emergency",
+					goal: money(),
+					endDate: day(20),
+					suggestedAmounts: [money()],
+				},
+			],
+			["app_get_campaign_editor", { id: drafted }],
+			[
+				"app_save_campaign_edit",
+				{
+					id: drafted,
+					expectedVersion: null,
+					page: {
+						pageKind: "blocks",
+						blocks: [{ type: "text", body: arg("editor-body") }],
+					},
+				},
+			],
+			["app_publish_campaign", { id: drafted, giftsGoTo: null }],
+			["app_end_campaign", { id: drafted }],
+			[
+				"app_set_campaign_photo",
+				{ id: live, downloadUrl: photo.download_url, alt: arg("photo-alt") },
+			],
+			["app_photo_upload_link", { id: live }],
+		];
+
+		const answered: Record<string, unknown> = {};
+		for (const [name, args] of calls) {
+			const raw = await rpc(
+				await world.sendAs(bearer, "tools/call", { name, arguments: args }),
+			);
+			answered[name] = raw.result
+				? raw.result.isError === true
+					? "error"
+					: "ok"
+				: "rpc error";
+		}
+		expect(Object.keys(answered)).toEqual(calls.map(([name]) => name));
+		expect(
+			Object.entries(answered).filter(([, how]) => how === "rpc error"),
 		).toEqual([]);
 		expectCleanScenario();
 	});

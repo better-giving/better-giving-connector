@@ -426,7 +426,7 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: OVERWRITES,
 	_meta: appMeta("Saving the page…", "Page saved"),
-	needs: [],
+	needs: ["campaigns.get"],
 	async run(call) {
 		const {
 			id: campaignId,

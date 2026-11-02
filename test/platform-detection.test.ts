@@ -224,8 +224,9 @@ test("a failed hello keeps the actions the row stored", async () => {
 
 	expect(names).toContain("create_campaign");
 	expect(names).not.toContain("create_form");
-	// and get_profile and recommend_campaign_presets, which need no action of their own
-	expect(names).toHaveLength(PLATFORM_READS.length + 2);
+	// and the connector's own: get_profile, recommend_campaign_presets and the
+	// eight widget tools whose actions the row holds
+	expect(names).toHaveLength(PLATFORM_READS.length + 2 + 8);
 });
 
 test("a reconnect, a new row, asks hello again", async () => {

@@ -164,6 +164,19 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			create_photo_upload_link: ADD,
 			get_profile: READ,
 			recommend_campaign_presets: READ,
+			show_campaign_create: READ,
+			show_campaigns: READ,
+			show_campaign_results: READ,
+			open_campaign_editor: READ,
+			show_photo: READ,
+			set_campaign_photo: OVERWRITES,
+			app_create_campaign: ADD,
+			app_publish_campaign: DESTRUCTIVE,
+			app_end_campaign: DESTRUCTIVE,
+			app_get_campaign_editor: READ,
+			app_save_campaign_edit: OVERWRITES,
+			app_set_campaign_photo: OVERWRITES,
+			app_photo_upload_link: ADD,
 		});
 	});
 
@@ -193,8 +206,9 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	test("a deployment that serves every action offers every tool", async () => {
 		const names = await connectWith(ALL_ACTIONS);
 
-		// and get_profile and recommend_campaign_presets, which need no action of their own
-		expect(new Set(names).size).toBe(ALL_ACTIONS.length + 2);
+		// and the connector's own: get_profile, recommend_campaign_presets and the
+		// thirteen widget tools, which need no action of their own
+		expect(new Set(names).size).toBe(ALL_ACTIONS.length + 2 + 13);
 	});
 
 	test("the instructions name only the confirm tools the deployment serves", async () => {
@@ -319,6 +333,25 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			create_photo_upload_link: ["target"],
 			get_profile: [],
 			recommend_campaign_presets: [],
+			show_campaign_create: [],
+			show_campaigns: [],
+			show_campaign_results: ["id"],
+			open_campaign_editor: ["id"],
+			show_photo: ["campaign_id"],
+			set_campaign_photo: ["campaign_id", "photo"],
+			app_create_campaign: [
+				"endDate",
+				"goal",
+				"suggestedAmounts",
+				"theme",
+				"title",
+			],
+			app_publish_campaign: ["giftsGoTo", "id"],
+			app_end_campaign: ["id"],
+			app_get_campaign_editor: ["id"],
+			app_save_campaign_edit: ["expectedVersion", "id", "page"],
+			app_set_campaign_photo: ["alt", "downloadUrl", "id"],
+			app_photo_upload_link: ["id"],
 		});
 	});
 

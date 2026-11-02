@@ -24,6 +24,7 @@ import { actionsFor, LIVE_EDITS_DRAFT } from "./actions";
 import { LOCAL_TOOLS } from "./local";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 import { loggedName, type ToolSpec } from "./spec";
+import { registerWidgetResources } from "./widget-resources";
 
 export type McpDeps = {
 	auth: Pick<AuthFacade, "authenticateMcp" | "dropConnection">;
@@ -158,7 +159,7 @@ function connectionServer(
 	const server = new McpServer(
 		{ name: "Better Giving", version: "1.0.0" },
 		{
-			capabilities: { tools: {} },
+			capabilities: { tools: {}, resources: {} },
 			instructions: instructionsFor(connection.orgName, specs, readOnly),
 		},
 	);
@@ -173,6 +174,8 @@ function connectionServer(
 				runTool(spec, connection, input, ctx, localeOf(request.mcpReq._meta)),
 		);
 	}
+	if (specs.some((spec) => "openai/outputTemplate" in spec._meta))
+		registerWidgetResources(server, ctx.publicOrigin);
 	if (readOnly)
 		refuseWrites(
 			server,

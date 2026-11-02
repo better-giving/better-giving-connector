@@ -60,6 +60,9 @@ test("only publishing, ending, resetting and discarding a draft are destructive;
 		"end_campaign",
 		"reset_donation_page",
 		"discard_campaign_draft",
+		"app_publish_campaign",
+		"app_end_campaign",
+		"app_discard_campaign_draft",
 	]);
 	for (const spec of EVERY_SPEC.filter((s) => s.annotations.readOnlyHint)) {
 		expect(spec.annotations.destructiveHint, spec.tool).toBe(false);

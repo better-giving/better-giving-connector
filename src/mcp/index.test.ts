@@ -171,7 +171,10 @@ test("tools/list offers only the tools whose action the deployment serves", asyn
 	expect(names).not.toContain("create_photo_upload_link");
 	expect(names).toContain("publish_campaign");
 	expect(names).toContain("list_campaigns");
-	expect(names).toHaveLength(serves.length + STANDALONE_LOCAL.length);
+	const offered = STANDALONE_LOCAL.filter((s) =>
+		s.needs.every((a) => (serves as string[]).includes(a)),
+	);
+	expect(names).toHaveLength(serves.length + offered.length);
 });
 
 test("tools/list offers a Platform deployment's tools from the tool names its hello lists", async () => {

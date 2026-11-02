@@ -3,6 +3,7 @@ import { READ } from "./actions";
 import { DISCARD_CAMPAIGN_DRAFT } from "./discard-draft";
 import { RECOMMEND_CAMPAIGN_PRESETS } from "./recommend-tool";
 import { type LocalSpec, statusLines } from "./spec";
+import { WIDGET_TOOLS } from "./widget-tools";
 
 const profile = z.strictObject({ id: z.string(), name: z.string() });
 
@@ -32,4 +33,5 @@ export const LOCAL_TOOLS: readonly LocalSpec[] = [
 	},
 	DISCARD_CAMPAIGN_DRAFT,
 	RECOMMEND_CAMPAIGN_PRESETS,
+	...WIDGET_TOOLS,
 ];
