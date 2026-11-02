@@ -42,12 +42,18 @@ export function formatMoney(
 	amount: string,
 	currency: string,
 	locale: string,
+	options: { dropZeroCents?: boolean } = {},
 ): string {
 	if (!DECIMAL.test(amount)) throw new RangeError("amount is not a decimal");
+	// `dropZeroCents` writes a whole amount without its cents ($25,000); one
+	// with cents keeps them.
+	const whole = options.dropZeroCents === true && /^-?\d+(\.0+)?$/.test(amount);
 	// A string is formatted as the exact decimal, never through a float.
-	return new Intl.NumberFormat(locale, { style: "currency", currency }).format(
-		amount as Intl.StringNumericLiteral,
-	);
+	return new Intl.NumberFormat(locale, {
+		style: "currency",
+		currency,
+		...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+	}).format(amount as Intl.StringNumericLiteral);
 }
 
 /**

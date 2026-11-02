@@ -18,6 +18,13 @@ export function useDate(): (
 	return (iso, options) => formatDate(iso, locale, options);
 }
 
+/** Like `useMoney`, but a whole amount drops its cents: $25,000, not $25,000.00. */
+export function useWholeMoney(): (money: Money) => string {
+	const locale = useLocale();
+	return (money) =>
+		formatMoney(money.amount, money.currency, locale, { dropZeroCents: true });
+}
+
 export function MoneyText(props: { value: Money }) {
 	return <>{useMoney()(props.value)}</>;
 }

@@ -114,8 +114,8 @@ export const CREATE: CampaignCreateData = {
 	presets: [
 		{
 			theme: "emergency",
-			title: "Emergency: Winter shelter",
-			goal: usd("5000.00"),
+			title: "Storm relief — Visayas",
+			goal: usd("25000.00"),
 			endDate: "2026-12-15",
 			suggestedAmounts: [
 				usd("25.00"),
@@ -127,7 +127,7 @@ export const CREATE: CampaignCreateData = {
 		{
 			theme: "year_end",
 			title: "Year-end appeal 2026",
-			goal: usd("10000.00"),
+			goal: usd("60000.00"),
 			endDate: "2026-12-31",
 			suggestedAmounts: [
 				usd("50.00"),
@@ -138,44 +138,42 @@ export const CREATE: CampaignCreateData = {
 		},
 		{
 			theme: "capital",
-			title: "Capital campaign: New kitchen",
-			goal: usd("25000.00"),
-			endDate: "2027-03-31",
+			title: "New learning center",
+			goal: usd("250000.00"),
+			endDate: "2027-06-30",
 			suggestedAmounts: [
 				usd("100.00"),
 				usd("500.00"),
 				usd("1000.00"),
-				usd("2500.00"),
+				usd("5000.00"),
 			],
 		},
 		{
 			theme: "giving_day",
-			title: "Giving Day 2027",
-			goal: usd("3000.00"),
-			endDate: "2027-02-12",
+			title: "GivingTuesday 2026",
+			goal: usd("15000.00"),
+			endDate: "2026-12-02",
 			suggestedAmounts: [
-				usd("10.00"),
-				usd("25.00"),
-				usd("50.00"),
-				usd("100.00"),
+				usd("20.00"),
+				usd("40.00"),
+				usd("75.00"),
+				usd("150.00"),
 			],
 		},
 	],
 	recommendations: {
 		basedOnHistory: true,
 		goal: {
-			value: usd("5000.00"),
-			evidence:
-				"Your last 3 campaigns raised $3,100 to $12,300; this sits near the middle.",
+			value: usd("25000.00"),
+			evidence: "Last emergency raised $21,480 in 18 days.",
 		},
 		suggestedAmounts: {
-			value: [usd("25.00"), usd("50.00"), usd("100.00"), usd("250.00")],
-			evidence: "Most of your 412 gifts were between $25 and $250.",
+			value: [usd("50.00")],
+			evidence: "38% of 412 gifts — put it 2nd.",
 		},
 		endDays: {
-			value: 30,
-			evidence:
-				"Your campaigns that ran about 30 days raised the most per day.",
+			value: 21,
+			evidence: "82% of gifts came in the first 14 days.",
 		},
 		theme: {
 			value: "emergency",

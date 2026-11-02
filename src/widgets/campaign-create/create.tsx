@@ -7,9 +7,10 @@ import { Card } from "../ui/card";
 import { Check } from "../ui/check";
 import { RadioGroup } from "../ui/radio";
 import { useWidgetState } from "../ui/state";
-import { useDate, useMoney } from "../ui/text";
+import { useDate, useWholeMoney } from "../ui/text";
 import { callTool } from "../ui/tools";
 import { useSession } from "../ui/widget";
+import { ThemeArt } from "./art";
 import "./create.css";
 
 const isTheme = (value: unknown): value is ThemeName =>
@@ -24,36 +25,45 @@ const STEP_LABEL: Record<CreateResult["steps"][number]["step"], string> = {
 };
 
 function PresetCard(props: { preset: Preset; checked: boolean }) {
-	const money = useMoney();
+	const money = useWholeMoney();
 	const date = useDate();
 	const { preset } = props;
 	return (
 		<div class={props.checked ? "preset preset-checked" : "preset"}>
-			<span class="preset-theme">
-				{THEMES[preset.theme].label}
-				{props.checked && <span class="preset-picked">✓ Selected</span>}
-			</span>
-			<strong class="preset-title">{preset.title}</strong>
-			<dl class="preset-facts">
-				<div>
-					<dt>Goal</dt>
-					<dd>{money(preset.goal)}</dd>
-				</div>
-				<div>
-					<dt>Ends</dt>
-					<dd>{date(preset.endDate)}</dd>
-				</div>
-				<div>
-					<dt>Gift amounts</dt>
-					<dd>{preset.suggestedAmounts.map(money).join(", ")}</dd>
-				</div>
-			</dl>
+			<div class="preset-media">
+				<ThemeArt theme={preset.theme} />
+				{props.checked && (
+					<span class="preset-badge" aria-hidden="true">
+						✓
+					</span>
+				)}
+			</div>
+			<div class="preset-body">
+				<span class="preset-theme">
+					{THEMES[preset.theme].label}
+					{props.checked && <span class="sr-only"> (selected)</span>}
+				</span>
+				<strong class="preset-title">{preset.title}</strong>
+				<p class="preset-line">
+					Goal <b>{money(preset.goal)}</b>
+				</p>
+				<p class="preset-line">
+					Ends {date(preset.endDate, { month: "short", day: "numeric" })}
+				</p>
+				<ul class="pills" aria-label="Gift amounts">
+					{preset.suggestedAmounts.map((a) => (
+						<li key={a.amount} class="pill-amount">
+							{money(a)}
+						</li>
+					))}
+				</ul>
+			</div>
 		</div>
 	);
 }
 
 function Recommendations(props: { data: CampaignCreateData }) {
-	const money = useMoney();
+	const money = useWholeMoney();
 	const { recommendations: r } = props.data;
 	const items = [
 		{ name: "Goal", value: money(r.goal.value), evidence: r.goal.evidence },
@@ -133,6 +143,7 @@ function Created(props: { result: CreateResult; onOpen: () => void }) {
 
 export function CampaignCreate(props: { data: CampaignCreateData }) {
 	const { host } = useSession();
+	const money = useWholeMoney();
 	const { data } = props;
 	const [theme, setTheme] = useWidgetState<ThemeName>(
 		"preset",
@@ -174,8 +185,22 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 	if (created) {
 		return <Created result={created} onOpen={() => void openEditor(created)} />;
 	}
+	const date = useDate();
+	const summary = preset
+		? `${preset.title} · ${money(preset.goal)} by ${date(preset.endDate)}`
+		: "";
 	return (
-		<section class="create stack">
+		<Card class="create" label="Start a campaign">
+			<div class="head">
+				<div>
+					<h2 class="title">Start a campaign</h2>
+					<p class="subtitle">
+						Pick a starting point. Everything stays editable — nothing goes live
+						until you publish.
+					</p>
+				</div>
+				<span class="chip chip-draft">Draft</span>
+			</div>
 			<RadioGroup
 				class="presets"
 				label="Campaign preset"
@@ -188,30 +213,30 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 				}}
 			/>
 			<Recommendations data={data} />
-			<div class="row">
-				<Button
-					variant="primary"
-					busy={busy === "create"}
-					disabled={busy !== null}
-					onClick={() => void create("stay")}
-				>
-					Create draft
-				</Button>
-				<Button
-					variant="secondary"
-					busy={busy === "customize"}
-					disabled={busy !== null}
-					onClick={() => void create("edit")}
-				>
-					Customize
-				</Button>
-				<span class="hint">
-					A draft is invisible to donors until you publish it.
-				</span>
-			</div>
 			<p class="error-line" role="alert">
 				{error}
 			</p>
-		</section>
+			<div class="foot">
+				<span class="summary">{summary}</span>
+				<div class="foot-actions">
+					<Button
+						variant="secondary"
+						busy={busy === "customize"}
+						disabled={busy !== null}
+						onClick={() => void create("edit")}
+					>
+						Customize
+					</Button>
+					<Button
+						variant="primary"
+						busy={busy === "create"}
+						disabled={busy !== null}
+						onClick={() => void create("stay")}
+					>
+						Create draft
+					</Button>
+				</div>
+			</div>
+		</Card>
 	);
 }
