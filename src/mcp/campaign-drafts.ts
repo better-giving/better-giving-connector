@@ -72,6 +72,8 @@ export async function readCampaign(
 	return isBody(body) ? body : {};
 }
 
+export const DRAFT_MOVED =
+	"Nothing was saved: this campaign's draft changed while the edit was being made. Read it again with get_campaign and re-make the edit.";
 export const STALE_DRAFT =
 	"This campaign changed since the draft was started. Read it again with get_campaign and re-make the edit.";
 const STALE_READ =
@@ -123,11 +125,11 @@ export async function saveLiveCampaignEdit(
 	const key = keyOf(deps, campaignId);
 	const stored = await deps.drafts.get(key);
 	const baseVersion = stored ? stored.baseVersion : current;
-	await deps.drafts.put({
-		...key,
-		baseVersion,
-		...mergeDraft(stored, edit),
-	});
+	const kept = await deps.drafts.put(
+		{ ...key, baseVersion, ...mergeDraft(stored, edit) },
+		stored?.revision ?? null,
+	);
+	if (!kept) throw new ToolRefusal("rejected", DRAFT_MOVED);
 	return { saved: "draft", campaign_id: campaignId, base_version: baseVersion };
 }
 
@@ -210,7 +212,7 @@ export async function publishLiveCampaignDraft(
 
 	const [first, second] = writes;
 	if (!first) {
-		await deps.drafts.delete(key);
+		await deps.drafts.delete(key, draft.revision);
 		return { campaign, applied: [], pending: [] };
 	}
 	let landed: Body;
@@ -221,20 +223,23 @@ export async function publishLiveCampaignDraft(
 		throw error;
 	}
 	if (!second) {
-		await deps.drafts.delete(key);
+		await deps.drafts.delete(key, draft.revision);
 		return { campaign: landed, applied: [first.part], pending: [] };
 	}
 	const version = versionOf(landed) ?? null;
 	try {
 		landed = await second.send(version);
 	} catch (error) {
-		await deps.drafts.put({
-			...key,
-			baseVersion: version,
-			settings: null,
-			page: draft.page,
-			pageKind: draft.pageKind,
-		});
+		await deps.drafts.put(
+			{
+				...key,
+				baseVersion: version,
+				settings: null,
+				page: draft.page,
+				pageKind: draft.pageKind,
+			},
+			draft.revision,
+		);
 		if (!isStepFailure(error)) throw error;
 		return {
 			campaign: landed,
@@ -243,7 +248,7 @@ export async function publishLiveCampaignDraft(
 			failure: failureDetail(error),
 		};
 	}
-	await deps.drafts.delete(key);
+	await deps.drafts.delete(key, draft.revision);
 	return { campaign: landed, applied: [first.part, second.part], pending: [] };
 }
 

@@ -133,7 +133,7 @@ const INSERT =
 	"INSERT INTO campaign_draft (user_id, origin, campaign_id, base_version, settings, page, page_kind, updated_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 // Random, not 1: a draft deleted and stored again must refuse a revision read
-// from the deleted one. Never 0, which 0005 gave rows already stored.
+// from the deleted one.
 const firstRevision = () => randomInt(1, 2 ** 47);
 
 // A NULL column, or one JSON can't read, is "not edited" (null).
