@@ -71,11 +71,13 @@ export function hostPage(options: {
 	theme: Theme;
 	fullscreen: boolean;
 	openai?: OpenAiSeed;
+	/** The chat column's width; a wider host shows more of a carousel. */
+	column?: number;
 }): string {
 	const { bg, fg } = BACKDROP[options.theme];
 	const column = options.fullscreen
 		? "width:100%;height:100vh;"
-		: `width:100%;max-width:${COLUMN}px;margin:0 auto;padding:24px 16px;`;
+		: `width:100%;max-width:${options.column ?? COLUMN}px;margin:0 auto;padding:24px 16px;`;
 	const frameHeight = options.fullscreen ? "100%" : "120px";
 	return `<!doctype html>
 <html lang="en" style="color-scheme:${options.theme}">

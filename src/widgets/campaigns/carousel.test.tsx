@@ -51,7 +51,7 @@ describe("campaign carousel", () => {
 		const gala = card(root, "Spring gala 2026");
 		expect(gala.querySelector(".chip")?.textContent).toBe("Ended");
 		expect(gala.querySelector(".campaign-amounts")?.textContent).toBe(
-			"$12,300.00 of $10,000.00 · 123%",
+			"$12,300 of $10,000123%",
 		);
 		const bar = gala.querySelector('[role="progressbar"]');
 		expect(bar?.getAttribute("aria-valuenow")).toBe("100");
@@ -65,7 +65,7 @@ describe("campaign carousel", () => {
 			"Giving Tuesday neighbor-to-neighbor match for families across the harbor district",
 		);
 		expect(tuesday.querySelector(".campaign-amounts")?.textContent).toBe(
-			"$1,875.00 raised",
+			"$1,875 raised",
 		);
 		expect(tuesday.querySelector('[role="progressbar"]')).toBeNull();
 		expect(tuesday.querySelector(".campaign-meta")?.textContent).toBe(
@@ -124,7 +124,7 @@ describe("campaign carousel", () => {
 			card(root, "Spring gala 2026").querySelector(".campaign-amounts")
 				?.textContent,
 		).toBe(
-			`${formatMoney("12300.00", "USD", "de-DE")} of ${formatMoney("10000.00", "USD", "de-DE")} · 123%`,
+			`${formatMoney("12300.00", "USD", "de-DE", { dropZeroCents: true })} of ${formatMoney("10000.00", "USD", "de-DE", { dropZeroCents: true })}123%`,
 		);
 		// the dollar stays a dollar: German separators, never a conversion to euro
 		expect(formatMoney("12300.00", "USD", "de-DE")).toMatch(/^12\.300,00\s\$$/);

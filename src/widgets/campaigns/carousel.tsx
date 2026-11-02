@@ -7,7 +7,7 @@ import { StatusChip } from "../ui/chip";
 import { ImageWithPlaceholder } from "../ui/image";
 import { ProgressBar, percentOf } from "../ui/progress";
 import { EmptyState } from "../ui/states";
-import { useDate, useMoney } from "../ui/text";
+import { useDate, useWholeMoney } from "../ui/text";
 import { useLocale, useSession } from "../ui/widget";
 import "./carousel.css";
 
@@ -56,7 +56,7 @@ function CampaignTile(props: {
 	onFollowUp: (prompt: string) => Promise<void>;
 }) {
 	const { campaign } = props;
-	const money = useMoney();
+	const money = useWholeMoney();
 	const meta = useMeta();
 	const [busy, setBusy] = useState(false);
 	const percent = percentOf(campaign.raised, campaign.goal);
@@ -67,21 +67,29 @@ function CampaignTile(props: {
 			<Card
 				class="campaign"
 				media={
-					<ImageWithPlaceholder
-						src={campaign.imageUrl}
-						alt=""
-						origins={props.imageOrigins}
-					/>
+					<div class="campaign-media">
+						<ImageWithPlaceholder
+							src={campaign.imageUrl}
+							alt=""
+							origins={props.imageOrigins}
+						/>
+						<span class="campaign-chip">
+							<StatusChip status={campaign.status} />
+						</span>
+					</div>
 				}
 			>
-				<StatusChip status={campaign.status} />
 				<h3 class="campaign-title" id={titleId}>
 					{campaign.title}
 				</h3>
 				<p class="campaign-amounts">
-					{campaign.goal && percent !== null
-						? `${money(campaign.raised)} of ${money(campaign.goal)} · ${percent}%`
-						: `${money(campaign.raised)} raised`}
+					<strong>{money(campaign.raised)}</strong>
+					<span class="muted">
+						{campaign.goal ? ` of ${money(campaign.goal)}` : " raised"}
+					</span>
+					{campaign.goal && percent !== null && (
+						<span class="campaign-percent">{percent}%</span>
+					)}
 				</p>
 				{percent !== null && (
 					<ProgressBar percent={percent} label="Raised of goal" />

@@ -26,6 +26,8 @@ export type Fixture = {
 	calls?: Record<string, (args: Record<string, unknown>) => ToolReply>;
 	/** Buttons the screenshot presses, by accessible name, once the widget has rendered. */
 	click?: string[];
+	/** The chat column's width in px, where it isn't the default. */
+	column?: number;
 };
 
 export const IMAGE_ORIGINS = [
@@ -300,7 +302,7 @@ export const PHOTO: PhotoData = {
 
 export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 	campaigns: {
-		five: { result: { structuredContent: CAMPAIGNS } },
+		five: { result: { structuredContent: CAMPAIGNS }, column: 1040 },
 		empty: {
 			result: {
 				structuredContent: { ...CAMPAIGNS, campaigns: [] },

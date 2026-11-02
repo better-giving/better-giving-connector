@@ -85,7 +85,13 @@ export async function showWidget(
 			}
 		: undefined;
 	await page.setContent(
-		hostPage({ html, theme: options.theme, fullscreen, openai }),
+		hostPage({
+			html,
+			theme: options.theme,
+			fullscreen,
+			openai,
+			column: fixture.column,
+		}),
 	);
 	await withTimeout(fake.served, "the widget never initialized");
 	if (!fullscreen) await withTimeout(sized.promise, "the widget never sized");
