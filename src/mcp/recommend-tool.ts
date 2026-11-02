@@ -51,7 +51,8 @@ async function readPages<T>(
 				...(cursor === undefined ? {} : { cursor }),
 			})
 		).body;
-		const data = isBody(answer) && Array.isArray(answer.data) ? answer.data : [];
+		const data =
+			isBody(answer) && Array.isArray(answer.data) ? answer.data : [];
 		for (const raw of data) {
 			const parsed = item.safeParse(raw);
 			if (parsed.success) items.push(parsed.data);
@@ -110,14 +111,20 @@ export const RECOMMEND_CAMPAIGN_PRESETS: LocalSpec = {
 		theme: z
 			.enum(THEME_NAMES)
 			.optional()
-			.describe("Recommend for this kind of appeal rather than the one history points to."),
+			.describe(
+				"Recommend for this kind of appeal rather than the one history points to.",
+			),
 	}),
 	output: {
 		schema: recommendations,
 		summary: (body, { locale }) => {
 			const r = body as z.output<typeof recommendations>;
 			const label = anAppeal(r.theme.value);
-			const goal = formatMoney(r.goal.value.amount, r.goal.value.currency, locale);
+			const goal = formatMoney(
+				r.goal.value.amount,
+				r.goal.value.currency,
+				locale,
+			);
 			const rest = `a goal of ${goal}, ${r.suggestedAmounts.value.length} suggested amounts and a ${r.endDays.value}-day run`;
 			return r.basedOnHistory
 				? `Recommended from your history: ${label} with ${rest}.`

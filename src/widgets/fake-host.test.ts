@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { connectHost } from "./host";
-import { flush, linkedPair } from "./test-dom";
 import { startFakeHost } from "../../test/widget-host/fake-host";
 import { CAMPAIGNS, type Fixture } from "../../test/widget-host/fixtures";
+import { connectHost } from "./host";
+import { flush, linkedPair } from "./test-dom";
 
 async function connect(fixture: Fixture, theme: "light" | "dark" = "dark") {
 	const [viewSide, hostSide] = linkedPair();
@@ -57,9 +57,11 @@ describe("fake host", () => {
 				}),
 			},
 		});
-		expect(
-			await host.callTool("publish_campaign_app", { id: "c-1" }),
-		).toEqual({ ok: true, data: { published: "c-1" }, text: "Published." });
+		expect(await host.callTool("publish_campaign_app", { id: "c-1" })).toEqual({
+			ok: true,
+			data: { published: "c-1" },
+			text: "Published.",
+		});
 		expect(await host.callTool("end_campaign_app", {})).toEqual({
 			ok: false,
 			error: "The fake host has no scripted answer for end_campaign_app.",

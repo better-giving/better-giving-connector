@@ -81,6 +81,7 @@ export function mcpRequest(
 			params: {
 				...params,
 				_meta: {
+					...(params?._meta as Record<string, unknown> | undefined),
 					[PROTOCOL_VERSION_META_KEY]: version,
 					[CLIENT_INFO_META_KEY]: CLIENT_INFO,
 					[CLIENT_CAPABILITIES_META_KEY]: {},

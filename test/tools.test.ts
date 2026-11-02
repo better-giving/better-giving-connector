@@ -163,6 +163,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			record_donation: { ...ADD, idempotentHint: true },
 			create_photo_upload_link: ADD,
 			get_profile: READ,
+			recommend_campaign_presets: READ,
 		});
 	});
 
@@ -192,8 +193,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 	test("a deployment that serves every action offers every tool", async () => {
 		const names = await connectWith(ALL_ACTIONS);
 
-		// and get_profile, which needs no action
-		expect(new Set(names).size).toBe(ALL_ACTIONS.length + 1);
+		// and get_profile and recommend_campaign_presets, which need no action of their own
+		expect(new Set(names).size).toBe(ALL_ACTIONS.length + 2);
 	});
 
 	test("the instructions name only the confirm tools the deployment serves", async () => {
@@ -317,6 +318,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			record_donation: ["amount", "date", "donor", "method"],
 			create_photo_upload_link: ["target"],
 			get_profile: [],
+			recommend_campaign_presets: [],
 		});
 	});
 

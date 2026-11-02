@@ -269,7 +269,9 @@ test("publishing a live campaign sends its settings at the draft's base version,
 		expected_version: String(Number(k.version) + 1),
 	});
 	// the page carries the draft's goal, not the one it was read with
-	expect((sent[1]?.body as { blocks: unknown }).blocks).toContainEqual({
+	expect(
+		(sent[1]?.body as { blocks: unknown } | undefined)?.blocks,
+	).toContainEqual({
 		type: "goal-bar",
 		goal: usd("5000.00"),
 	});

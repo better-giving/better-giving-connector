@@ -52,6 +52,7 @@ export const PLATFORM_TOOLS = [
 	"get_donor",
 	"list_recurring_gifts",
 	"create_photo_upload_link",
+	"recommend_campaign_presets",
 	// the connector's own, offered whatever the hello lists
 	"get_profile",
 	"discard_campaign_draft",

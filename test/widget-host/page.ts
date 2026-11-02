@@ -89,7 +89,7 @@ addEventListener("message", (event) => {
 	if (event.source === frame().contentWindow) window.${RELAY.toHost}(event.data);
 });
 window.${RELAY.toWidget} = (message) => frame().contentWindow.postMessage(message, "*");
-window.${RELAY.resize} = (height) => { ${options.fullscreen ? "" : 'frame().style.height = `${Math.ceil(height)}px`;'} };
+window.${RELAY.resize} = (height) => { ${options.fullscreen ? "" : "frame().style.height = `${Math.ceil(height)}px`;"} };
 </script></head>
 <body><main><iframe id="widget" title="Widget" srcdoc="${escapeAttribute(widgetDocument(options.html, options.openai))}"></iframe></main></body></html>`;
 }

@@ -2418,6 +2418,129 @@
 				"openai/toolInvocation/invoked": "Account read",
 				"openai/profile": true
 			}
+		},
+		{
+			"name": "recommend_campaign_presets",
+			"title": "Recommend campaign settings",
+			"description": "Recommends a new campaign's goal, suggested amounts, run length (endDays, days from publish to the end date) and theme from the nonprofit's ended campaigns and its gifts, each with a sentence of evidence. With little history, each is the theme's starting point and basedOnHistory is false. Use the values as create_campaign's preset, with end_date endDays after today.",
+			"inputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"theme": {
+						"description": "Recommend for this kind of appeal rather than the one history points to.",
+						"type": "string",
+						"enum": ["emergency", "year_end", "capital", "giving_day"]
+					}
+				},
+				"additionalProperties": false
+			},
+			"outputSchema": {
+				"type": "object",
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"properties": {
+					"basedOnHistory": {
+						"type": "boolean"
+					},
+					"goal": {
+						"type": "object",
+						"properties": {
+							"value": {
+								"type": "object",
+								"properties": {
+									"amount": {
+										"type": "string"
+									},
+									"currency": {
+										"type": "string"
+									}
+								},
+								"required": ["amount", "currency"],
+								"additionalProperties": {}
+							},
+							"evidence": {
+								"type": "string"
+							}
+						},
+						"required": ["value", "evidence"],
+						"additionalProperties": {}
+					},
+					"suggestedAmounts": {
+						"type": "object",
+						"properties": {
+							"value": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"amount": {
+											"type": "string"
+										},
+										"currency": {
+											"type": "string"
+										}
+									},
+									"required": ["amount", "currency"],
+									"additionalProperties": {}
+								}
+							},
+							"evidence": {
+								"type": "string"
+							}
+						},
+						"required": ["value", "evidence"],
+						"additionalProperties": {}
+					},
+					"endDays": {
+						"type": "object",
+						"properties": {
+							"value": {
+								"type": "integer",
+								"exclusiveMinimum": 0,
+								"maximum": 9007199254740991
+							},
+							"evidence": {
+								"type": "string"
+							}
+						},
+						"required": ["value", "evidence"],
+						"additionalProperties": {}
+					},
+					"theme": {
+						"type": "object",
+						"properties": {
+							"value": {
+								"type": "string",
+								"enum": ["emergency", "year_end", "capital", "giving_day"]
+							},
+							"evidence": {
+								"type": "string"
+							}
+						},
+						"required": ["value", "evidence"],
+						"additionalProperties": {}
+					}
+				},
+				"required": [
+					"basedOnHistory",
+					"goal",
+					"suggestedAmounts",
+					"endDays",
+					"theme"
+				],
+				"additionalProperties": {}
+			},
+			"annotations": {
+				"readOnlyHint": true,
+				"destructiveHint": false,
+				"idempotentHint": true,
+				"openWorldHint": false,
+				"title": "Recommend campaign settings"
+			},
+			"_meta": {
+				"openai/toolInvocation/invoking": "Reading past campaigns and gifts…",
+				"openai/toolInvocation/invoked": "Recommendations ready"
+			}
 		}
 	]
 }

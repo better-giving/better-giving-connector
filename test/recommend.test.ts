@@ -130,7 +130,9 @@ test("it reads only: ended campaigns, results and gifts, each a GET", async () =
 	await recommend();
 
 	expect(
-		deployment.calls.map((c) => `${c.method} ${c.path} ${JSON.stringify(c.query)}`),
+		deployment.calls.map(
+			(c) => `${c.method} ${c.path} ${JSON.stringify(c.query)}`,
+		),
 	).toEqual([
 		'GET /connector/v1/campaigns {"status":"ended","limit":"100"}',
 		"GET /connector/v1/results {}",
@@ -158,7 +160,11 @@ test("money and the summary read in the request's locale, in the gifts' own curr
 
 test("below the threshold, every field is the theme's default and says it is a starting point", async () => {
 	const only = deployment.seedCampaign("Spring meals", "ended");
-	deployment.seedGift({ amount: "40.00", date: "2026-03-01", campaign_id: only });
+	deployment.seedGift({
+		amount: "40.00",
+		date: "2026-03-01",
+		campaign_id: only,
+	});
 
 	const result = await recommend({ theme: "capital" });
 
@@ -212,7 +218,10 @@ test("a deployment's failure is worded as get_results words the same failure", a
 		new URL(req.url).pathname === "/connector/v1/results"
 			? Response.json(
 					{ type: "about:blank", title: "Server error", status: 500 },
-					{ status: 500, headers: { "content-type": "application/problem+json" } },
+					{
+						status: 500,
+						headers: { "content-type": "application/problem+json" },
+					},
 				)
 			: undefined,
 	);

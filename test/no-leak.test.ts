@@ -217,9 +217,9 @@ const deployments: FakeDeployment[] = [];
 // where a moved site answers hello, so a permanent hop is confirmed as a move
 let movedTo: FakeDeployment;
 
-async function startWorld() {
+async function startWorld(platform = false) {
 	const db = await freshDb();
-	const dep = fakeDeployment({ name: ORG });
+	const dep = fakeDeployment({ name: ORG, platform });
 	movedTo = fakeDeployment({ host: "moved.example.org", name: ORG });
 	deployments.push(dep, movedTo);
 	const net = sentinelled(fakeNetwork(dep, movedTo));
@@ -424,8 +424,9 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		const tools = await rpc(await world.sendAs(bearer, "tools/list"));
 
 		expect(init.result.instructions).toContain(ORG);
+		// the draft tool is a Platform connection's alone
 		expect(tools.result.tools).toHaveLength(
-			ACTIONS.length + LOCAL_TOOLS.length,
+			ACTIONS.length + LOCAL_TOOLS.filter((t) => !t.platformOnly).length,
 		);
 		expect(world.dep.issuedKeys).toHaveLength(1);
 		expectCleanScenario();
@@ -715,10 +716,18 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			tools.map((t) => t.name).toSorted();
 		// get_profile, asking the deployment nothing, has its own scenario below.
 		expect(
-			names([...TOOLS.map(([name]) => ({ name })), { name: "get_profile" }]),
+			names([
+				...TOOLS.map(([name]) => ({ name })),
+				{ name: "get_profile" },
+				{ name: "recommend_campaign_presets" },
+			]),
 		).toEqual(names(listed));
 		expect(
-			names([...ACTIONS, ...LOCAL_TOOLS].map((a) => ({ name: a.tool }))),
+			names(
+				[...ACTIONS, ...LOCAL_TOOLS.filter((t) => !t.platformOnly)].map(
+					(a) => ({ name: a.tool }),
+				),
+			),
 		).toEqual(names(listed));
 	});
 
@@ -781,6 +790,59 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		]);
 		expect(JSON.stringify(result)).not.toContain(world.dep.host);
 		expect(world.dep.calls.length).toBe(sent);
+		expectCleanScenario();
+	});
+
+	test("recommend_campaign_presets reads the history and answers it without the deployment's answers reaching a log line", async () => {
+		const bearer = await world.signIn();
+		for (let i = 0; i < 3; i++) {
+			world.dep.seedCampaign(arg(`past-campaign-${i}`), "ended");
+		}
+		world.dep.seedGift({ amount: "40.00", date: "2031-04-02" });
+		const sent = world.dep.calls.length;
+
+		const result = await callTool(bearer, "recommend_campaign_presets", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(result.structuredContent?.basedOnHistory).toBe(true);
+		expect(world.dep.calls.length).toBeGreaterThan(sent);
+		expectCleanScenario();
+	});
+
+	test("draft edits to a live campaign, their discard and their publish keep their content out of every log line and body", async () => {
+		world.db.close();
+		world = await startWorld(true);
+		const bearer = await world.signIn();
+		const created = await callTool(bearer, "create_campaign", {
+			title: arg("draft-title"),
+		});
+		const id = String(created.structuredContent?.id);
+		await callTool(bearer, "update_campaign_settings", {
+			id,
+			goal: money(),
+		});
+		await callTool(bearer, "publish_campaign", { id, gifts_go_to: null });
+		const sent = world.dep.calls.length;
+
+		const edited = await callTool(bearer, "update_campaign_settings", {
+			id,
+			goal: {
+				amount: plant("arg:draft-goal", "8123.45", true),
+				currency: "USD",
+			},
+			end_date: day(19),
+		});
+		const dropped = await callTool(bearer, "discard_campaign_draft", { id });
+
+		expect(edited.structuredContent?.saved).toBe("draft");
+		expect(dropped.structuredContent).toEqual({ discarded: true });
+		// the draft held back from the deployment, then dropped
+		expect(
+			world.dep.calls
+				.slice(sent)
+				.filter((c) => c.method !== "GET")
+				.map((c) => c.path),
+		).toEqual([]);
 		expectCleanScenario();
 	});
 

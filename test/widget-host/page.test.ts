@@ -37,8 +37,8 @@ describe("hostPage", () => {
 	it("embeds the widget document whole in the iframe's srcdoc", () => {
 		const page = hostPage({ html: WIDGET, theme: "light", fullscreen: false });
 		const srcdoc = /srcdoc="([^"]*)"/.exec(page)?.[1];
-		expect(
-			srcdoc?.replaceAll("&quot;", '"').replaceAll("&amp;", "&"),
-		).toBe(WIDGET);
+		expect(srcdoc?.replaceAll("&quot;", '"').replaceAll("&amp;", "&")).toBe(
+			WIDGET,
+		);
 	});
 });

@@ -297,6 +297,8 @@ function remoteFake(dir: string, origin: string): FakeDeployment {
 		setRetryAfter() {},
 		uploadPhoto: () => null,
 		setCampaignForms: () => {},
+		seedCampaign: () => "",
+		seedGift() {},
 	};
 }
 

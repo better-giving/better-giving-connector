@@ -224,8 +224,8 @@ test("a failed hello keeps the actions the row stored", async () => {
 
 	expect(names).toContain("create_campaign");
 	expect(names).not.toContain("create_form");
-	// and get_profile, which needs no action
-	expect(names).toHaveLength(PLATFORM_READS.length + 1);
+	// and get_profile and recommend_campaign_presets, which need no action of their own
+	expect(names).toHaveLength(PLATFORM_READS.length + 2);
 });
 
 test("a reconnect, a new row, asks hello again", async () => {

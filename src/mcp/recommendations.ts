@@ -70,7 +70,8 @@ export function recommend(
 		history.pastCampaigns.length >= MIN_PAST_CAMPAIGNS ||
 		history.gifts.length >= MIN_GIFTS;
 	const theme = opts.theme ?? DEFAULT_THEME;
-	const asked = opts.theme === undefined ? null : `You asked for ${KIND[theme].an}.`;
+	const asked =
+		opts.theme === undefined ? null : `You asked for ${KIND[theme].an}.`;
 	if (!basedOnHistory) {
 		return {
 			basedOnHistory,
@@ -315,7 +316,8 @@ const defaultEndDays = (
 function currencyOf(history: History): string {
 	const counts = new Map<string, number>();
 	const tally = (ms: Money[]) => {
-		for (const m of ms) counts.set(m.currency, (counts.get(m.currency) ?? 0) + 1);
+		for (const m of ms)
+			counts.set(m.currency, (counts.get(m.currency) ?? 0) + 1);
 	};
 	tally(history.gifts.map((g) => g.amount));
 	if (counts.size === 0)

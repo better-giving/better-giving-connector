@@ -19,7 +19,8 @@ export async function serveFixtureImages(context: BrowserContext) {
 		const url = new URL(route.request().url());
 		if (url.host !== STAND_IN_HOST) return route.abort("blockedbyclient");
 		let hue = 0;
-		for (const char of url.pathname) hue = (hue * 31 + char.charCodeAt(0)) % 360;
+		for (const char of url.pathname)
+			hue = (hue * 31 + char.charCodeAt(0)) % 360;
 		const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 16 9">
 <defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 55% 62%)"/><stop offset="1" stop-color="hsl(${(hue + 40) % 360} 45% 32%)"/></linearGradient></defs>
 <rect width="16" height="9" fill="url(#g)"/><circle cx="12" cy="2.6" r="1.2" fill="hsl(48 90% 85%)"/>
@@ -62,10 +63,10 @@ export async function showWidget(
 		onSize: ({ height }) => {
 			if (height === undefined) return;
 			page
-				.evaluate(
-					([name, h]) => (globalThis as unknown as Relay)[name]?.(h),
-					[RELAY.resize, height] as const,
-				)
+				.evaluate(([name, h]) => (globalThis as unknown as Relay)[name]?.(h), [
+					RELAY.resize,
+					height,
+				] as const)
 				.then(() => sized.resolve(), sized.reject);
 		},
 	});
@@ -90,7 +91,9 @@ export async function showWidget(
 	if (!fullscreen) await withTimeout(sized.promise, "the widget never sized");
 	// the result renders a task after it arrives (ui/states.tsx draws the spinner until then)
 	const frame = page.frameLocator("#widget");
-	await frame.locator(".spinner").waitFor({ state: "detached", timeout: 10_000 });
+	await frame
+		.locator(".spinner")
+		.waitFor({ state: "detached", timeout: 10_000 });
 	await page.waitForLoadState("networkidle");
 	// the size report for the rendered result lands after the render
 	await page.waitForTimeout(250);

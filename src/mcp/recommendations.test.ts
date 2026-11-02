@@ -82,7 +82,11 @@ test("two past campaigns are enough history: the goal is their median raised, ro
 	});
 });
 
-const gift = (amount: string, date = "2026-03-01", campaignId: string | null = null) => ({
+const gift = (
+	amount: string,
+	date = "2026-03-01",
+	campaignId: string | null = null,
+) => ({
 	amount: usd(amount),
 	date,
 	campaignId,
