@@ -6,7 +6,7 @@ States: `01` presets (history) and starting (no history); `02` five, empty, erro
 
 ## Where the widgets still differ from the approved mockups
 
-Compared against `01`–`04` of the approved mockups. The chat shell around each card (sidebar, assistant text, composer) is drawn by the host and is not built.
+Compared against `01`-`04` of the approved mockups. The chat shell around each card (sidebar, assistant text, composer) is drawn by the host and is not built.
 
 **01 Campaign create.** Matches: "Start a campaign" header and subtitle, Draft chip, scene illustrations, theme label in the brand colour, bold titles, goal and end date, gift amounts as pills, selected card with a 2px border and check badge, four recommendation columns with large values, the summary line left of Customize and Create draft.
 - The scenes are simpler redrawings, not the mockup's artwork.
