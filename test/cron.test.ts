@@ -67,6 +67,24 @@ test("/cron/sweep with the secret drops a connection whose refresh token expired
 	expect(await countRows(db, "connection")).toBe(0);
 });
 
+test("/cron/sweep drops the campaign drafts of each connection it drops", async () => {
+	await seedDeadUsers(db, 1);
+	const drafts = campaignDrafts(db);
+	const key = { userId: "u1", origin: deployment.origin, campaignId: "c1" };
+	await drafts.put({
+		...key,
+		baseVersion: "3",
+		settings: { goal: { amount: "10.00", currency: "USD" } },
+		page: null,
+		pageKind: null,
+	});
+
+	await call(sweepRequest(BEARER));
+
+	expect(await countRows(db, "user")).toBe(0);
+	expect(await drafts.get(key)).toBeNull();
+});
+
 test("/cron/sweep sweeps again while a batch comes back full", async () => {
 	await seedDeadUsers(db, 1001);
 

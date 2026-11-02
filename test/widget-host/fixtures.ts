@@ -109,7 +109,7 @@ const DAILY = [0, 120, 80, 0, 240, 60, 0, 150, 310, 90, 40, 0, 220, 380].map(
 	(n, i) => ({ date: day(13 - i), total: usd(`${n}.00`) }),
 );
 
-const CREATE: CampaignCreateData = {
+export const CREATE: CampaignCreateData = {
 	selected: "emergency",
 	presets: [
 		{
@@ -184,7 +184,7 @@ const CREATE: CampaignCreateData = {
 	},
 };
 
-const RESULTS_LIVE: CampaignResultsData = {
+export const RESULTS_LIVE: CampaignResultsData = {
 	campaign: {
 		id: "c-winter",
 		title: "Winter coat drive",
@@ -234,7 +234,7 @@ const RESULTS_DRAFT: CampaignResultsData = {
 	],
 };
 
-const EDITOR: CampaignEditorData = {
+export const EDITOR: CampaignEditorData = {
 	orgName: "Harbor Food Bank",
 	campaign: {
 		id: "c-winter",

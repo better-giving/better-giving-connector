@@ -58,7 +58,7 @@ export interface Host {
 	/** Called on every new tool input or result and every context change; returns the unsubscribe. */
 	subscribe(listener: () => void): () => void;
 	callTool(name: string, args?: Record<string, unknown>): Promise<ToolOutcome>;
-	/** Posts `prompt` as the user's next chat message. */
+	/** Posts `prompt` as the user's next chat message; rejects when the host refuses or can't. */
 	sendFollowUp(prompt: string): Promise<void>;
 	/** Asks for fullscreen; resolves with the mode the host actually set. */
 	requestFullscreen(): Promise<DisplayMode>;
@@ -66,6 +66,7 @@ export interface Host {
 	exitFullscreen(): Promise<DisplayMode>;
 	/** Tells the host the document's size now (the bridge also does this on every resize). */
 	reportSize(): void;
+	/** Opens `url` outside the chat; rejects when the host refuses or nothing can open it. */
 	openLink(url: string): Promise<void>;
 	getState<T>(): T | undefined;
 	setState(state: unknown): void;
@@ -188,12 +189,15 @@ export async function connectHost(
 		},
 		async sendFollowUp(prompt) {
 			if (app.getHostCapabilities()?.message) {
-				await app.sendMessage({
+				const sent = await app.sendMessage({
 					role: "user",
 					content: [{ type: "text", text: prompt }],
 				});
+				if (sent.isError) throw new Error("the host refused the message");
 			} else if (openai?.sendFollowUpMessage) {
 				await openai.sendFollowUpMessage({ prompt });
+			} else {
+				throw new Error("this host takes no messages");
 			}
 		},
 		async requestFullscreen() {
@@ -230,11 +234,15 @@ export async function connectHost(
 		},
 		async openLink(url) {
 			if (app.getHostCapabilities()?.openLinks) {
-				await app.openLink({ url });
+				const opened = await app.openLink({ url });
+				if (opened.isError) throw new Error("the host refused the link");
 			} else if (openai?.openExternal) {
 				openai.openExternal({ href: url });
+			} else if (typeof globalThis.open === "function") {
+				// null with noopener whether or not a window opened, so it can't be checked
+				globalThis.open(url, "_blank", "noopener");
 			} else {
-				globalThis.open?.(url, "_blank", "noopener");
+				throw new Error("this host opens no links");
 			}
 		},
 		getState<T>() {

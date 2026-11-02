@@ -8,7 +8,7 @@ import { StatusChip } from "../ui/chip";
 import { useWidgetState } from "../ui/state";
 import { DateText, useMoney } from "../ui/text";
 import { callTool } from "../ui/tools";
-import { useSession } from "../ui/widget";
+import { useLocale, useSession } from "../ui/widget";
 import { EndConfirm } from "./end-confirm";
 import { Facts, Totals, Trend } from "./stats";
 import "./results.css";
@@ -30,6 +30,7 @@ function Title(props: { data: CampaignResultsData; id: string }) {
 
 export function CampaignResults(props: { data: CampaignResultsData }) {
 	const { host } = useSession();
+	const locale = useLocale();
 	const money = useMoney();
 	const titleId = useId();
 	const [data, setData] = useState(props.data);
@@ -73,12 +74,37 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 			giftsGoTo: giftsGoTo === GENERAL ? null : giftsGoTo,
 		});
 
-	const preview = () => {
-		if (campaign.url) void host.openLink(campaign.url);
-		else
-			void host.sendFollowUp(
-				`Open the editor for the draft campaign "${campaign.title}" (id ${campaign.id}) so I can preview it.`,
+	const openPage = (url: string) => {
+		setError(null);
+		host
+			.openLink(url)
+			.catch(() =>
+				setError(
+					`Couldn't open the page. It's at ${url} if you'd like to copy it.`,
+				),
 			);
+	};
+
+	const preview = () => {
+		if (campaign.url) {
+			openPage(campaign.url);
+			return;
+		}
+		setError(null);
+		host
+			.sendFollowUp(
+				`Open the editor for the draft campaign "${campaign.title}" (id ${campaign.id}) so I can preview it.`,
+			)
+			.catch(() =>
+				setError(
+					"Couldn't ask the chat to open it. Ask for the draft by name instead.",
+				),
+			);
+	};
+
+	const keepLive = () => {
+		setConfirming(false);
+		setTimeout(() => document.getElementById(`${titleId}-end`)?.focus(), 0);
 	};
 
 	const errorLine = (
@@ -163,7 +189,7 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 						"This campaign no longer takes gifts."
 					)}
 					{data.giftCount > 0 &&
-						` ${data.giftCount} gifts, ${money(data.raised)} in all.`}
+						` ${new Intl.NumberFormat(locale).format(data.giftCount)} ${data.giftCount === 1 ? "gift" : "gifts"}, ${money(data.raised)} in all.`}
 				</p>
 			) : (
 				<Trend data={data} />
@@ -188,12 +214,13 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 					{campaign.url && (
 						<Button
 							variant="secondary"
-							onClick={() => campaign.url && void host.openLink(campaign.url)}
+							onClick={() => campaign.url && openPage(campaign.url)}
 						>
 							View page
 						</Button>
 					)}
 					<Button
+						id={`${titleId}-end`}
 						variant="outline-destructive"
 						onClick={() => setConfirming(true)}
 					>
@@ -205,7 +232,7 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 				<EndConfirm
 					donors={data.donors}
 					busy={busy === "end"}
-					onKeep={() => setConfirming(false)}
+					onKeep={keepLive}
 					onEnd={() => void run("end", { id: campaign.id })}
 				/>
 			)}

@@ -2,6 +2,7 @@ import type {
 	CampaignDraft,
 	CampaignDraftKey,
 	CampaignDrafts,
+	CampaignDraftWrite,
 } from "../src/db";
 
 /** The draft store in a Map, for a test or harness that has no database. Keeps src/db's contract. */
@@ -21,10 +22,25 @@ export function memoryDrafts(): CampaignDrafts {
 	};
 	return {
 		get: async (key) => structuredClone(rows.get(id(key)) ?? null),
-		put: async (draft) => {
-			rows.set(id(draft), structuredClone({ ...draft, updatedAt: new Date() }));
+		put: async (draft: CampaignDraftWrite, read?: number | null) => {
+			const stored = rows.get(id(draft));
+			if (read === null && stored) return false;
+			if (typeof read === "number" && stored?.revision !== read) return false;
+			rows.set(
+				id(draft),
+				structuredClone({
+					...draft,
+					updatedAt: new Date(),
+					revision: (stored?.revision ?? 0) + 1,
+				}),
+			);
+			return true;
 		},
-		delete: async (key) => rows.delete(id(key)),
+		delete: async (key, read) => {
+			const stored = rows.get(id(key));
+			if (read !== undefined && stored?.revision !== read) return false;
+			return rows.delete(id(key));
+		},
 		deleteIdleSince: async (cutoff) =>
 			removeWhere((d) => d.updatedAt.getTime() < cutoff.getTime()),
 		deleteForUser: async (userId) => removeWhere((d) => d.userId === userId),

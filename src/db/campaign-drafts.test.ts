@@ -38,6 +38,7 @@ test("get returns the draft put, with updatedAt set to now", async () => {
 		page: [{ type: "text", body: "Hello" }],
 		pageKind: "blocks",
 		updatedAt: expect.any(Date),
+		revision: expect.any(Number),
 	});
 	expect(draft?.updatedAt.getTime()).toBeGreaterThanOrEqual(before);
 	expect(draft?.updatedAt.getTime()).toBeLessThanOrEqual(Date.now());
@@ -103,6 +104,51 @@ test("drafts differing in user, origin or campaign are kept apart", async () => 
 
 const EMPTY = { baseVersion: null, settings: null, page: null, pageKind: null };
 
+test("a put with the revision get returned applies, and moves the revision", async () => {
+	const store = campaignDrafts(db);
+	await store.put({ ...KEY, ...EMPTY }, null);
+	const read = await store.get(KEY);
+	if (!read) throw new Error("no draft");
+
+	expect(
+		await store.put(
+			{ ...KEY, ...EMPTY, settings: { goal: 9000 } },
+			read.revision,
+		),
+	).toBe(true);
+
+	const after = await store.get(KEY);
+	expect(after?.settings).toEqual({ goal: 9000 });
+	expect(after?.revision).not.toBe(read.revision);
+});
+
+test("a put with a revision since moved on writes nothing and says so", async () => {
+	const store = campaignDrafts(db);
+	await store.put({ ...KEY, ...EMPTY }, null);
+	const read = await store.get(KEY);
+	if (!read) throw new Error("no draft");
+	await store.put({ ...KEY, ...EMPTY, settings: { goal: 1 } }, read.revision);
+
+	expect(
+		await store.put({ ...KEY, ...EMPTY, settings: { goal: 2 } }, read.revision),
+	).toBe(false);
+
+	expect((await store.get(KEY))?.settings).toEqual({ goal: 1 });
+});
+
+test("a first put, expecting no draft, writes nothing over one stored since", async () => {
+	const store = campaignDrafts(db);
+	expect(
+		await store.put({ ...KEY, ...EMPTY, settings: { goal: 1 } }, null),
+	).toBe(true);
+
+	expect(
+		await store.put({ ...KEY, ...EMPTY, settings: { goal: 2 } }, null),
+	).toBe(false);
+
+	expect((await store.get(KEY))?.settings).toEqual({ goal: 1 });
+});
+
 test("delete removes that draft alone and says whether one was there", async () => {
 	const store = campaignDrafts(db);
 	const other = { ...KEY, campaignId: "camp-2" };
@@ -114,6 +160,48 @@ test("delete removes that draft alone and says whether one was there", async () 
 
 	expect(await store.get(KEY)).toBeNull();
 	expect(await store.get(other)).not.toBeNull();
+});
+
+test("a delete with a revision since moved on leaves the draft and says so", async () => {
+	const store = campaignDrafts(db);
+	await store.put({ ...KEY, ...EMPTY }, null);
+	const read = await store.get(KEY);
+	if (!read) throw new Error("no draft");
+	await store.put({ ...KEY, ...EMPTY, settings: { goal: 1 } }, read.revision);
+
+	expect(await store.delete(KEY, read.revision)).toBe(false);
+
+	expect((await store.get(KEY))?.settings).toEqual({ goal: 1 });
+});
+
+test("a delete with the revision get returned removes the draft", async () => {
+	const store = campaignDrafts(db);
+	await store.put({ ...KEY, ...EMPTY }, null);
+	const read = await store.get(KEY);
+	if (!read) throw new Error("no draft");
+
+	expect(await store.delete(KEY, read.revision)).toBe(true);
+
+	expect(await store.get(KEY)).toBeNull();
+});
+
+test("a draft deleted and stored again refuses a revision read before the delete", async () => {
+	const store = campaignDrafts(db);
+	await store.put({ ...KEY, ...EMPTY }, null);
+	const deleted = await store.get(KEY);
+	if (!deleted) throw new Error("no draft");
+	await store.delete(KEY, deleted.revision);
+	await store.put({ ...KEY, ...EMPTY, settings: { goal: 1 } }, null);
+
+	expect(
+		await store.put(
+			{ ...KEY, ...EMPTY, settings: { goal: 2 } },
+			deleted.revision,
+		),
+	).toBe(false);
+	expect(await store.delete(KEY, deleted.revision)).toBe(false);
+
+	expect((await store.get(KEY))?.settings).toEqual({ goal: 1 });
 });
 
 test("deleteIdleSince removes only drafts last put before the cutoff, counting them", async () => {

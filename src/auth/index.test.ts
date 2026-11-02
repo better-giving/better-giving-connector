@@ -35,7 +35,7 @@ import {
 	StoreDown,
 	seedDeadUsers,
 } from "../../test/support";
-import { type Connections, connections, type Db } from "../db";
+import { type Connections, campaignDrafts, connections, type Db } from "../db";
 import {
 	type DeploymentClient,
 	deploymentClient,
@@ -736,6 +736,31 @@ test("after dropConnection the bearer and refresh token are refused and the row 
 	);
 	expect(await store.get(who.userId)).toBeNull();
 	expect(await connectionRows(db)).toEqual(NO_CONNECTION_ROWS);
+});
+
+const draftOf = (userId: string, campaignId = "c1") => ({
+	userId,
+	origin: ORIGIN,
+	campaignId,
+	baseVersion: "3",
+	settings: { goal: { amount: "10.00", currency: "USD" } },
+	page: null,
+	pageKind: null,
+});
+
+test("dropConnection deletes the user's campaign drafts and keeps another user's", async () => {
+	const drafts = campaignDrafts(db);
+	const dropped = await connectedUser();
+	const kept = await connectedUser();
+	await drafts.put(draftOf(dropped, "c1"));
+	await drafts.put(draftOf(dropped, "c2"));
+	await drafts.put(draftOf(kept));
+
+	await auth.dropConnection(dropped);
+
+	expect(await drafts.get(draftOf(dropped, "c1"))).toBeNull();
+	expect(await drafts.get(draftOf(dropped, "c2"))).toBeNull();
+	expect(await drafts.get(draftOf(kept))).not.toBeNull();
 });
 
 test("two connections' tokens resolve to their own connections", async () => {

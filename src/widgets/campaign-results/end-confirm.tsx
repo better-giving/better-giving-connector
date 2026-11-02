@@ -1,6 +1,7 @@
 /** @jsxImportSource hono/jsx/dom */
 import { useEffect, useId } from "hono/jsx/dom";
 import { Button } from "../ui/button";
+import { useLocale } from "../ui/widget";
 
 /**
  * The inline confirm for ending a campaign. Focus starts on "Keep it live";
@@ -13,13 +14,14 @@ export function EndConfirm(props: {
 	onEnd: () => void;
 }) {
 	const id = useId();
+	const locale = useLocale();
 	useEffect(() => {
 		document.getElementById(`${id}-keep`)?.focus();
 	}, [id]);
 	const who =
 		props.donors === 1
 			? "1 donor has given"
-			: `${new Intl.NumberFormat().format(props.donors)} donors have given`;
+			: `${new Intl.NumberFormat(locale).format(props.donors)} donors have given`;
 	return (
 		<section
 			class="confirm"

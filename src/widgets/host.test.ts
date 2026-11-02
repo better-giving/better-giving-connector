@@ -239,6 +239,21 @@ describe("display mode, links and follow-ups", () => {
 		]);
 	});
 
+	it("rejects a follow-up the host refuses, or that no one can send", async () => {
+		const refusing = await start();
+		refusing.bridge.onmessage = async () => ({ isError: true });
+		await expect(refusing.host.sendFollowUp("Hi")).rejects.toThrow();
+
+		const mute = await start({ caps: {} });
+		await expect(mute.host.sendFollowUp("Hi")).rejects.toThrow();
+	});
+
+	it("rejects a link the host refuses to open", async () => {
+		const { bridge, host } = await start();
+		bridge.onopenlink = async () => ({ isError: true });
+		await expect(host.openLink("https://example.org/a")).rejects.toThrow();
+	});
+
 	it("reports the document size to the host", async () => {
 		const { bridge, host } = await start();
 		const sizes: unknown[] = [];
