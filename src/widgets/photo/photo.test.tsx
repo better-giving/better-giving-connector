@@ -23,7 +23,7 @@ async function show(data: PhotoData) {
 	document.body.append(root);
 	renderWidget(root, host, PhotoData, PhotoCard, "Loading…");
 	await bridge.sendToolResult({ content: [], structuredContent: data });
-	await flush(10);
+	for (let i = 0; i < 20 && !called.length; i++) await flush(10);
 	await flush(10);
 	return { root, called };
 }
