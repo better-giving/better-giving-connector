@@ -1,0 +1,33 @@
+.photo-crop {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	object-fit: cover;
+}
+
+.done {
+	margin: 0;
+	color: var(--success-ink, var(--gray-12));
+	font-weight: 600;
+}
+
+.account {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--gray-6);
+}
+
+.account p {
+	margin: 0;
+}
+
+.account-label {
+	color: var(--gray-11);
+	font-size: var(--text-xs);
+}
+
+.account-name {
+	font-weight: 600;
+}

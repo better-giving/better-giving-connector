@@ -271,7 +271,7 @@ export const EDITOR: CampaignEditorData = {
 	images: {},
 };
 
-const PHOTO: PhotoData = {
+export const PHOTO: PhotoData = {
 	campaign: { id: "c-winter", title: "Winter coat drive" },
 	current: { url: blobImage("old-cover"), alt: "Coats on a rack" },
 	file: {
@@ -328,10 +328,22 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 		},
 	},
 	photo: {
-		dropped: { result: { structuredContent: PHOTO } },
+		dropped: {
+			result: { structuredContent: PHOTO },
+			calls: {
+				get_profile: () => ({
+					structuredContent: { id: "u1", name: "Harbor Food Bank" },
+				}),
+			},
+		},
 		none: {
 			result: {
 				structuredContent: { ...PHOTO, file: null, canUpload: false },
+			},
+			calls: {
+				get_profile: () => ({
+					structuredContent: { id: "u1", name: "Harbor Food Bank" },
+				}),
 			},
 		},
 	},
