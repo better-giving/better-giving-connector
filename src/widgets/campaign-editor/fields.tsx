@@ -1,8 +1,11 @@
 /** @jsxImportSource hono/jsx/dom */
-import { useId } from "hono/jsx/dom";
+import { useId, useState } from "hono/jsx/dom";
+import { storyDocument } from "../../presets/themes";
 import type { Block, PageContent } from "../model";
-import { useLocale } from "../ui/widget";
-import { humanize } from "./labels";
+import { Button } from "../ui/button";
+import { callTool } from "../ui/tools";
+import { useLocale, useSession } from "../ui/widget";
+import { humanize, plainText } from "./labels";
 
 const HIDDEN = new Set(["type", "id", "key"]);
 const LONG = /body|text|story|description|lede|summary|answer/i;
@@ -11,6 +14,7 @@ function Text(props: {
 	label: string;
 	value: string;
 	long?: boolean;
+	rows?: number;
 	onInput: (value: string) => void;
 }) {
 	const id = useId();
@@ -25,7 +29,7 @@ function Text(props: {
 		<div class="field">
 			<label for={id}>{props.label}</label>
 			{props.long ? (
-				<textarea rows={4} {...common} />
+				<textarea rows={props.rows ?? 4} {...common} />
 			) : (
 				<input type="text" {...common} />
 			)}
@@ -58,8 +62,47 @@ function NumberField(props: {
 	);
 }
 
+/** Replaces the cover through the site's own upload page: a single-use link the operator opens. */
+export function PhotoReplace(props: { campaignId: string }) {
+	const { host } = useSession();
+	const [error, setError] = useState<string | null>(null);
+	const open = async () => {
+		setError(null);
+		const res = await callTool(host, "app_photo_upload_link", {
+			id: props.campaignId,
+		});
+		if (!res.ok) {
+			setError(res.error);
+			return;
+		}
+		const { url } = res.data;
+		await host.openLink(url).catch(() => {
+			setError(
+				`Couldn't open the page. It's at ${url} if you'd like to copy it.`,
+			);
+		});
+	};
+	return (
+		<div class="field">
+			<Button variant="secondary" onClick={() => void open()}>
+				Replace photo
+			</Button>
+			<p class="hint">
+				Opens a one-time upload page. Reopen the editor afterwards to see the
+				new photo.
+			</p>
+			{error && (
+				<p class="error-line" role="alert">
+					{error}
+				</p>
+			)}
+		</div>
+	);
+}
+
 /** The settings of one block that are plain text, numbers or switches. */
 export function BlockFields(props: {
+	campaignId: string;
 	block: Block;
 	onChange: (block: Block) => void;
 }) {
@@ -73,6 +116,9 @@ export function BlockFields(props: {
 	const more = entries.length - simple.length;
 	return (
 		<div class="stack">
+			{props.block.type.toLowerCase() === "hero" && (
+				<PhotoReplace campaignId={props.campaignId} />
+			)}
 			{simple.map(([key, value]) => {
 				const label = humanize(key);
 				if (typeof value === "number") {
@@ -146,6 +192,7 @@ export function minorFactor(currency: string, locale: string): number {
 
 /** The fields of one section of a standalone (content) page. */
 export function ContentFields(props: {
+	campaignId: string;
 	section: ContentSection;
 	content: PageContent;
 	currency: string;
@@ -157,18 +204,21 @@ export function ContentFields(props: {
 		props.onChange({ ...content, ...patch });
 	switch (props.section) {
 		case "hero":
-			return content.hero ? (
-				<Text
-					label="Photo description (alt text)"
-					value={content.hero.alt ?? ""}
-					onInput={(alt) =>
-						set({ hero: { ...(content.hero as { imageId: string }), alt } })
-					}
-				/>
-			) : (
-				<p class="muted">
-					This page has no cover photo yet. Ask in the chat to set one.
-				</p>
+			return (
+				<div class="stack">
+					{content.hero && (
+						<Text
+							label="Photo description (alt text)"
+							value={content.hero.alt ?? ""}
+							onInput={(alt) =>
+								set({
+									hero: { ...(content.hero as { imageId: string }), alt },
+								})
+							}
+						/>
+					)}
+					<PhotoReplace campaignId={props.campaignId} />
+				</div>
 			);
 		case "title":
 			return (
@@ -184,9 +234,14 @@ export function ContentFields(props: {
 						value={content.lede ?? ""}
 						onInput={(lede) => set({ lede })}
 					/>
-					<p class="hint">
-						The story is written in the chat; it stays as it is here.
-					</p>
+					<Text
+						label="Story"
+						long
+						rows={8}
+						value={plainText(content.story)}
+						onInput={(story) => set({ story: storyDocument(story) })}
+					/>
+					<p class="hint">Leave a blank line between paragraphs.</p>
 				</div>
 			);
 		case "form": {
@@ -232,20 +287,30 @@ export function ContentFields(props: {
 			return (
 				<div class="stack">
 					{faq.map((item, i) => (
-						<Text
-							key={`q-${i}`}
-							label={`Question ${i + 1}`}
-							value={item.question}
-							onInput={(question) =>
-								set({
-									faq: faq.map((q, j) => (j === i ? { ...q, question } : q)),
-								})
-							}
-						/>
+						<div key={`q-${i}`} class="stack">
+							<Text
+								label={`Question ${i + 1}`}
+								value={item.question}
+								onInput={(question) =>
+									set({
+										faq: faq.map((q, j) => (j === i ? { ...q, question } : q)),
+									})
+								}
+							/>
+							<Text
+								label={`Answer ${i + 1}`}
+								long
+								value={plainText(item.answer)}
+								onInput={(answer) =>
+									set({
+										faq: faq.map((q, j) =>
+											j === i ? { ...q, answer: storyDocument(answer) } : q,
+										),
+									})
+								}
+							/>
+						</div>
 					))}
-					<p class="hint">
-						Answers are written in the chat; they stay as they are here.
-					</p>
 				</div>
 			);
 		}

@@ -19,11 +19,58 @@ import "./editor.css";
 
 const isDevice = (v: unknown): v is Device => v === "desktop" || v === "phone";
 
+/** A block's first line of text, for the list. */
+function summaryOf(block: Block): string {
+	const text = Object.entries(block).find(
+		([key, value]) =>
+			key !== "type" && typeof value === "string" && !/^https:/.test(value),
+	)?.[1];
+	return typeof text === "string"
+		? text.length > 44
+			? `${text.slice(0, 43)}…`
+			: text
+		: "";
+}
+
 function move<T>(list: readonly T[], from: number, to: number): T[] {
 	const next = [...list];
 	const [item] = next.splice(from, 1);
 	if (item !== undefined) next.splice(to, 0, item);
 	return next;
+}
+
+function AddBlock(props: { onAdd: (type: string) => void }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div class="add-row">
+			<button
+				type="button"
+				class="add-btn"
+				aria-expanded={open}
+				onClick={() => setOpen(!open)}
+			>
+				+ Add block
+			</button>
+			{open && (
+				<ul class="add-menu" aria-label="Block types">
+					{ADDABLE_BLOCKS.map((b) => (
+						<li key={b.type}>
+							<button
+								type="button"
+								class="add-choice"
+								onClick={() => {
+									props.onAdd(b.type);
+									setOpen(false);
+								}}
+							>
+								{b.label}
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
+	);
 }
 
 export function CampaignEditor(props: { data: CampaignEditorData }) {
@@ -118,6 +165,7 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 			? blocks.map((b, i) => ({
 					key: `${b.type}-${i}`,
 					label: blockLabel(b.type),
+					summary: summaryOf(b),
 				}))
 			: CONTENT_SECTIONS.map((s) => ({ key: s.key, label: s.label }));
 	const index = Math.min(selected, Math.max(items.length - 1, 0));
@@ -184,6 +232,19 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 			<div class="editor-body">
 				<div class="editor-left">
 					<Outline
+						footer={
+							page.pageKind === "blocks" && !ended ? (
+								<AddBlock
+									onAdd={(type) => {
+										edit({
+											pageKind: "blocks",
+											blocks: [...blocks, { type }],
+										});
+										setSelected(blocks.length);
+									}}
+								/>
+							) : undefined
+						}
 						items={items}
 						selected={index}
 						onSelect={setSelected}
@@ -208,42 +269,20 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 								: undefined
 						}
 					/>
-					{page.pageKind === "blocks" && !ended && (
-						<div class="field">
-							<label for="add-block">Add block</label>
-							<select
-								id="add-block"
-								class="input"
-								value=""
-								onChange={(e: Event) => {
-									const select = e.target as HTMLSelectElement;
-									if (!select.value) return;
-									edit({
-										pageKind: "blocks",
-										blocks: [...blocks, { type: select.value }],
-									});
-									setSelected(blocks.length);
-									select.value = "";
-								}}
-							>
-								<option value="">Choose a block…</option>
-								{ADDABLE_BLOCKS.map((b) => (
-									<option key={b.type} value={b.type}>
-										{b.label}
-									</option>
-								))}
-							</select>
-						</div>
-					)}
 					<section class="editor-fields" aria-label="Selected section">
 						<h3 class="section-title">
 							{items[index]?.label ?? "Nothing selected"}
 						</h3>
 						{page.pageKind === "blocks" && blocks[index] && (
-							<BlockFields block={blocks[index]} onChange={setBlock} />
+							<BlockFields
+								campaignId={campaign.id}
+								block={blocks[index]}
+								onChange={setBlock}
+							/>
 						)}
 						{page.pageKind === "content" && items[index] && (
 							<ContentFields
+								campaignId={campaign.id}
 								section={items[index].key as ContentSection}
 								content={page.content}
 								currency={data.formAmounts[0]?.currency ?? "USD"}

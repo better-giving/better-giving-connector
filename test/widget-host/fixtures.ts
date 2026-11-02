@@ -248,10 +248,10 @@ const SHOT_DRAFT: CampaignResultsData = {
 };
 
 export const EDITOR: CampaignEditorData = {
-	orgName: "Harbor Food Bank",
+	orgName: "Bayanihan Relief Network",
 	campaign: {
-		id: "c-winter",
-		title: "Winter coat drive",
+		id: "c-storm",
+		title: "Storm relief — Visayas",
 		status: "draft",
 		version: "14",
 		url: null,
@@ -261,20 +261,20 @@ export const EDITOR: CampaignEditorData = {
 		blocks: [
 			{
 				type: "hero",
-				imageUrl: blobImage("coats"),
-				alt: "Volunteers sorting coats",
+				imageUrl: blobImage("storm"),
+				alt: "A house after the flood",
 			},
 			{
 				type: "story",
-				heading: "Every neighbor deserves a warm coat",
-				body: "Winter is coming and 300 families on our list have no coat.\n\nYour gift buys a new coat and a pair of gloves.",
+				heading: "Storm relief — Visayas",
+				body: "Typhoon Ofel flooded Brgy. San Roque and Brgy. Malinao on Oct 28. 640 families lost food stocks and school supplies.\n\nYour gift puts a 5-day family food pack and clean water on a truck this week.",
 			},
 			{ type: "goal" },
 			{ type: "donate" },
 			{
 				type: "faq",
 				heading: "Questions",
-				q1: "Where do the coats go? To families on our waiting list.",
+				q1: "Where does my gift go?",
 			},
 		],
 	},
@@ -338,6 +338,7 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 		blocks: {
 			result: { structuredContent: EDITOR },
 			displayMode: "fullscreen",
+			click: ["Title & story"],
 		},
 	},
 	photo: {

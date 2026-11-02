@@ -1,8 +1,9 @@
 /** @jsxImportSource hono/jsx/dom */
+import type { Child } from "hono/jsx";
 import { useState } from "hono/jsx/dom";
 import { Button } from "../ui/button";
 
-export type OutlineItem = { key: string; label: string };
+export type OutlineItem = { key: string; label: string; summary?: string };
 
 /**
  * The page's sections as a list. With `onMove` each row drags, and also has
@@ -14,6 +15,8 @@ export function Outline(props: {
 	onSelect: (index: number) => void;
 	onMove?: (from: number, to: number) => void;
 	onRemove?: (index: number) => void;
+	/** A last row of the list, such as Add block. */
+	footer?: Child;
 }) {
 	const [dragging, setDragging] = useState<number | null>(null);
 	const [over, setOver] = useState<number | null>(null);
@@ -54,7 +57,10 @@ export function Outline(props: {
 						aria-pressed={props.selected === i}
 						onClick={() => props.onSelect(i)}
 					>
-						{item.label}
+						<span class="outline-label">{item.label}</span>
+						{item.summary && (
+							<span class="outline-summary">{item.summary}</span>
+						)}
 					</button>
 					{onMove && (
 						<span class="outline-moves">
@@ -90,6 +96,7 @@ export function Outline(props: {
 					)}
 				</li>
 			))}
+			{props.footer && <li class="outline-footer">{props.footer}</li>}
 		</ol>
 	);
 }
