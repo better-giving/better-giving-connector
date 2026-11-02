@@ -46,7 +46,11 @@ export function plainText(node: unknown): string {
 		if (typeof rec.text === "string") return rec.text;
 		const inner = Array.isArray(rec.content) ? rec.content.map(walk) : [];
 		const isBlock = rec.type !== undefined && rec.type !== "doc";
-		if (isBlock && Array.isArray(rec.content) && rec.content.every((c) => (c as { text?: unknown }).text !== undefined)) {
+		if (
+			isBlock &&
+			Array.isArray(rec.content) &&
+			rec.content.every((c) => (c as { text?: unknown }).text !== undefined)
+		) {
 			paragraphs.push(inner.join(""));
 			return "";
 		}

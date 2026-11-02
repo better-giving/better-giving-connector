@@ -33,7 +33,8 @@ export function Outline(props: {
 					}}
 					onDrop={(e: DragEvent) => {
 						e.preventDefault();
-						if (dragging !== null && onMove && dragging !== i) onMove(dragging, i);
+						if (dragging !== null && onMove && dragging !== i)
+							onMove(dragging, i);
 						setDragging(null);
 						setOver(null);
 					}}

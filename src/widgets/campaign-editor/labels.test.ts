@@ -17,7 +17,13 @@ describe("editor labels", () => {
 		const doc = {
 			type: "doc",
 			content: [
-				{ type: "paragraph", content: [{ type: "text", text: "One " }, { type: "text", text: "two." }] },
+				{
+					type: "paragraph",
+					content: [
+						{ type: "text", text: "One " },
+						{ type: "text", text: "two." },
+					],
+				},
 				{ type: "paragraph", content: [{ type: "text", text: "Three." }] },
 			],
 		};

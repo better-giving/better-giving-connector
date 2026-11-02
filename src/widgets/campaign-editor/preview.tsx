@@ -3,8 +3,8 @@ import { formatMoney } from "../../format";
 import type { Block, CampaignEditorData, PageContent } from "../model";
 import { ImageWithPlaceholder } from "../ui/image";
 import { useLocale } from "../ui/widget";
-import { blockLabel, firstImageUrl, humanize, plainText } from "./labels";
 import { minorFactor } from "./fields";
+import { blockLabel, firstImageUrl, humanize, plainText } from "./labels";
 
 export type Device = "desktop" | "phone";
 
@@ -40,11 +40,16 @@ function Donate(props: { amounts: string[] }) {
 	);
 }
 
-function PreviewBlock(props: { block: Block; data: CampaignEditorData; amounts: string[] }) {
+function PreviewBlock(props: {
+	block: Block;
+	data: CampaignEditorData;
+	amounts: string[];
+}) {
 	const { block } = props;
 	const type = block.type.toLowerCase();
 	const strings = Object.entries(block).filter(
-		(e): e is [string, string] => typeof e[1] === "string" && e[0] !== "type" && !/^https:/.test(e[1]),
+		(e): e is [string, string] =>
+			typeof e[1] === "string" && e[0] !== "type" && !/^https:/.test(e[1]),
 	);
 	const heading = strings.find(([k]) => TEXTY.test(k))?.[1];
 	const body = strings.find(([k]) => BODY.test(k))?.[1];
@@ -83,17 +88,33 @@ function PreviewBlock(props: { block: Block; data: CampaignEditorData; amounts: 
 	return (
 		<section class="pv-section">
 			<h2>{heading ?? blockLabel(block.type)}</h2>
-			{body ? <Paragraphs text={body} /> : strings.filter(([k]) => !TEXTY.test(k)).map(([k, v]) => <p key={k}><b>{humanize(k)}:</b> {v}</p>)}
+			{body ? (
+				<Paragraphs text={body} />
+			) : (
+				strings
+					.filter(([k]) => !TEXTY.test(k))
+					.map(([k, v]) => (
+						<p key={k}>
+							<b>{humanize(k)}:</b> {v}
+						</p>
+					))
+			)}
 		</section>
 	);
 }
 
-function ContentPreview(props: { content: PageContent; data: CampaignEditorData; amounts: string[] }) {
+function ContentPreview(props: {
+	content: PageContent;
+	data: CampaignEditorData;
+	amounts: string[];
+}) {
 	const { content, data } = props;
 	const locale = useLocale();
 	const currency = data.formAmounts[0]?.currency ?? "USD";
 	const factor = minorFactor(currency, locale);
-	const heroUrl = content.hero ? (data.images[content.hero.imageId] ?? null) : null;
+	const heroUrl = content.hero
+		? (data.images[content.hero.imageId] ?? null)
+		: null;
 	return (
 		<>
 			{content.hero && (
@@ -114,7 +135,14 @@ function ContentPreview(props: { content: PageContent; data: CampaignEditorData;
 					<div class="pv-tiers">
 						{content.tiers.map((t, i) => (
 							<p key={i} class="pv-tier">
-								<b>{formatMoney(String(t.amountMinor / factor), currency, locale)}</b> {t.buys}
+								<b>
+									{formatMoney(
+										String(t.amountMinor / factor),
+										currency,
+										locale,
+									)}
+								</b>{" "}
+								{t.buys}
 							</p>
 						))}
 					</div>
@@ -151,20 +179,34 @@ export function PagePreview(props: {
 	const { page } = props;
 	return (
 		<div class="preview-scroll">
-			<div class={`preview preview-${props.device}`} aria-label={`Donor page preview, ${props.device}`} role="group">
+			<section
+				class={`preview preview-${props.device}`}
+				aria-label={`Donor page preview, ${props.device}`}
+			>
 				<p class="pv-org">{props.data.orgName}</p>
 				{page.pageKind === "blocks" ? (
 					<>
 						<h1 class="pv-title">{props.data.campaign.title}</h1>
 						{page.blocks.map((block, i) => (
-							<PreviewBlock key={`${block.type}-${i}`} block={block} data={props.data} amounts={amounts} />
+							<PreviewBlock
+								key={`${block.type}-${i}`}
+								block={block}
+								data={props.data}
+								amounts={amounts}
+							/>
 						))}
-						{page.blocks.length === 0 && <p class="pv-empty">This page has no blocks yet.</p>}
+						{page.blocks.length === 0 && (
+							<p class="pv-empty">This page has no blocks yet.</p>
+						)}
 					</>
 				) : (
-					<ContentPreview content={page.content} data={props.data} amounts={amounts} />
+					<ContentPreview
+						content={page.content}
+						data={props.data}
+						amounts={amounts}
+					/>
 				)}
-			</div>
+			</section>
 		</div>
 	);
 }

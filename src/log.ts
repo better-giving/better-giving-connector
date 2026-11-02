@@ -10,6 +10,20 @@ export const LOCAL_TOOL_NAMES = [
 	"get_profile",
 	"discard_campaign_draft",
 	"recommend_campaign_presets",
+	"show_campaign_create",
+	"show_campaigns",
+	"show_campaign_results",
+	"open_campaign_editor",
+	"show_photo",
+	"set_campaign_photo",
+	"app_create_campaign",
+	"app_publish_campaign",
+	"app_end_campaign",
+	"app_get_campaign_editor",
+	"app_save_campaign_edit",
+	"app_discard_campaign_draft",
+	"app_set_campaign_photo",
+	"app_photo_upload_link",
 ] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 type LoggedTool = ActionName | LocalToolName;

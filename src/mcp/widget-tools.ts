@@ -13,17 +13,17 @@ import {
 	type WidgetName,
 } from "../widgets/model";
 import { ADD, DESTRUCTIVE, OVERWRITES, READ } from "./actions";
+import { discardCampaignDraft, isLive, readCampaign } from "./campaign-drafts";
+import { createCampaignWithPreset } from "./campaign-presets";
 import {
 	BLOCKS_EDIT,
 	CONTENT_EDIT,
 	composeLiveEdit,
 	composePublish,
 } from "./draft-tools";
-import { createCampaignWithPreset } from "./campaign-presets";
-import { discardCampaignDraft, isLive, readCampaign } from "./campaign-drafts";
 import { setCampaignPhoto, uploadLink } from "./photo-upload";
 import type { LocalCall, LocalSpec, ToolMeta } from "./spec";
-import { statusLines } from "./spec";
+import { statusLines, ToolRefusal } from "./spec";
 import {
 	campaignsData,
 	createData,
@@ -143,11 +143,7 @@ const SHOW_CAMPAIGNS: LocalSpec = {
 		},
 	},
 	annotations: READ,
-	_meta: renderMeta(
-		"campaigns",
-		"Loading campaigns…",
-		"Campaigns ready",
-	),
+	_meta: renderMeta("campaigns", "Loading campaigns…", "Campaigns ready"),
 	needs: ["campaigns.list", "campaigns.get", "results.summary"],
 	async run(call) {
 		const status = z
@@ -312,13 +308,18 @@ const SET_CAMPAIGN_PHOTO: LocalSpec = {
 	needs: ["photos.upload_link"],
 	async run(call) {
 		const photo = photoFile.parse(call.input.photo);
-		return setPhotoAnswer(call, String(call.input.campaign_id), photo.download_url);
+		return setPhotoAnswer(
+			call,
+			String(call.input.campaign_id),
+			photo.download_url,
+		);
 	},
 };
 
 // --- app-only tools -------------------------------------------------------------
 
-const { app_create_campaign, app_publish_campaign, app_end_campaign } = APP_TOOLS;
+const { app_create_campaign, app_publish_campaign, app_end_campaign } =
+	APP_TOOLS;
 
 const APP_CREATE_CAMPAIGN: LocalSpec = {
 	tool: "app_create_campaign",
@@ -395,7 +396,9 @@ const APP_END_CAMPAIGN: LocalSpec = {
 	needs: ["campaigns.end"],
 	async run(call) {
 		const { id: campaignId } = app_end_campaign.args.parse(call.input);
-		await call.client.call(call.connection, "campaigns.end", { id: campaignId });
+		await call.client.call(call.connection, "campaigns.end", {
+			id: campaignId,
+		});
 		return answer(await resultsData(call, campaignId));
 	},
 };
@@ -425,8 +428,11 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 	_meta: appMeta("Saving the page…", "Page saved"),
 	needs: [],
 	async run(call) {
-		const { id: campaignId, expectedVersion, page } =
-			APP_TOOLS.app_save_campaign_edit.args.parse(call.input);
+		const {
+			id: campaignId,
+			expectedVersion,
+			page,
+		} = APP_TOOLS.app_save_campaign_edit.args.parse(call.input);
 		const version =
 			expectedVersion === null ? {} : { expected_version: expectedVersion };
 		const isBlocks = page.pageKind === "blocks";
@@ -486,12 +492,10 @@ const APP_SET_CAMPAIGN_PHOTO: LocalSpec = {
 		const args = APP_TOOLS.app_set_campaign_photo.args.parse(call.input);
 		const outcome = await setCampaignPhoto(call, args.id, args.downloadUrl);
 		if (!outcome.uploaded) {
-			const structured = { url: outcome.link?.url ?? "", alt: null };
-			throw new (await import("./spec")).ToolRefusal(
+			throw new ToolRefusal(
 				"rejected",
 				`The photo wasn't set: ${outcome.reason}${outcome.link ? ` Upload it at ${outcome.link.url}.` : ""}`,
 			);
-			void structured;
 		}
 		return answer({ url: outcome.imageUrl ?? args.downloadUrl, alt: args.alt });
 	},

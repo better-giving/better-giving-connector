@@ -63,6 +63,9 @@ export function widgetDocument(html: string, openai?: OpenAiSeed): string {
 	return html.slice(0, head) + openAiScript(openai) + html.slice(head);
 }
 
+// biome-ignore lint/suspicious/noTemplateCurlyInString: browser script, evaluated in the page
+const RESIZE_STATEMENT = "frame().style.height = `${Math.ceil(height)}px`;";
+
 export function hostPage(options: {
 	html: string;
 	theme: Theme;
@@ -89,7 +92,7 @@ addEventListener("message", (event) => {
 	if (event.source === frame().contentWindow) window.${RELAY.toHost}(event.data);
 });
 window.${RELAY.toWidget} = (message) => frame().contentWindow.postMessage(message, "*");
-window.${RELAY.resize} = (height) => { ${options.fullscreen ? "" : "frame().style.height = `${Math.ceil(height)}px`;"} };
+window.${RELAY.resize} = (height) => { ${options.fullscreen ? "" : RESIZE_STATEMENT} };
 </script></head>
 <body><main><iframe id="widget" title="Widget" srcdoc="${escapeAttribute(widgetDocument(options.html, options.openai))}"></iframe></main></body></html>`;
 }
