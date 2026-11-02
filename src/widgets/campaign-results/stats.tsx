@@ -3,11 +3,11 @@ import type { CampaignResultsData } from "../model";
 import { scaled, scaleOf, unscaled } from "../ui/decimal";
 import { ProgressBar, percentOf } from "../ui/progress";
 import { Sparkline, weekOverWeek } from "../ui/sparkline";
-import { useMoney } from "../ui/text";
+import { useWholeMoney } from "../ui/text";
 import { useLocale } from "../ui/widget";
 
 export function Totals(props: { data: CampaignResultsData }) {
-	const money = useMoney();
+	const money = useWholeMoney();
 	const { data } = props;
 	const { goal } = data.campaign;
 	const percent = percentOf(data.raised, goal);
@@ -48,7 +48,7 @@ export function Totals(props: { data: CampaignResultsData }) {
 }
 
 export function Facts(props: { data: CampaignResultsData }) {
-	const money = useMoney();
+	const money = useWholeMoney();
 	const count = new Intl.NumberFormat(useLocale());
 	const { data } = props;
 	const { daily } = data;
