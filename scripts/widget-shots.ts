@@ -4,7 +4,7 @@
 //
 //   pnpm exec tsx scripts/widget-shots.ts [widget...] [--chatgpt]
 //
-// Writes /tmp/widget-shots/<widget>-<state>-<theme>-<width>.png (with a
+// Writes docs/widget-screenshots/<nn>-<widget>-<state>-<theme>-<width>.png (with a
 // `-chatgpt` suffix when the frame also gets `window.openai`).
 
 import { mkdir } from "node:fs/promises";
@@ -16,7 +16,14 @@ import type { Theme } from "../test/widget-host/fake-host";
 import { FIXTURES } from "../test/widget-host/fixtures";
 import "./binary-register.mjs";
 
-const OUT = "/tmp/widget-shots";
+const OUT = "docs/widget-screenshots";
+const ORDER = [
+	"campaign-create",
+	"campaigns",
+	"campaign-results",
+	"campaign-editor",
+	"photo",
+];
 const THEMES: Theme[] = ["light", "dark"];
 const WIDTHS = [1440, 375];
 const LOCALE = "en-US";
@@ -56,7 +63,7 @@ try {
 					const suffix = values.chatgpt ? "-chatgpt" : "";
 					const file = join(
 						OUT,
-						`${name}-${state}-${theme}-${width}${suffix}.png`,
+						`${String(ORDER.indexOf(name) + 1).padStart(2, "0")}-${name}-${state}-${theme}-${width}${suffix}.png`,
 					);
 					const context = await browser.newContext({
 						viewport: { width, height: width < 640 ? 812 : 900 },
@@ -75,6 +82,13 @@ try {
 							width,
 							chatgpt: values.chatgpt,
 						});
+						for (const label of fixture.click ?? []) {
+							await page
+								.frameLocator("#widget")
+								.getByRole("button", { name: label })
+								.click();
+							await page.waitForTimeout(250);
+						}
 						await page.screenshot({ path: file, fullPage: true });
 						if (errors.length > 0) throw new Error(errors.join("; "));
 						process.stdout.write(`${file}\n`);
