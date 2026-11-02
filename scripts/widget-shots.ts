@@ -1,8 +1,12 @@
 // Screenshots of every widget state in test/widget-host/fixtures.ts, light and
 // dark, desktop and phone, hosted by the fake MCP Apps host in headless
-// chromium. Not part of `pnpm test`.
+// chromium. Not part of `pnpm test` or CI.
 //
-//   pnpm exec tsx scripts/widget-shots.ts [widget...] [--chatgpt]
+//   pnpm widget-shots [widget...] [--chatgpt]
+//
+// playwright-core ships no browser. On a clean machine install one first:
+//
+//   pnpm exec playwright-core install chromium
 //
 // Writes docs/widget-screenshots/<nn>-<widget>-<state>-<theme>-<width>.png (with a
 // `-chatgpt` suffix when the frame also gets `window.openai`).

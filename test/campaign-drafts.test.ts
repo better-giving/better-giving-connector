@@ -484,7 +484,8 @@ test("a read-only token can't discard a draft, and the draft stays", async () =>
 	expect((await get(k.id)).pendingDraft).toBeDefined();
 });
 
-test("a Standalone connection is not offered discard_campaign_draft", async () => {
+/** A Standalone deployment and its MCP session, beside the Platform one. */
+async function standaloneSession() {
 	const standalone = fakeDeployment({ name: "Hope Shelter" });
 	const app = createApp({
 		env,
@@ -496,16 +497,64 @@ test("a Standalone connection is not offered discard_campaign_draft", async () =
 	await warmUp(standaloneCall);
 	const token = (await connectFlow(standaloneCall, standalone, BASE).connect())
 		.access_token;
+	const send = async (method: string, params?: Record<string, unknown>) =>
+		(
+			await rpc(
+				await standaloneCall(
+					mcpRequest(
+						MCP_VERSIONS[0],
+						`Bearer ${token}`,
+						method,
+						params,
+						++rpcId,
+					),
+				),
+			)
+		).result;
+	const tool = async (
+		name: string,
+		args: Record<string, unknown> = {},
+	): Promise<Result> => send("tools/call", { name, arguments: args });
+	/** A published Standalone campaign as its editor card shows it, the calls so far forgotten. */
+	const live = async (): Promise<{ id: string; version: string }> => {
+		const k = (await tool("create_campaign", { title: "Winter coats" }))
+			.structuredContent as Campaign;
+		await tool("publish_campaign", { id: k.id, gifts_go_to: null });
+		const editor = await tool("app_get_campaign_editor", { id: k.id });
+		standalone.calls.length = 0;
+		return (editor.structuredContent as { campaign: Campaign }).campaign;
+	};
+	return { deployment: standalone, send, tool, live };
+}
 
-	const { result } = await rpc(
-		await standaloneCall(
-			mcpRequest(MCP_VERSIONS[0], `Bearer ${token}`, "tools/list", {}, ++rpcId),
-		),
-	);
+test("a Standalone connection is not offered discard_campaign_draft", async () => {
+	const { send } = await standaloneSession();
+
+	const result = await send("tools/list", {});
 
 	const names = result.tools.map((t: { name: string }) => t.name);
 	expect(names).toContain("get_profile");
 	expect(names).not.toContain("discard_campaign_draft");
+});
+
+test("on Standalone, the editor's save to a live campaign is written through and keeps no draft", async () => {
+	const standalone = await standaloneSession();
+	const k = await standalone.live();
+
+	const result = await standalone.tool("app_save_campaign_edit", {
+		id: k.id,
+		expectedVersion: k.version,
+		page: { pageKind: "content", content: { heading: "Every coat counts" } },
+	});
+
+	expect(result.isError).toBeUndefined();
+	expect(
+		standalone.deployment.calls
+			.filter((c) => c.method !== "GET")
+			.map((c) => [c.method, c.path]),
+	).toEqual([["PATCH", `/connector/v1/campaigns/${k.id}/content`]]);
+	expect(result.structuredContent).toMatchObject({ pendingDraft: false });
+	expect(await countRows(db, "campaign_draft")).toBe(0);
 });
 
 test("the instructions say a live campaign's edits wait as a draft, and publishing still waits for a yes", async () => {

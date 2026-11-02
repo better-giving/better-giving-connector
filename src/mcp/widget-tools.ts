@@ -433,16 +433,22 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 			expectedVersion,
 			page,
 		} = APP_TOOLS.app_save_campaign_edit.args.parse(call.input);
+		// Standalone's content action takes no version.
 		const version =
-			expectedVersion === null ? {} : { expected_version: expectedVersion };
+			expectedVersion === null || !call.connection.platform
+				? {}
+				: { expected_version: expectedVersion };
 		const isBlocks = page.pageKind === "blocks";
 		const input = isBlocks
 			? { id: campaignId, blocks: page.blocks, ...version }
 			: { id: campaignId, ...page.content, ...version };
-		const kept = await composeLiveEdit(isBlocks ? BLOCKS_EDIT : CONTENT_EDIT)({
-			...call,
-			input,
-		});
+		// Standalone shows a live campaign's edit at once, as its own tools do.
+		const kept = call.connection.platform
+			? await composeLiveEdit(isBlocks ? BLOCKS_EDIT : CONTENT_EDIT)({
+					...call,
+					input,
+				})
+			: null;
 		if (kept === null) {
 			await call.client.call(
 				call.connection,

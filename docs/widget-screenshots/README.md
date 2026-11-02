@@ -1,6 +1,6 @@
 # Widget screenshots
 
-Each PNG is one widget state mounted in headless Chromium against a fake MCP Apps host (`test/widget-host/`). Names are `<nn>-<widget>-<state>-<light|dark>-<width>.png`: `01` campaign create, `02` campaigns carousel, `03` results card, `04` editor, `05` photo card. Regenerate with `pnpm exec tsx scripts/widget-shots.ts`; the states live in `test/widget-host/fixtures.ts`.
+Each PNG is one widget state mounted in headless Chromium against a fake MCP Apps host (`test/widget-host/`). Names are `<nn>-<widget>-<state>-<light|dark>-<width>.png`: `01` campaign create, `02` campaigns carousel, `03` results card, `04` editor, `05` photo card. Regenerate with `pnpm widget-shots` (on a clean machine run `pnpm exec playwright-core install chromium` once first: playwright-core ships no browser); the states live in `test/widget-host/fixtures.ts`.
 
 States: `01` presets (history) and starting (no history); `02` five, empty, error; `03` draft, live, end-confirm (End campaign pressed); `04` blocks (fullscreen); `05` dropped (a photo in the chat), none. Every state is shot light and dark at 1440 and 375. The inline widgets sit in a 736px column at 1440, as a chat column does.
 

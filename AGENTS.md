@@ -8,7 +8,7 @@ The repo is public. Secrets live only in Vercel environment variables or ignored
 
 ## Stack
 
-Node 24 (`.nvmrc`, `engines` `24.x`), pnpm 12.4.2 (`packageManager`; use no other package manager), TypeScript 7 (`tsc --noEmit`), Hono 4 with hono/jsx, `@modelcontextprotocol/server` 2, better-auth 1.7 (`oauth-provider` and `mcp`), Kysely and `@libsql/client` (Turso), zod 4, Biome 2 with GritQL plugins in `lint/`, Vitest 5, esbuild. Exact versions are pinned in `package.json` (`savePrefix: ""` in `pnpm-workspace.yaml`).
+Node 24 (`.nvmrc`, `engines` `24.x`), pnpm 12.4.2 (`packageManager`; use no other package manager), TypeScript 7 (`tsc --noEmit`), Hono 4 with hono/jsx, `@modelcontextprotocol/server` 2, better-auth 1.7 (`oauth-provider` and `mcp`), Kysely and `@libsql/client` (Turso), zod 4, Biome 2 with GritQL plugins in `lint/`, Vitest 5, esbuild, `@modelcontextprotocol/ext-apps` (the widgets' MCP Apps client), happy-dom (widget unit tests), playwright-core (widget screenshots only). Exact versions are pinned in `package.json` (`savePrefix: ""` in `pnpm-workspace.yaml`).
 
 ## Commands
 
@@ -16,7 +16,7 @@ Run from the repo root. These match `.github/workflows/ci.yml`:
 
 - Install: `pnpm install --frozen-lockfile`
 - Lint: `pnpm exec biome check .` (`pnpm lint` is the same check)
-- Typecheck: `pnpm typecheck`
+- Typecheck: `pnpm typecheck` (two `tsc --noEmit` projects: `tsconfig.json` for node code, `tsconfig.widgets.json` for `src/widgets/` and `test/fixtures/widget` with DOM types)
 - Test: `pnpm test` (`vitest run`). Hermetic: in-memory libSQL and a fake deployment. No env and no network.
 - Build: `pnpm build` (esbuild → `dist/index.js`)
 - Bundle-load: with no environment, the bundle must throw the fail-closed env error and nothing else:
@@ -30,8 +30,12 @@ echo "$out" | grep -q "Invalid environment:" || { echo "$out"; echo "dist/index.
 Also:
 
 - Format: `pnpm format <paths>` (paths are required; the script exits if you omit them)
-- Dev: `pnpm dev`, with `.env.local` copied from `.env.example` (`TURSO_DATABASE_URL=file:local.db`, `PUBLIC_URL=http://localhost:3000`, and throwaway 32+ character secrets)
+- Dev: `pnpm dev` (tsx watch; it also watches `src/widgets`, whose sources the `?widget` loader bundles outside node's module graph), with `.env.local` copied from `.env.example` (`TURSO_DATABASE_URL=file:local.db`, `PUBLIC_URL=http://localhost:3000`, and throwaway 32+ character secrets)
 - Migrate: `pnpm db:migrate` against a local `file:` database
+- Live check: `pnpm test:live` runs `test/live/*.live.ts` against a real deployment (`vitest.live.config.ts`; `LIVE_ORIGIN` and `LIVE_CODE` from the environment or an ignored `.env.live`). Not part of CI.
+- ChatGPT package: `pnpm chatgpt:package` (`scripts/chatgpt-package.ts`; `test/chatgpt-package.test.ts` pins the entries' hashes)
+- Widget screenshots: `pnpm widget-shots` writes `docs/widget-screenshots/`. Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
+- Dark palette: `scripts/derive-dark-palette.ts` derives `src/widgets/tokens.css`'s dark half; its header says how to run it.
 
 Done means the CI checks above are all green: lint, typecheck, test, build, and bundle-load.
 
@@ -44,10 +48,15 @@ Biome enforces the import walls:
 - `src/db/`: the only place that imports `@libsql/client`. Connection rows and the key cipher. Schema changes are new numbered files in `migrations/`.
 - `src/deployment/`: the `/connector/v1` client. It imports nothing from `src/db/`, `src/auth/`, or `src/mcp/`.
 - `src/connect/`: the connect-flow pages, server-rendered with hono/jsx, mounted at `/connect`.
+- `src/widgets/`: the MCP Apps widgets, browser code (`hono/jsx/dom`, DOM types) and the only place that imports `@modelcontextprotocol/ext-apps`. It imports nothing from `src/db/`, `src/auth/`, `src/mcp/`, `src/deployment/`, `src/connect/`, `src/site/`, `src/env.ts`, `src/log.ts`, or `src/secret.ts`; `src/format.ts` and `src/presets/` are the server files it shares, so they stay free of node and server imports. `src/widgets/html.ts` exposes each widget as one HTML document, which `src/mcp/` serves as a resource.
+- `?widget`: `import html from "./x/index.tsx?widget"` is the entry bundled into a self-contained HTML string (`scripts/widget-html.mjs`). Three loaders resolve it: the esbuild plugin in `scripts/build.ts`, the vitest plugin in `vitest.config.ts`, and the node hook `scripts/widget-hook.mjs`, which `scripts/binary-register.mjs` registers for tsx (`pnpm dev`, `pnpm widget-shots`).
+- `src/presets/`: the campaign theme presets, shared by `src/mcp/` and `src/widgets/`.
+- `src/format.ts`: money and date formatting in the reader's locale, shared by `src/mcp/` and `src/widgets/`.
 - `src/log.ts`: the only place `console` is allowed. Each event is a closed set of fields (`kind`, and the fields that kind names). `errorName` is `err.name`, never a message.
 - `src/env.ts`: the only parse of the process environment (zod, fails closed, names variables, never values).
 - `src/secret.ts`: `Secret` holds a deployment's connector key. Printing, interpolating, or serializing it yields `[redacted]`; only `reveal()` reads it.
 - `test/`: integration tests and the harness (`test/harness.ts`, `test/fake-deployment.ts`).
+- `test/widget-host/`: a fake MCP Apps host and the widget state fixtures; the widget tests and `pnpm widget-shots` mount widgets in it. Widget unit tests that need a DOM start with `// @vitest-environment happy-dom`.
 
 A deployment is reached only through its `/connector/v1`. `better-giving-oss` owns and versions that contract. An older release answers with "update Better Giving". A refused key answers with "reconnect" and the row is dropped.
 
