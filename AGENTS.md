@@ -73,5 +73,5 @@ A deployment is reached only through its `/connector/v1`. `better-giving-oss` ow
 - Never add a tool that moves money. No charge, refund, or payout. `record_donation` only records a gift that was already received off the site.
 - Never let a tool accept or return a connection key. The key is exchanged and stored inside the service, encrypted at rest with `CONNECTION_KEY_SECRET`. It is never logged, returned to a chat, or written into an error. Tool arguments and tool results never reach a log line. `test/no-leak.test.ts` checks this on every route and tool; never weaken that test.
 - Never use `connect.better.giving` as this service's host. It is mail-only. The production origin is `https://app.connect.better.giving`.
-- Never talk to a deployment by any path other than `/connector/v1`.
+- Never talk to a deployment by any path other than `/connector/v1`, with one exception: `set_campaign_photo` POSTs the photo to the upload page URL that `photos.upload_link` returned, and only when that URL's origin equals the connection's origin (`src/mcp/photo-upload.ts`).
 - Never negate `.claude/skills` or `.claude/agents` in `.gitignore`.

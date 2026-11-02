@@ -53,7 +53,7 @@ const LONG_DESCRIPTION = [
 ].join(" ");
 
 const RELEASE_NOTES =
-	"Initial release. Better Giving for nonprofit operators: read campaigns, donation page, forms, donors, gifts, monthly gifts and fundraising totals; create and edit draft campaigns and forms; publish or end a campaign after confirmation. No money movement.";
+	"Initial release. Better Giving for nonprofit operators: read campaigns, donation page, forms, donors, gifts, monthly gifts and fundraising totals; create and edit draft campaigns and forms; start a campaign from a preset, browse and edit campaigns and set a cover photo on cards in the chat; publish or end a campaign after confirmation. No money movement.";
 
 const ONBOARDING_SKILL_PATH = "skills/get-started/SKILL.md";
 
@@ -108,6 +108,7 @@ export function pluginManifest() {
 						"Manage donation forms",
 						"Review donations and donors",
 						"See fundraising results",
+						"Cards for campaigns and results",
 					],
 					websiteURL: "https://better.giving",
 					brandColor: BRAND_COLOR,
@@ -164,6 +165,28 @@ export function pluginManifest() {
 									"list_campaigns, get_campaign, update_campaign_settings",
 								expected_behavior:
 									"Updates only the goal and end date, with the version checked.",
+							},
+							{
+								description: "Start a campaign from a preset",
+								prompt: "Help me start an emergency campaign for our shelter.",
+								tools_triggered:
+									"recommend_campaign_presets, show_campaign_create",
+								expected_behavior: `Shows a card with four presets and values recommended from past results, served from ${ORIGIN}. Its Create draft button makes a draft donors cannot see.`,
+							},
+							{
+								description: "Browse campaigns and open the editor",
+								prompt:
+									"Show my campaigns, then open the winter drive to edit.",
+								tools_triggered: "show_campaigns, open_campaign_editor",
+								expected_behavior:
+									"Shows a card of campaigns with progress, then a fullscreen editor with a live preview. Edits to a live campaign stay a draft until published.",
+							},
+							{
+								description: "Set a cover photo from the chat",
+								prompt: "Use this photo as the cover for the winter drive.",
+								tools_triggered: "set_campaign_photo",
+								expected_behavior:
+									"Sets the cover from the dropped photo, or returns a single-use upload link if it cannot.",
 							},
 						],
 						negative: [

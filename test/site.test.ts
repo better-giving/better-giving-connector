@@ -10,6 +10,7 @@ import {
 import type { Db } from "../src/db";
 import { PLATFORM_ORIGIN } from "../src/deployment/origin";
 import { ACTIONS } from "../src/mcp/actions";
+import { LOCAL_TOOLS } from "../src/mcp/local";
 import { fakeDeployment } from "./fake-deployment";
 import { BASE, env, warmUp } from "./harness";
 import type { Call } from "./oauth";
@@ -334,9 +335,9 @@ test("the docs tool reference lists every tool once, and only reads as Read", as
 
 	expect(docs).toContain("<h2>Tool reference</h2>");
 	expect(rows.map((row) => row.tool).sort()).toEqual(
-		ACTIONS.map((spec) => spec.tool).sort(),
+		[...ACTIONS, ...LOCAL_TOOLS].map((spec) => spec.tool).sort(),
 	);
-	for (const spec of ACTIONS) {
+	for (const spec of [...ACTIONS, ...LOCAL_TOOLS]) {
 		const row = rows.find((r) => r.tool === spec.tool);
 		expect(row?.toolClass === "Read", spec.tool).toBe(
 			spec.annotations.readOnlyHint === true,
