@@ -10,7 +10,7 @@ The mockup images could not be opened in the build environment, so this compares
 
 **01 Campaign create**
 - Four preset cards as a radio group, a "Recommended from your past results" strip with an evidence sentence per value, and Create draft / Customize match.
-- The strip's four values are shown in a row; the cards do not collapse to 2x2 below 640px but stack by the column's own wrapping.
+- Customize creates the draft and opens it in the fullscreen editor. Below 640px the cards and the strip wrap 2x2, as DESIGN.md asks.
 - The mockup's pre-selected card comes from the render tool's `theme` input; with none, Emergency is selected.
 - "Starting points" (fewer than 2 past campaigns and 25 gifts) is a state DESIGN.md leaves open; it shows the theme defaults with the strip labelled as starting points.
 
