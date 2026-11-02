@@ -38,6 +38,23 @@ const button = (root: HTMLElement, text: string) => {
 	return found;
 };
 
+describe("campaign results money", () => {
+	it.each([
+		["en-US", "$3,240.50"],
+		["en-PH", "$3,240.50"],
+		["de-DE", "3.240,50"],
+	])(
+		"shows the raised amount in %s, still in dollars",
+		async (locale, shown) => {
+			const { root } = await show(RESULTS_LIVE, { locale });
+			const text = root.querySelector(".raised")?.textContent ?? "";
+			expect(text).toContain(shown);
+			expect(text).toMatch(/\$/);
+			expect(text).not.toMatch(/[₱€]/);
+		},
+	);
+});
+
 describe("campaign results", () => {
 	it("says so when the host won't open the campaign page", async () => {
 		const { bridge, root } = await show(RESULTS_LIVE);

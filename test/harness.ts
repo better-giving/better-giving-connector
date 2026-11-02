@@ -72,7 +72,12 @@ export function mcpRequest(
 			"mcp-protocol-version": version,
 		});
 	}
-	const name = method === "tools/call" ? params?.name : undefined;
+	const name =
+		method === "tools/call"
+			? params?.name
+			: method === "resources/read"
+				? params?.uri
+				: undefined;
 	return mcpPost(
 		{
 			jsonrpc: "2.0",

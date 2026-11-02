@@ -355,6 +355,31 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		});
 	});
 
+	test("every widget is listed and read as an MCP App resource with its sandbox rules", async () => {
+		const listed = (await rpc(await send("resources/list"))).result.resources;
+		expect(listed.map((r: { uri: string }) => r.uri).sort()).toEqual(
+			[
+				"campaign-create",
+				"campaign-editor",
+				"campaign-results",
+				"campaigns",
+				"photo",
+			].map((name) => `ui://better-giving/${name}.html`),
+		);
+		for (const { uri } of listed) {
+			const raw = await rpc(await send("resources/read", { uri }));
+			if (!raw.result) throw new Error(JSON.stringify(raw).slice(0, 400));
+			const read = raw.result.contents[0];
+			expect(read.mimeType).toBe("text/html;profile=mcp-app");
+			expect(read.text).toContain("<script");
+			expect(read._meta.ui.csp.resourceDomains).toContain(
+				"https://*.public.blob.vercel-storage.com",
+			);
+			expect(read._meta.ui.csp.connectDomains).toEqual([]);
+			expect(read._meta.ui.domain).toMatch(/^https?:\/\//);
+		}
+	});
+
 	test("record_donation offers only the contract's payment methods", async () => {
 		const tools = await listTools();
 		const record = tools.find(
