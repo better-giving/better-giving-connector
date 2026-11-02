@@ -56,7 +56,7 @@ export type LogEvent =
 	// a successful call whose body its output schema refused, answered as text alone
 	| { kind: "output_invalid"; tool: LoggedTool }
 	| { kind: "connect"; step: ConnectStep; outcome: ConnectOutcome }
-	| { kind: "sweep"; connections: number; ms: number }
+	| { kind: "sweep"; connections: number; drafts: number; ms: number }
 	| {
 			kind: "error";
 			where: "mcp" | "connect" | "auth" | "app" | "sweep" | "disconnect";
@@ -81,8 +81,8 @@ export function log(event: LogEvent): void {
 			return;
 		}
 		case "sweep": {
-			const { kind, connections, ms } = event;
-			console.log(JSON.stringify({ kind, connections, ms }));
+			const { kind, connections, drafts, ms } = event;
+			console.log(JSON.stringify({ kind, connections, drafts, ms }));
 			return;
 		}
 		case "error": {

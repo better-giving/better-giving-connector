@@ -1255,7 +1255,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		expect(refused.map((r) => r.status)).toEqual([401, 401, 401]);
 		expect(accepted.status).toBe(200);
-		expect(await accepted.json()).toEqual({ connections: 0 });
+		expect(await accepted.json()).toEqual({ connections: 0, drafts: 0 });
 		expect(broken.status).toBe(500);
 		expectCleanScenario();
 	});

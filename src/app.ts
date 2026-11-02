@@ -45,7 +45,14 @@ export function createApp(deps: AppDeps): Hono {
 			platformOrigin: deps.platformOrigin,
 		}),
 	);
-	app.route("/cron", cronRoutes({ auth, secret: deps.env.CRON_SECRET }));
+	app.route(
+		"/cron",
+		cronRoutes({
+			auth,
+			drafts: campaignDrafts(deps.db),
+			secret: deps.env.CRON_SECRET,
+		}),
+	);
 	app.route("/", siteRoutes({ challenge: deps.env.OPENAI_APPS_CHALLENGE }));
 	app.route(
 		"/mcp",

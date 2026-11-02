@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import { cronRoutes } from "../src/cron";
-import type { Db } from "../src/db";
+import { campaignDrafts, type Db } from "../src/db";
 import { type FakeDeployment, fakeDeployment } from "./fake-deployment";
 import { BASE, env, warmUp } from "./harness";
 import type { Call } from "./oauth";
@@ -63,7 +63,7 @@ test("/cron/sweep with the secret drops a connection whose refresh token expired
 	const res = await call(sweepRequest(BEARER));
 
 	expect(res.status).toBe(200);
-	expect(await res.json()).toEqual({ connections: 1 });
+	expect(await res.json()).toEqual({ connections: 1, drafts: 0 });
 	expect(await countRows(db, "connection")).toBe(0);
 });
 
@@ -72,7 +72,7 @@ test("/cron/sweep sweeps again while a batch comes back full", async () => {
 
 	const res = await call(sweepRequest(BEARER));
 
-	expect(await res.json()).toEqual({ connections: 1001 });
+	expect(await res.json()).toEqual({ connections: 1001, drafts: 0 });
 	expect(await countRows(db, "user")).toBe(0);
 });
 
@@ -87,6 +87,7 @@ test("/cron/sweep stops repeating once 50 s have passed, leaving the rest for to
 				return { connections: 500, more: true };
 			},
 		},
+		drafts: { deleteIdleSince: async () => 0 },
 		secret: env.CRON_SECRET,
 		clock: () => now,
 	});
@@ -95,7 +96,7 @@ test("/cron/sweep stops repeating once 50 s have passed, leaving the rest for to
 		new Request(`${BASE}/sweep`, { headers: { authorization: BEARER } }),
 	);
 
-	expect(await res.json()).toEqual({ connections: 1000 });
+	expect(await res.json()).toEqual({ connections: 1000, drafts: 0 });
 });
 
 test("/cron/sweep writes one log line, its counts and duration only", async () => {
@@ -110,6 +111,7 @@ test("/cron/sweep writes one log line, its counts and duration only", async () =
 	expect(JSON.parse(lines[0])).toStrictEqual({
 		kind: "sweep",
 		connections: 2,
+		drafts: 0,
 		ms: expect.any(Number),
 	});
 });
@@ -131,4 +133,29 @@ test("/cron/sweep that throws is a 500 logged by error name only", async () => {
 			),
 		],
 	]);
+});
+
+test("/cron/sweep drops drafts untouched for 30 days and keeps newer ones", async () => {
+	const drafts = campaignDrafts(db);
+	const key = (campaignId: string) => ({
+		userId: "u1",
+		origin: deployment.origin,
+		campaignId,
+	});
+	const draft = (campaignId: string) => ({
+		...key(campaignId),
+		baseVersion: "3",
+		settings: { goal: { amount: "10.00", currency: "USD" } },
+		page: null,
+		pageKind: null,
+	});
+	await drafts.put(draft("old"));
+	advance(31 * DAY);
+	await drafts.put(draft("new"));
+
+	const res = await call(sweepRequest(BEARER));
+
+	expect(await res.json()).toMatchObject({ drafts: 1 });
+	expect(await drafts.get(key("old"))).toBeNull();
+	expect(await drafts.get(key("new"))).not.toBeNull();
 });
