@@ -8,6 +8,7 @@ import { useLocale } from "../ui/widget";
  * only the filled red button ends the campaign.
  */
 export function EndConfirm(props: {
+	title: string;
 	donors: number;
 	busy: boolean;
 	onKeep: () => void;
@@ -20,8 +21,8 @@ export function EndConfirm(props: {
 	}, [id]);
 	const who =
 		props.donors === 1
-			? "1 donor has given"
-			: `${new Intl.NumberFormat(locale).format(props.donors)} donors have given`;
+			? "1 donor"
+			: `${new Intl.NumberFormat(locale).format(props.donors)} donors`;
 	return (
 		<section
 			class="confirm"
@@ -32,10 +33,11 @@ export function EndConfirm(props: {
 			}}
 		>
 			<h3 id={`${id}-title`} class="confirm-title">
-				End this campaign?
+				End “{props.title}” for good?
 			</h3>
 			<p id={`${id}-body`}>
-				It stops taking gifts right away. {who} so far. Ending can't be undone.
+				The donation page stops taking gifts immediately. <b>{who}</b> have
+				given so far. This can't be undone.
 			</p>
 			<div class="row">
 				<Button
@@ -52,7 +54,7 @@ export function EndConfirm(props: {
 					onClick={props.onEnd}
 					class="confirm-end"
 				>
-					Yes, end campaign
+					End campaign
 				</Button>
 			</div>
 		</section>

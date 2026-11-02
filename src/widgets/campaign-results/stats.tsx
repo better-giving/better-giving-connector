@@ -1,5 +1,6 @@
 /** @jsxImportSource hono/jsx/dom */
 import type { CampaignResultsData } from "../model";
+import { scaled, scaleOf, unscaled } from "../ui/decimal";
 import { ProgressBar, percentOf } from "../ui/progress";
 import { Sparkline, weekOverWeek } from "../ui/sparkline";
 import { useMoney } from "../ui/text";
@@ -10,19 +11,37 @@ export function Totals(props: { data: CampaignResultsData }) {
 	const { data } = props;
 	const { goal } = data.campaign;
 	const percent = percentOf(data.raised, goal);
+	const scale = goal ? scaleOf([data.raised.amount, goal.amount]) : 0;
+	const left = goal
+		? scaled(goal.amount, scale) - scaled(data.raised.amount, scale)
+		: 0n;
+	const draft = data.campaign.status === "draft";
 	return (
 		<div class="totals">
 			<p class="raised">
-				<strong>{money(data.raised)}</strong>
+				<strong class="raised-figure">{money(data.raised)}</strong>
 				{goal ? (
-					<span class="muted"> of {money(goal)}</span>
+					<span class="muted">
+						{" "}
+						raised of {money(goal)}
+						{draft ? " goal" : ""}
+					</span>
 				) : (
 					<span class="muted"> raised</span>
 				)}
-				{percent !== null && <span class="percent"> · {percent}%</span>}
 			</p>
 			{percent !== null && (
 				<ProgressBar percent={percent} label="Raised of goal" />
+			)}
+			{percent !== null && !draft && (
+				<p class="goal-row">
+					<span>{percent}% of goal</span>
+					<span>
+						{left > 0n
+							? `${money({ amount: unscaled(left, scale), currency: data.raised.currency })} to go`
+							: "Goal reached"}
+					</span>
+				</p>
 			)}
 		</div>
 	);
@@ -32,63 +51,49 @@ export function Facts(props: { data: CampaignResultsData }) {
 	const money = useMoney();
 	const count = new Intl.NumberFormat(useLocale());
 	const { data } = props;
-	const facts = [
-		{ name: "Donors", value: count.format(data.donors) },
-		{
-			name: "Average gift",
-			value: data.averageGift ? money(data.averageGift) : "No gifts yet",
-		},
-		{
-			name: "Median gift",
-			value: data.medianGift ? money(data.medianGift) : "No gifts yet",
-		},
-	];
-	return (
-		<dl class="facts">
-			{facts.map((f) => (
-				<div key={f.name} class="fact">
-					<dt>{f.name}</dt>
-					<dd>{f.value}</dd>
-				</div>
-			))}
-		</dl>
-	);
-}
-
-export function Trend(props: { data: CampaignResultsData }) {
-	const money = useMoney();
-	const { daily } = props.data;
+	const { daily } = data;
 	const week = weekOverWeek(daily);
 	const { change } = week;
-	let words: string;
-	let mark = "";
-	if (change === null) words = "No gifts in the 7 days before";
-	else if (change > 0) {
-		words = `Up ${change}% from the previous 7 days`;
-		mark = "▲";
-	} else if (change < 0) {
-		words = `Down ${-change}% from the previous 7 days`;
-		mark = "▼";
-	} else words = "Same as the previous 7 days";
+	const ended = data.campaign.status === "ended";
 	return (
-		<section class="trend" aria-label="Last 7 days">
-			<div class="trend-text">
-				<p class="eyebrow">Last 7 days</p>
-				<p class="trend-amount">{money(week.last)}</p>
-				<p class="trend-change">
-					{mark && <span aria-hidden="true">{mark} </span>}
-					{words}
-				</p>
-				<p class="hint">Previous 7 days: {money(week.previous)}</p>
+		<dl class="facts">
+			<div class="fact">
+				<dt>Donors</dt>
+				<dd>{count.format(data.donors)}</dd>
+				<dd class="fact-sub">
+					{count.format(data.giftCount)}{" "}
+					{data.giftCount === 1 ? "gift" : "gifts"}
+				</dd>
 			</div>
-			<div class="trend-chart">
-				<Sparkline
-					values={daily.map((d) => Number(d.total.amount))}
-					emphasize={7}
-					label="Gifts per day over the last 14 days"
-				/>
-				<p class="hint trend-legend">Previous 7 days, then last 7 days</p>
+			<div class="fact">
+				<dt>Average gift</dt>
+				<dd>{data.averageGift ? money(data.averageGift) : "No gifts yet"}</dd>
+				{data.medianGift && (
+					<dd class="fact-sub">Median {money(data.medianGift)}</dd>
+				)}
 			</div>
-		</section>
+			{!ended && (
+				<div class="fact fact-trend">
+					<dt>Last 7 days</dt>
+					<dd class="fact-line">
+						<span>{money(week.last)}</span>
+						{change !== null && change !== 0 && (
+							<span class={change > 0 ? "pill pill-up" : "pill pill-down"}>
+								<span aria-hidden="true">{change > 0 ? "↗" : "↘"}</span>{" "}
+								{change > 0 ? "Up" : "Down"} {Math.abs(change)}%
+							</span>
+						)}
+					</dd>
+					<dd class="fact-sub">Previous 7 days: {money(week.previous)}</dd>
+					<dd class="fact-chart">
+						<Sparkline
+							values={daily.map((d) => Number(d.total.amount))}
+							emphasize={7}
+							label="Gifts per day over the last 14 days"
+						/>
+					</dd>
+				</div>
+			)}
+		</dl>
 	);
 }

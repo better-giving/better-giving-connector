@@ -206,32 +206,45 @@ export const RESULTS_LIVE: CampaignResultsData = {
 	pendingDraft: false,
 };
 
-const RESULTS_DRAFT: CampaignResultsData = {
+// The states the screenshots show, with the approved mockup's numbers.
+const SHOT_DAILY = [
+	400, 500, 450, 600, 520, 687, 600, 600, 640, 700, 720, 760, 780, 760,
+].map((n, i) => ({ date: day(13 - i), total: usd(`${n}.00`) }));
+
+const SHOT_LIVE: CampaignResultsData = {
 	...RESULTS_LIVE,
 	campaign: {
 		...RESULTS_LIVE.campaign,
-		id: "c-spring",
-		title: "Spring planting day",
-		status: "draft",
-		url: null,
-		version: "3",
+		id: "c-storm",
+		title: "Storm relief — Visayas",
+		goal: usd("25000.00"),
+		endDate: "2026-12-15",
 	},
+	raised: usd("18420.00"),
+	donors: 214,
+	giftCount: 214,
+	averageGift: usd("86.07"),
+	medianGift: usd("50.00"),
+	daily: SHOT_DAILY,
+};
+
+const SHOT_DRAFT: CampaignResultsData = {
+	...SHOT_LIVE,
+	campaign: { ...SHOT_LIVE.campaign, status: "draft", url: null, version: "3" },
 	raised: usd("0.00"),
 	donors: 0,
 	giftCount: 0,
 	averageGift: null,
 	medianGift: null,
-	daily: DAILY.map((d) => ({ ...d, total: usd("0.00") })),
+	daily: SHOT_DAILY.map((d) => ({ ...d, total: usd("0.00") })),
 	readiness: [
-		{ id: "goal", label: "A fundraising goal is set", done: true },
-		{ id: "story", label: "The page has a story", done: true },
-		{ id: "photo", label: "A cover photo is added", done: false },
-		{ id: "gifts", label: "Gifts go to a fund", done: false },
+		{ id: "photo", label: "Cover photo", done: true },
+		{ id: "story", label: "Story", done: true },
+		{ id: "goal", label: "Goal & end date", done: true },
+		{ id: "amounts", label: "Gift amounts", done: true },
 	],
-	programs: [
-		{ id: "p-food", name: "Food pantry" },
-		{ id: "p-shelter", name: "Winter shelter" },
-	],
+	programs: [{ id: "p-disaster", name: "Disaster response fund" }],
+	giftsGoTo: "p-disaster",
 };
 
 export const EDITOR: CampaignEditorData = {
@@ -314,10 +327,10 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 		},
 	},
 	"campaign-results": {
-		draft: { result: { structuredContent: RESULTS_DRAFT } },
-		live: { result: { structuredContent: RESULTS_LIVE } },
+		draft: { result: { structuredContent: SHOT_DRAFT } },
+		live: { result: { structuredContent: SHOT_LIVE } },
 		"end-confirm": {
-			result: { structuredContent: RESULTS_LIVE },
+			result: { structuredContent: SHOT_LIVE },
 			click: ["End campaign"],
 		},
 	},

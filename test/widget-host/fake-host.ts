@@ -56,6 +56,12 @@ export function hostContext(options: FakeHostOptions): McpUiHostContext {
 		availableDisplayModes: ["inline", "fullscreen"],
 		platform: phone ? "mobile" : "web",
 		deviceCapabilities: { touch: phone, hover: !phone },
+		// A host hands its font down; this one has a family with a bold weight.
+		styles: {
+			variables: {
+				"--font-sans": '"Liberation Sans", Arial, sans-serif',
+			} as unknown as NonNullable<McpUiHostContext["styles"]>["variables"],
+		},
 	};
 }
 

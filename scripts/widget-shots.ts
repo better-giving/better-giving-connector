@@ -90,6 +90,7 @@ try {
 							await page
 								.frameLocator("#widget")
 								.getByRole("button", { name: label })
+								.first()
 								.click();
 							await page.waitForTimeout(250);
 						}

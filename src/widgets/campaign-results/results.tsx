@@ -1,5 +1,6 @@
 /** @jsxImportSource hono/jsx/dom */
-import { useId, useState } from "hono/jsx/dom";
+import type { Child } from "hono/jsx";
+import { useEffect, useId, useState } from "hono/jsx/dom";
 import type { CampaignResultsData } from "../model";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -10,21 +11,69 @@ import { DateText, useMoney } from "../ui/text";
 import { callTool } from "../ui/tools";
 import { useLocale, useSession } from "../ui/widget";
 import { EndConfirm } from "./end-confirm";
-import { Facts, Totals, Trend } from "./stats";
+import { Facts, Totals } from "./stats";
 import "./results.css";
 
 const GENERAL = "";
 const isBool = (v: unknown): v is boolean => typeof v === "boolean";
 
-function Title(props: { data: CampaignResultsData; id: string }) {
-	const { campaign } = props.data;
+const DAY_MS = 86_400_000;
+
+/** Whole days from today to `iso` (a day), never negative. */
+const daysUntil = (iso: string, now: number) =>
+	Math.max(0, Math.ceil((Date.parse(`${iso}T23:59:59`) - now) / DAY_MS));
+
+function Updated() {
+	const [minutes, setMinutes] = useState(0);
+	useEffect(() => {
+		const started = Date.now();
+		const timer = setInterval(
+			() => setMinutes(Math.floor((Date.now() - started) / 60_000)),
+			30_000,
+		);
+		return () => clearInterval(timer);
+	}, []);
 	return (
-		<>
+		<span class="updated">
+			{minutes < 1 ? "Updated just now" : `Updated ${minutes} min ago`}
+		</span>
+	);
+}
+
+function Header(props: { data: CampaignResultsData; id: string }) {
+	const { campaign } = props.data;
+	const locale = useLocale();
+	const days = campaign.endDate
+		? daysUntil(campaign.endDate, Date.now())
+		: null;
+	const ends = campaign.endDate ? <DateText iso={campaign.endDate} /> : null;
+	let sub: Child;
+	if (campaign.status === "draft")
+		sub = "Not published · donors can't see it yet";
+	else if (campaign.status === "ended")
+		sub = ends ? <>Ended {ends}</> : "Ended";
+	else if (ends)
+		sub = (
+			<>
+				Ends {ends} ·{" "}
+				{days === null
+					? ""
+					: days === 1
+						? "1 day left"
+						: `${new Intl.NumberFormat(locale).format(days)} days left`}
+			</>
+		);
+	else sub = "No end date";
+	return (
+		<div class="head">
+			<div>
+				<h2 class="title" id={props.id} tabindex={-1}>
+					{campaign.title}
+				</h2>
+				<p class="subtitle">{sub}</p>
+			</div>
 			<StatusChip status={campaign.status} />
-			<h2 class="title" id={props.id} tabindex={-1}>
-				{campaign.title}
-			</h2>
-		</>
+		</div>
 	);
 }
 
@@ -118,17 +167,25 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 		</p>
 	);
 
+	const share = () => {
+		if (!campaign.url) return;
+		setError(null);
+		const url = campaign.url;
+		navigator.clipboard
+			.writeText(url)
+			.then(() => setStatus("Link copied."))
+			.catch(() => setError(`Copy the link from here: ${url}`));
+	};
+
 	if (campaign.status === "draft") {
-		const open = data.readiness.filter((r) => !r.done).length;
+		const done = data.readiness.filter((r) => r.done).length;
 		return (
 			<Card class="results" label="Campaign results">
-				<Title data={data} id={titleId} />
+				<Header data={data} id={titleId} />
 				<Totals data={data} />
 				<section aria-label="Ready to publish">
-					<h3 class="section-title">
-						{open === 0
-							? "Ready to publish"
-							: `${open} to do before publishing`}
+					<h3 class="eyebrow">
+						Ready to publish · {done} of {data.readiness.length}
 					</h3>
 					<ul class="checks">
 						{data.readiness.map((r) => (
@@ -138,36 +195,42 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 						))}
 					</ul>
 				</section>
-				<div class="field">
-					<label for={`${titleId}-gifts`}>Gifts go to</label>
-					<select
-						id={`${titleId}-gifts`}
-						class="input"
-						value={giftsGoTo}
-						onChange={(e: Event) =>
-							setGiftsGoTo((e.target as HTMLSelectElement).value)
-						}
-					>
-						<option value={GENERAL} selected={giftsGoTo === GENERAL}>
-							General fund
-						</option>
-						{data.programs.map((p) => (
-							<option key={p.id} value={p.id} selected={giftsGoTo === p.id}>
-								{p.name}
-							</option>
-						))}
-					</select>
-				</div>
-				<div class="row">
-					<Button variant="primary" busy={busy === "publish"} onClick={publish}>
-						Publish
-					</Button>
-					<Button variant="secondary" onClick={preview}>
-						Preview
-					</Button>
-				</div>
 				{errorLine}
 				{statusLine}
+				<div class="foot">
+					<div class="gifts-go">
+						<label for={`${titleId}-gifts`}>Gifts go to:</label>
+						<select
+							id={`${titleId}-gifts`}
+							class="input"
+							value={giftsGoTo}
+							onChange={(e: Event) =>
+								setGiftsGoTo((e.target as HTMLSelectElement).value)
+							}
+						>
+							<option value={GENERAL} selected={giftsGoTo === GENERAL}>
+								General fund
+							</option>
+							{data.programs.map((p) => (
+								<option key={p.id} value={p.id} selected={giftsGoTo === p.id}>
+									{p.name}
+								</option>
+							))}
+						</select>
+					</div>
+					<div class="foot-actions">
+						<Button variant="secondary" onClick={preview}>
+							Preview
+						</Button>
+						<Button
+							variant="primary"
+							busy={busy === "publish"}
+							onClick={publish}
+						>
+							Publish
+						</Button>
+					</div>
+				</div>
 			</Card>
 		);
 	}
@@ -175,24 +238,15 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 	const ended = campaign.status === "ended";
 	return (
 		<Card class="results" label="Campaign results">
-			<Title data={data} id={titleId} />
+			<Header data={data} id={titleId} />
 			<Totals data={data} />
 			<Facts data={data} />
-			{ended ? (
+			{ended && (
 				<p class="muted">
-					{campaign.endDate ? (
-						<>
-							Ended <DateText iso={campaign.endDate} />. This campaign no longer
-							takes gifts.
-						</>
-					) : (
-						"This campaign no longer takes gifts."
-					)}
+					This campaign no longer takes gifts.
 					{data.giftCount > 0 &&
 						` ${new Intl.NumberFormat(locale).format(data.giftCount)} ${data.giftCount === 1 ? "gift" : "gifts"}, ${money(data.raised)} in all.`}
 				</p>
-			) : (
-				<Trend data={data} />
 			)}
 			{!ended && data.pendingDraft && (
 				<p class="pending">
@@ -200,44 +254,53 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 					them live.
 				</p>
 			)}
-			{!ended && !confirmOpen && (
-				<div class="row">
-					{data.pendingDraft && (
+			{errorLine}
+			{statusLine}
+			{!ended && (
+				<div class="foot">
+					<Updated />
+					<div class="foot-actions">
+						{data.pendingDraft && (
+							<Button
+								variant="primary"
+								busy={busy === "publish"}
+								onClick={publish}
+							>
+								Publish changes
+							</Button>
+						)}
 						<Button
-							variant="primary"
-							busy={busy === "publish"}
-							onClick={publish}
+							id={`${titleId}-end`}
+							variant="outline-destructive"
+							onClick={() => setConfirming(true)}
 						>
-							Publish changes
+							End campaign
 						</Button>
-					)}
-					{campaign.url && (
-						<Button
-							variant="secondary"
-							onClick={() => campaign.url && openPage(campaign.url)}
-						>
-							View page
-						</Button>
-					)}
-					<Button
-						id={`${titleId}-end`}
-						variant="outline-destructive"
-						onClick={() => setConfirming(true)}
-					>
-						End campaign
-					</Button>
+						{campaign.url && (
+							<Button variant="secondary" onClick={share}>
+								Share link
+							</Button>
+						)}
+						{campaign.url && (
+							<Button
+								variant="secondary"
+								onClick={() => campaign.url && openPage(campaign.url)}
+							>
+								View page
+							</Button>
+						)}
+					</div>
 				</div>
 			)}
 			{confirmOpen && (
 				<EndConfirm
+					title={campaign.title}
 					donors={data.donors}
 					busy={busy === "end"}
 					onKeep={keepLive}
 					onEnd={() => void run("end", { id: campaign.id })}
 				/>
 			)}
-			{errorLine}
-			{statusLine}
 		</Card>
 	);
 }
