@@ -8,7 +8,7 @@ import type {
 	PhotoData,
 } from "../widgets/model";
 import { isLive, pendingDraft, readCampaign } from "./campaign-drafts";
-import { findCampaignForm } from "./campaign-presets";
+import { findCampaignForm, versionOf } from "./campaign-presets";
 import { type Body, isBody, readPages } from "./read-pages";
 import { readHistory } from "./recommend-tool";
 import { recommend } from "./recommendations";
@@ -55,10 +55,7 @@ const url = (value: unknown): string | null => {
 		return null;
 	}
 };
-const version = (campaign: Body): string | null => {
-	const v = campaign.version;
-	return typeof v === "string" || typeof v === "number" ? String(v) : null;
-};
+const version = (campaign: Body): string | null => versionOf(campaign) ?? null;
 const status = (campaign: Body): "draft" | "published" | "ended" =>
 	campaign.status === "published" || campaign.status === "ended"
 		? campaign.status

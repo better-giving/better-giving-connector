@@ -1,9 +1,14 @@
+import { randomInt } from "node:crypto";
 import type {
 	CampaignDraft,
 	CampaignDraftKey,
 	CampaignDrafts,
 	CampaignDraftWrite,
 } from "../src/db";
+
+// Random, as in src/db: a draft deleted and stored again must refuse a
+// revision read from the deleted one.
+const firstRevision = () => randomInt(1, 2 ** 47);
 
 /** The draft store in a Map, for a test or harness that has no database. Keeps src/db's contract. */
 export function memoryDrafts(): CampaignDrafts {
@@ -31,7 +36,7 @@ export function memoryDrafts(): CampaignDrafts {
 				structuredClone({
 					...draft,
 					updatedAt: new Date(),
-					revision: (stored?.revision ?? 0) + 1,
+					revision: stored ? stored.revision + 1 : firstRevision(),
 				}),
 			);
 			return true;

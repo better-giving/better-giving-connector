@@ -7,7 +7,7 @@ import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { applySetCookies } from "better-auth/cookies";
 import { Kysely } from "kysely";
-import { type Connections, campaignDrafts, type Db } from "../db";
+import type { CampaignDrafts, Connections, Db } from "../db";
 import type { ActionName, ChatClient, DeploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import type { Env } from "../env";
@@ -30,6 +30,7 @@ import {
 export type AuthDeps = {
 	db: Db;
 	connections: Connections;
+	drafts: Pick<CampaignDrafts, "deleteForUser">;
 	env: Env;
 	client: Pick<DeploymentClient, "disconnect">;
 	// How the CIMD plugin fetches a Client ID Metadata Document. Production
@@ -87,10 +88,10 @@ export interface AuthFacade {
 	/**
 	 * Ends a connection: asks its deployment to revoke the key, then deletes
 	 * its row and campaign drafts, then its user with every session, token
-	 * and consent. The
-	 * revoke is best effort; its failure is logged by name and the drop goes
-	 * on. A failure part-way through the deletes leaves a user without a row:
-	 * /mcp answers its tokens "reconnect", and the next sweep finishes the drop.
+	 * and consent. The revoke is best effort; its failure is logged by name
+	 * and the drop goes on. A failure part-way through the deletes leaves a
+	 * user without a row: /mcp answers its tokens "reconnect", and the next
+	 * sweep finishes the drop.
 	 */
 	dropConnection(userId: string): Promise<void>;
 	/**
@@ -240,7 +241,6 @@ export function buildAuth(
 
 export function createAuth(deps: AuthDeps): AuthFacade {
 	const authDb = authTables(deps.db);
-	const drafts = campaignDrafts(deps.db);
 	const base = deps.env.PUBLIC_URL;
 
 	// better-auth builds its context (`auth.$context`) and runs each plugin's
@@ -406,8 +406,9 @@ export function createAuth(deps: AuthDeps): AuthFacade {
 	async function deleteConnection(userId: string) {
 		await deps.connections.delete(userId);
 		// before the user row: campaign_draft has no FK to it
-		// (migrations/0004_campaign_draft.sql), so nothing else removes them
-		await drafts.deleteForUser(userId);
+		// (migrations/0004_campaign_draft.sql), and deadUsers finds this user
+		// for the next sweep only while the user row stands
+		await deps.drafts.deleteForUser(userId);
 		const { adapter, internalAdapter } = await (await ready()).$context;
 		const byUser = [{ field: "userId", value: userId }];
 		// explicit, not left to FK cascades: foreign_keys is a per-connection

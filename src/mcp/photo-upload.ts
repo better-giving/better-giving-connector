@@ -87,20 +87,27 @@ async function download(
 	return { bytes, type };
 }
 
-/** A fresh single-use link for the campaign's cover, from the site. */
+const OFF_SITE_LINK = "The site's upload page isn't on the connected site.";
+
+/**
+ * A fresh single-use link for the campaign's cover, from the site; null when
+ * the site's answer names no page on the connection's own origin, which is
+ * never handed out.
+ */
 export async function uploadLink(
 	{ connection, client }: Pick<LocalCall, "connection" | "client">,
 	campaignId: string,
-): Promise<UploadLink> {
+): Promise<UploadLink | null> {
 	const { body } = await client.call(connection, "photos.upload_link", {
 		target: { kind: "campaign", id: campaignId },
 		slot: "hero",
 	});
 	const link: Body = isBody(body) ? body : {};
-	return {
-		url: String(link.url),
-		expiresAt: String(link.expires_at),
-	};
+	if (typeof link.url !== "string" || typeof link.expires_at !== "string")
+		return null;
+	return URL.parse(link.url)?.origin === connection.origin
+		? { url: link.url, expiresAt: link.expires_at }
+		: null;
 }
 
 /**
@@ -122,19 +129,7 @@ export async function setCampaignPhoto(
 		reason = error.message;
 	}
 	const link = await uploadLink(call, campaignId);
-	let target: URL | null = null;
-	try {
-		target = new URL(link.url);
-	} catch {
-		target = null;
-	}
-	if (target === null || target.origin !== call.connection.origin) {
-		return {
-			uploaded: false,
-			reason: "The site's upload page isn't on the connected site.",
-			link: null,
-		};
-	}
+	if (link === null) return { uploaded: false, reason: OFF_SITE_LINK, link };
 	if (file === null) return { uploaded: false, reason, link };
 
 	const form = new FormData();
@@ -144,7 +139,7 @@ export async function setCampaignPhoto(
 		"photo",
 	);
 	try {
-		const res = await call.fetch(target, {
+		const res = await call.fetch(new URL(link.url), {
 			method: "POST",
 			body: form,
 			headers: { accept: "application/json" },

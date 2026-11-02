@@ -173,6 +173,56 @@ const fixtures: Record<string, { source: string; fires: Rule[] }> = {
 		source: 'import "../db/connections";\n',
 		fires: [],
 	},
+	"src/widgets/reaches-in-ext.ts": {
+		source:
+			'import "../env.ts";\nimport "../log.ts";\nimport "../secret.ts";\nimport "../../db/connections.ts";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/editor/reaches-in-log-ext.ts": {
+		source: 'import "../../log.ts";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/editor/reaches-in-secret-ext.ts": {
+		source: 'import "../../secret.ts";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/node-import.ts": {
+		source: 'import "node:fs";\n',
+		fires: ["restricted-import"],
+	},
+	"src/widgets/node-import.test.ts": {
+		source: 'import "node:fs";\n',
+		fires: [],
+	},
+	"src/format.ts": {
+		source: 'import "node:path";\n',
+		fires: ["restricted-import"],
+	},
+	"src/presets/node-import.ts": {
+		source: 'import "node:fs";\n',
+		fires: ["restricted-import"],
+	},
+	"src/presets/vendor.ts": {
+		source: 'import "better-auth/plugins/oauth";\n',
+		fires: ["restricted-import"],
+	},
+	"src/presets/clean.ts": {
+		source: 'import "zod";\nimport "./other";\n',
+		fires: [],
+	},
+	"src/mcp/node-import.ts": {
+		source: 'import "node:fs";\n',
+		fires: [],
+	},
+	"src/deployment/nested/reaches-in.ts": {
+		source:
+			'import "../../db/connections";\nimport "../../auth";\nimport "../../mcp/run-tool";\n',
+		fires: ["restricted-import"],
+	},
+	"src/deployment/nested/clean.ts": {
+		source: 'import "../origin";\nimport "../../secret";\n',
+		fires: [],
+	},
 	"src/console-use.ts": {
 		source: 'console.log("x");\n',
 		fires: ["console"],

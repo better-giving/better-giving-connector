@@ -1,11 +1,11 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CAMPAIGNS } from "../../../test/widget-host/fixtures";
 import { formatMoney } from "../../format";
 import { CampaignsData } from "../model";
-import { flush, startHost } from "../test-dom";
+import { startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { Campaigns } from "./carousel";
 
@@ -21,7 +21,9 @@ async function show(
 	document.body.append(root);
 	renderWidget(root, host, CampaignsData, Campaigns, "Loading campaigns…");
 	await bridge.sendToolResult(result);
-	await flush(10);
+	await vi.waitFor(() =>
+		expect(root.textContent).not.toContain("Loading campaigns…"),
+	);
 	return { bridge, root };
 }
 
@@ -105,11 +107,12 @@ describe("campaign carousel", () => {
 		).querySelector("button");
 		expect(draft?.textContent).toBe("Open draft");
 		draft?.click();
-		await flush(10);
-		expect(sent).toEqual([
-			'Show the results for the campaign "Winter coat drive" (id c-winter).',
-			'Open the editor for the draft campaign "Year-end appeal: Keep the pantry full" (id c-yearend).',
-		]);
+		await vi.waitFor(() =>
+			expect(sent).toEqual([
+				'Show the results for the campaign "Winter coat drive" (id c-winter).',
+				'Open the editor for the draft campaign "Year-end appeal: Keep the pantry full" (id c-yearend).',
+			]),
+		);
 	});
 
 	it("formats money and dates in the host's locale, never converting the currency", async () => {
@@ -149,10 +152,11 @@ describe("campaign carousel", () => {
 			"No campaigns yet",
 		);
 		root.querySelector("button")?.click();
-		await flush(10);
-		expect(sent).toEqual([
-			[{ type: "text", text: "Help me create a campaign." }],
-		]);
+		await vi.waitFor(() =>
+			expect(sent).toEqual([
+				[{ type: "text", text: "Help me create a campaign." }],
+			]),
+		);
 	});
 
 	it("shows the tool's own sentence when it failed", async () => {

@@ -1,9 +1,8 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Host, ToolOutcome } from "../host";
-import { flush } from "../test-dom";
 import { renderWidget } from "./widget";
 
 function fakeHost(onSubscribe: (set: (o: ToolOutcome) => void) => void): Host {
@@ -41,7 +40,8 @@ describe("renderWidget", () => {
 			(props) => <p class="name">{props.data.name}</p>,
 			"Loading…",
 		);
-		await flush(10);
-		expect(root.querySelector(".name")?.textContent).toBe("Harbor");
+		await vi.waitFor(() =>
+			expect(root.querySelector(".name")?.textContent).toBe("Harbor"),
+		);
 	});
 });

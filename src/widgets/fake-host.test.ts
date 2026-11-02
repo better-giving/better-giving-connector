@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { startFakeHost } from "../../test/widget-host/fake-host";
 import { CAMPAIGNS, type Fixture } from "../../test/widget-host/fixtures";
 import { connectHost } from "./host";
-import { flush, linkedPair } from "./test-dom";
+import { linkedPair } from "./test-dom";
 
 async function connect(fixture: Fixture, theme: "light" | "dark" = "dark") {
 	const [viewSide, hostSide] = linkedPair();
@@ -14,7 +14,8 @@ async function connect(fixture: Fixture, theme: "light" | "dark" = "dark") {
 		width: 375,
 	});
 	const host = await connectHost({ transport: viewSide });
-	await flush(20);
+	// the fixture's result lands on a later task than the handshake
+	await vi.waitFor(() => expect(host.toolResult()).toBeDefined());
 	return { fake, host };
 }
 
@@ -77,8 +78,9 @@ describe("fake host", () => {
 		await host.sendFollowUp("Show the results.");
 		await host.openLink("https://give.example.org/x");
 		expect(await host.requestFullscreen()).toBe("fullscreen");
-		await flush(20);
-		expect(host.context().displayMode).toBe("fullscreen");
+		await vi.waitFor(() =>
+			expect(host.context().displayMode).toBe("fullscreen"),
+		);
 		expect(fake.log.messages).toEqual(["Show the results."]);
 		expect(fake.log.links).toEqual(["https://give.example.org/x"]);
 	});

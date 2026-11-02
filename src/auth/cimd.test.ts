@@ -22,7 +22,7 @@ import {
 	freshDb,
 	NO_CONNECTION_ROWS,
 } from "../../test/support";
-import { type Connections, connections, type Db } from "../db";
+import { type Connections, campaignDrafts, connections, type Db } from "../db";
 import { deploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import { Secret } from "../secret";
@@ -84,6 +84,7 @@ function buildWith(docs: Map<string, Served>) {
 	auth = createAuth({
 		db,
 		connections: store,
+		drafts: campaignDrafts(db),
 		env,
 		client: deploymentClient({ fetch: deployment.fetch }),
 		fetchClientMetadata: metadataFetch(docs),

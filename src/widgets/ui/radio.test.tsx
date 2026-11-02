@@ -1,8 +1,8 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
 import { useState } from "hono/jsx/dom";
-import { describe, expect, it } from "vitest";
-import { flush, mount } from "../test-dom";
+import { describe, expect, it, vi } from "vitest";
+import { mount } from "../test-dom";
 import { RadioGroup } from "./radio";
 
 const THEMES = ["Emergency", "Year-end", "Capital", "Giving day"];
@@ -30,12 +30,11 @@ const checked = (root: HTMLElement) => {
 	expect(on).toHaveLength(1);
 	return optionText(on[0]);
 };
-const press = async (root: HTMLElement, key: string) => {
+const press = async (root: HTMLElement, key: string, shown: string) => {
 	document.activeElement?.dispatchEvent(
 		new KeyboardEvent("keydown", { key, bubbles: true }),
 	);
-	await flush();
-	return root;
+	await vi.waitFor(() => expect(checked(root)).toBe(shown));
 };
 
 describe("RadioGroup", () => {
@@ -52,27 +51,26 @@ describe("RadioGroup", () => {
 	it("moves the choice and the focus with the arrow keys, wrapping at the ends", async () => {
 		const root = mount(<Harness initial="Capital" />);
 		radios(root)[2]?.focus();
-		expect(checked(await press(root, "ArrowRight"))).toBe("Giving day");
+		await press(root, "ArrowRight", "Giving day");
 		expect(optionText(document.activeElement)).toBe("Giving day");
-		expect(checked(await press(root, "ArrowDown"))).toBe("Emergency");
-		expect(checked(await press(root, "ArrowLeft"))).toBe("Giving day");
-		expect(checked(await press(root, "ArrowUp"))).toBe("Capital");
+		await press(root, "ArrowDown", "Emergency");
+		await press(root, "ArrowLeft", "Giving day");
+		await press(root, "ArrowUp", "Capital");
 		expect(radios(root).map((r) => r.tabIndex)).toEqual([-1, -1, 0, -1]);
 	});
 
 	it("jumps to the first and last option with Home and End", async () => {
 		const root = mount(<Harness initial="Year-end" />);
 		radios(root)[1]?.focus();
-		expect(checked(await press(root, "End"))).toBe("Giving day");
-		expect(checked(await press(root, "Home"))).toBe("Emergency");
+		await press(root, "End", "Giving day");
+		await press(root, "Home", "Emergency");
 	});
 
 	it("checks an option on a click on its card, or Space", async () => {
 		const root = mount(<Harness initial="Emergency" />);
 		radios(root)[3]?.closest("label")?.click();
-		await flush();
-		expect(checked(root)).toBe("Giving day");
+		await vi.waitFor(() => expect(checked(root)).toBe("Giving day"));
 		radios(root)[1]?.focus();
-		expect(checked(await press(root, " "))).toBe("Year-end");
+		await press(root, " ", "Year-end");
 	});
 });

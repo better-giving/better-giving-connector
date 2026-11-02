@@ -282,6 +282,7 @@ export const PLATFORM_OUTPUTS = {
 					page_kind: z.enum(["blocks", "content"]).nullable(),
 					base_version: z.string().nullable(),
 					updated_at: z.string(),
+					revision: z.int(),
 				})
 				.optional(),
 		}),

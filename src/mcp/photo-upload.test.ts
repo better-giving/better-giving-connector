@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { MAX_PHOTO_BYTES, setCampaignPhoto } from "./photo-upload";
-import type { LocalCall } from "./spec";
+import { type LocalCall, ToolRefusal } from "./spec";
+import { WIDGET_TOOLS } from "./widget-tools";
 
 const ORIGIN = "https://hopeshelter.org";
 const PNG = new Uint8Array([
@@ -11,18 +12,32 @@ type Seen = { url: string; method: string; accept: string | null };
 
 function setup(options: {
 	linkUrl?: string;
+	link?: Record<string, unknown>;
 	file?: () => Response;
 	upload?: () => Response;
+	/** The address that answers a redirect, which the stub follows or refuses as the caller's `redirect` option says. */
+	redirects?: "download" | "upload";
 }) {
 	const seen: Seen[] = [];
+	const redirects: RequestInit["redirect"][] = [];
 	const fetchStub = (async (input: URL | string, init?: RequestInit) => {
 		const url = String(input);
+		const onUpload = url.startsWith(`${ORIGIN}/photo-upload/`);
+		if (options.redirects === (onUpload ? "upload" : "download")) {
+			redirects.push(init?.redirect);
+			if (init?.redirect === "error") throw new TypeError("redirect");
+			if (init?.redirect === "manual")
+				return new Response(null, {
+					status: 302,
+					headers: { location: "https://evil.example/" },
+				});
+		}
 		seen.push({
 			url,
 			method: init?.method ?? "GET",
 			accept: new Headers(init?.headers).get("accept"),
 		});
-		if (url.startsWith(`${ORIGIN}/photo-upload/`))
+		if (onUpload)
 			return options.upload?.() ?? Response.json({ url: "https://cdn/x.png" });
 		return options.file?.() ?? new Response(PNG);
 	}) as typeof fetch;
@@ -32,16 +47,16 @@ function setup(options: {
 			call: async (_c: unknown, action: string) => ({
 				body:
 					action === "photos.upload_link"
-						? {
+						? (options.link ?? {
 								url: options.linkUrl ?? `${ORIGIN}/photo-upload/tok`,
 								expires_at: "2031-04-02T10:15:00Z",
-							}
+							})
 						: { id: "cmp_1" },
 			}),
 		},
 		fetch: fetchStub,
 	} as unknown as LocalCall;
-	return { call, seen };
+	return { call, seen, redirects };
 }
 
 const photo = "https://files.example.org/p.png";
@@ -69,6 +84,74 @@ describe("setCampaignPhoto", () => {
 
 		expect(outcome).toMatchObject({ uploaded: false, link: null });
 		expect(seen.some((s) => s.method === "POST")).toBe(false);
+	});
+
+	test.each([
+		["on another port", `${ORIGIN}:8443/photo-upload/tok`],
+		["over http", "http://hopeshelter.org/photo-upload/tok"],
+		["on a subdomain", "https://evil.hopeshelter.org/photo-upload/tok"],
+	])(
+		"never posts to an upload link %s of the connected site",
+		async (_, linkUrl) => {
+			const { call, seen } = setup({ linkUrl });
+
+			const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+			expect(outcome).toMatchObject({ uploaded: false, link: null });
+			expect(seen.some((s) => s.method === "POST")).toBe(false);
+		},
+	);
+
+	test("refuses a photo address that redirects rather than follow it", async () => {
+		const { call, seen, redirects } = setup({ redirects: "download" });
+
+		const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(outcome).toMatchObject({
+			uploaded: false,
+			reason: "The photo couldn't be downloaded from the chat.",
+		});
+		expect(redirects[0]).toBe("error");
+		expect(seen.some((s) => s.method === "POST")).toBe(false);
+	});
+
+	test("does not follow a redirect from the upload page, and hands back the link", async () => {
+		const { call, redirects } = setup({ redirects: "upload" });
+
+		const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(outcome).toMatchObject({
+			uploaded: false,
+			reason: "The site didn't accept the photo.",
+			link: { url: `${ORIGIN}/photo-upload/tok` },
+		});
+		expect(redirects).toEqual(["manual"]);
+	});
+
+	test("refuses a streamed photo that outgrows the cap with no length declared, and stops reading it", async () => {
+		let cancelled = false;
+		const chunk = new Uint8Array(MAX_PHOTO_BYTES / 2 + 1);
+		const { call } = setup({
+			file: () =>
+				new Response(
+					new ReadableStream({
+						pull(controller) {
+							controller.enqueue(chunk);
+						},
+						cancel() {
+							cancelled = true;
+						},
+					}),
+				),
+		});
+
+		const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(outcome).toMatchObject({
+			uploaded: false,
+			reason: "The photo is larger than 4 MB.",
+		});
+		expect(cancelled).toBe(true);
 	});
 
 	test("refuses an address that isn't https, without downloading it", async () => {
@@ -120,5 +203,39 @@ describe("setCampaignPhoto", () => {
 			uploaded: false,
 			link: { url: `${ORIGIN}/photo-upload/tok` },
 		});
+	});
+});
+
+describe("the photo card's upload link", () => {
+	const linkFor = (call: LocalCall) =>
+		WIDGET_TOOLS.find((s) => s.tool === "app_photo_upload_link")?.run({
+			...call,
+			input: { id: "cmp_1" },
+		});
+
+	test("hands out the site's own upload page", async () => {
+		const { call } = setup({});
+
+		expect((await linkFor(call))?.structured).toEqual({
+			url: `${ORIGIN}/photo-upload/tok`,
+			expiresAt: "2031-04-02T10:15:00Z",
+		});
+	});
+
+	test("refuses a link on another origin rather than hand it to the card", async () => {
+		const { call } = setup({ linkUrl: "https://evil.example/photo-upload/t" });
+
+		const outcome = linkFor(call);
+
+		await expect(outcome).rejects.toThrow(ToolRefusal);
+		await expect(outcome).rejects.toMatchObject({
+			text: "The site's upload page isn't on the connected site, so no link was made.",
+		});
+	});
+
+	test("refuses an answer with no link, never answering the word undefined", async () => {
+		const { call } = setup({ link: { expires_at: "2031-04-02T10:15:00Z" } });
+
+		await expect(linkFor(call)).rejects.toThrow(ToolRefusal);
 	});
 });

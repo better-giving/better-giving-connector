@@ -335,7 +335,7 @@ test("a draft the campaign moved past is kept whole, and the chat is told to rea
 
 	expect(result.isError).toBe(true);
 	expect(result.content[0]?.text).toBe(
-		"This campaign changed since the draft was started. Read it again with get_campaign and re-make the edit.",
+		"Nothing was published: this campaign changed on the site after its draft edits were started, and publishing them would overwrite that change. Read it with get_campaign, which shows the campaign as it is now and the draft under pendingDraft, and tell the operator what changed. To keep the draft, re-make its edit with the version get_campaign returns as expected_version, which moves the draft onto that version, then publish again; or drop it with discard_campaign_draft.",
 	);
 	expect(writes()).toMatchObject([PATCH(k.id, "settings")]);
 	expect((await get(k.id)).pendingDraft).toEqual(before);
@@ -440,11 +440,15 @@ test("an edit to a live campaign against a version it moved past is refused, and
 	expect(await countRows(db, "campaign_draft")).toBe(0);
 });
 
+const revisionOf = async (id: string) =>
+	(await get(id)).pendingDraft?.revision as number;
+
 test("discard_campaign_draft drops the draft and sends nothing; a second discard finds none", async () => {
 	const k = await liveWithDraft();
+	const revision = await revisionOf(k.id);
 
-	const first = await tool("discard_campaign_draft", { id: k.id });
-	const second = await tool("discard_campaign_draft", { id: k.id });
+	const first = await tool("discard_campaign_draft", { id: k.id, revision });
+	const second = await tool("discard_campaign_draft", { id: k.id, revision });
 
 	expect(first.isError).toBeUndefined();
 	expect(first.structuredContent).toEqual({ discarded: true });
@@ -459,6 +463,81 @@ test("discard_campaign_draft drops the draft and sends nothing; a second discard
 	const read = await get(k.id);
 	expect(read.pendingDraft).toBeUndefined();
 	expect(read.settings.goal).toEqual(usd("1000.00"));
+});
+
+test("a discard of a draft saved since it was read is refused, and the newer draft stays", async () => {
+	const k = await liveWithDraft();
+	const seen = await revisionOf(k.id);
+	await tool("update_campaign_settings", { id: k.id, goal: usd("7000.00") });
+
+	const result = await tool("discard_campaign_draft", {
+		id: k.id,
+		revision: seen,
+	});
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toBe(
+		"Nothing was dropped: this campaign's draft changed since it was read. Read it again with get_campaign, tell the operator what it holds now, and discard it with the revision get_campaign returns only if they still want to.",
+	);
+	expect((await get(k.id)).pendingDraft).toMatchObject({
+		settings: { goal: usd("7000.00") },
+	});
+});
+
+const onSite = async (id: string, settings: Record<string, unknown>) =>
+	deployment.handle(
+		new Request(`${deployment.origin}/connector/v1/campaigns/${id}/settings`, {
+			method: "PATCH",
+			headers: {
+				authorization: `Bearer ${deployment.issuedKeys.at(-1)}`,
+				"content-type": "application/json",
+			},
+			body: JSON.stringify(settings),
+		}),
+	);
+
+test("a draft the site moved past goes live once its edit is re-made against the campaign as it is now", async () => {
+	const k = await liveWithDraft();
+	await onSite(k.id, { end_date: "2031-01-31" });
+	const refused = await tool("publish_campaign", { id: k.id });
+	const now = await get(k.id);
+
+	const resaved = await tool("update_campaign_settings", {
+		id: k.id,
+		goal: usd("5000.00"),
+		expected_version: now.version,
+	});
+	const published = await tool("publish_campaign", { id: k.id });
+
+	expect(refused.isError).toBe(true);
+	expect(resaved.structuredContent).toMatchObject({
+		base_version: now.version,
+	});
+	expect(published.isError).toBeUndefined();
+	expect(published.structuredContent).toMatchObject({
+		draft: { applied: ["settings", "page"], pending: [] },
+	});
+	const after = await get(k.id);
+	expect(after.settings).toMatchObject({
+		goal: usd("5000.00"),
+		end_date: "2031-01-31",
+	});
+	expect(after.pendingDraft).toBeUndefined();
+});
+
+test("the card's Publish on a draft the site moved past says what to do in the card, not in the chat", async () => {
+	const k = await liveWithDraft();
+	await onSite(k.id, { end_date: "2031-01-31" });
+
+	const result = await tool("app_publish_campaign", {
+		id: k.id,
+		giftsGoTo: null,
+	});
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toBe(
+		"Nothing was published: this campaign was changed on the site after these draft edits were saved, and publishing them would overwrite that change. To keep them, make your edit again in the editor and save it, then publish; or discard the draft edits.",
+	);
 });
 
 test("a read-only token can't discard a draft, and the draft stays", async () => {
@@ -567,4 +646,60 @@ test("the instructions say a live campaign's edits wait as a draft, and publishi
 	expect(instructions).toMatch(
 		/Before publish_campaign or end_campaign, say what will change and wait for the operator's explicit yes in this chat\.$/,
 	);
+});
+
+const widgetSave = (
+	id: string,
+	expectedVersion: string | null,
+	blocks: Record<string, unknown>[],
+) =>
+	tool("app_save_campaign_edit", {
+		id,
+		expectedVersion,
+		page: { pageKind: "blocks", blocks },
+	});
+
+test("the editor card's save of a live campaign against a version it moved past is refused, and no draft is kept", async () => {
+	const k = await live();
+
+	const result = await widgetSave(
+		k.id,
+		String(Number(k.version) - 1),
+		withStory(k, "Stale."),
+	);
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toMatch(/^Nothing was saved/);
+	expect(await countRows(db, "campaign_draft")).toBe(0);
+	expect(writes()).toEqual([]);
+});
+
+test("the editor card's save of a live campaign at its current version is kept as a draft on that version, sending nothing", async () => {
+	const k = await live();
+
+	const result = await widgetSave(k.id, k.version, withStory(k, "Fresh."));
+
+	expect(result.isError).toBeUndefined();
+	expect(result.structuredContent).toMatchObject({ pendingDraft: true });
+	expect(writes()).toEqual([]);
+	expect((await get(k.id)).pendingDraft).toMatchObject({
+		base_version: k.version,
+		page_kind: "blocks",
+	});
+});
+
+test("the editor card's save of a draft campaign sends its version to the site as expected_version, and none when it has none", async () => {
+	const k = (await tool("create_campaign", { title: "Spring gala" }))
+		.structuredContent as Campaign;
+	deployment.calls.length = 0;
+
+	await widgetSave(k.id, k.version, withStory(k, "Versioned."));
+	await widgetSave(k.id, null, withStory(k, "Unversioned."));
+
+	expect(writes().map((w) => w.path)).toEqual([
+		`/connector/v1/campaigns/${k.id}/blocks`,
+		`/connector/v1/campaigns/${k.id}/blocks`,
+	]);
+	expect(writes()[0]?.body).toMatchObject({ expected_version: k.version });
+	expect(writes()[1]?.body).not.toHaveProperty("expected_version");
 });

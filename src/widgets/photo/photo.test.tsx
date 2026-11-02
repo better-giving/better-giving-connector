@@ -1,9 +1,9 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PHOTO } from "../../../test/widget-host/fixtures";
 import { PhotoData } from "../model";
-import { flush, startHost } from "../test-dom";
+import { startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { PhotoCard } from "./photo";
 
@@ -23,8 +23,11 @@ async function show(data: PhotoData) {
 	document.body.append(root);
 	renderWidget(root, host, PhotoData, PhotoCard, "Loading…");
 	await bridge.sendToolResult({ content: [], structuredContent: data });
-	for (let i = 0; i < 20 && !called.length; i++) await flush(10);
-	await flush(10);
+	await vi.waitFor(() =>
+		expect(root.querySelector(".account-name")?.textContent).toBe(
+			"Harbor Food Bank",
+		),
+	);
 	return { root, called };
 }
 
@@ -43,9 +46,12 @@ describe("photo card", () => {
 			"Harbor Food Bank",
 		);
 		button(root, "Set as cover").click();
-		await flush(10);
+		await vi.waitFor(() =>
+			expect(root.querySelector('[role="status"]')?.textContent).toBe(
+				"The photo is now the cover.",
+			),
+		);
 		expect(called.map((c) => c.name)).toContain("app_set_campaign_photo");
-		expect(root.textContent).toContain("The photo is now the cover.");
 	});
 
 	it("offers the upload link where the host takes no file", async () => {

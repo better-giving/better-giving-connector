@@ -1,5 +1,6 @@
 import type { CampaignDraft, CampaignDraftKey, CampaignDrafts } from "../db";
 import { DeploymentRejected } from "../deployment";
+import { log } from "../log";
 import {
 	type DeploymentDeps,
 	failureDetail,
@@ -37,6 +38,8 @@ export type PendingDraft = {
 	base_version: string | null;
 	/** ISO timestamp of the last edit. */
 	updated_at: string;
+	/** Moves on every save; a discard names the one it read. */
+	revision: number;
 };
 
 /** What publishing a live campaign's draft did: the parts that went live, and those still kept. */
@@ -44,7 +47,7 @@ export type DraftPublished = {
 	campaign: Record<string, unknown>;
 	applied: DraftPart[];
 	pending: DraftPart[];
-	/** Why the pending part didn't go live, when one was tried. */
+	/** Why a part is still pending. */
 	failure?: string;
 };
 
@@ -74,10 +77,16 @@ export async function readCampaign(
 
 export const DRAFT_MOVED =
 	"Nothing was saved: this campaign's draft changed while the edit was being made. Read it again with get_campaign and re-make the edit.";
+const DRAFT_MOVED_CARD =
+	"Nothing was saved: this campaign's draft edits changed elsewhere while you were editing. Close the editor and open it again to see them, then make the change again.";
 export const STALE_DRAFT =
-	"This campaign changed since the draft was started. Read it again with get_campaign and re-make the edit.";
+	"Nothing was published: this campaign changed on the site after its draft edits were started, and publishing them would overwrite that change. Read it with get_campaign, which shows the campaign as it is now and the draft under pendingDraft, and tell the operator what changed. To keep the draft, re-make its edit with the version get_campaign returns as expected_version, which moves the draft onto that version, then publish again; or drop it with discard_campaign_draft.";
+const STALE_DRAFT_CARD =
+	"Nothing was published: this campaign was changed on the site after these draft edits were saved, and publishing them would overwrite that change. To keep them, make your edit again in the editor and save it, then publish; or discard the draft edits.";
 const STALE_READ =
 	"Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, make the change against what it shows now, and send the version it returns as expected_version.";
+const STALE_READ_CARD =
+	"Nothing was saved: this campaign changed on the site after the editor opened it. Close the editor and open it again to see it as it is now, then make the change again.";
 
 /**
  * The draft after `edit`: settings merge key by key, the later value winning;
@@ -107,8 +116,10 @@ export function mergeDraft(
 /**
  * Keeps `edit` as the campaign's draft when the campaign is live, and answers
  * what was kept; null when it isn't live, for the edit to be sent as usual.
- * The first edit records the version it was read at; a later one keeps it. An
- * `expectedVersion` other than the campaign's own is refused as stale.
+ * The first edit records the version it was read at; a later one keeps it,
+ * unless it names the campaign's own version as `expectedVersion`: made
+ * against the campaign as it is now, it moves the whole draft onto that
+ * version. Any other `expectedVersion` is refused as stale.
  */
 export async function saveLiveCampaignEdit(
 	deps: DraftDeps,
@@ -120,16 +131,17 @@ export async function saveLiveCampaignEdit(
 	if (!isLive(campaign)) return null;
 	const current = versionOf(campaign) ?? null;
 	if (expectedVersion !== undefined && expectedVersion !== current) {
-		throw new ToolRefusal("rejected", STALE_READ);
+		throw new ToolRefusal("rejected", STALE_READ, STALE_READ_CARD);
 	}
 	const key = keyOf(deps, campaignId);
 	const stored = await deps.drafts.get(key);
-	const baseVersion = stored ? stored.baseVersion : current;
+	const baseVersion =
+		stored && expectedVersion === undefined ? stored.baseVersion : current;
 	const kept = await deps.drafts.put(
 		{ ...key, baseVersion, ...mergeDraft(stored, edit) },
 		stored?.revision ?? null,
 	);
-	if (!kept) throw new ToolRefusal("rejected", DRAFT_MOVED);
+	if (!kept) throw new ToolRefusal("rejected", DRAFT_MOVED, DRAFT_MOVED_CARD);
 	return { saved: "draft", campaign_id: campaignId, base_version: baseVersion };
 }
 
@@ -145,14 +157,23 @@ export async function pendingDraft(
 		page_kind: draft.pageKind,
 		base_version: draft.baseVersion,
 		updated_at: draft.updatedAt.toISOString(),
+		revision: draft.revision,
 	};
 }
 
-/** Whether the campaign had a draft to discard. */
-export const discardCampaignDraft = (
+/**
+ * Drops the campaign's draft while it is still the one at `revision`:
+ * "moved" when a save has replaced it since, "none" when there is no draft.
+ */
+export async function discardCampaignDraft(
 	deps: Pick<DraftDeps, "connection" | "drafts">,
 	campaignId: string,
-): Promise<boolean> => deps.drafts.delete(keyOf(deps, campaignId));
+	revision: number,
+): Promise<"discarded" | "moved" | "none"> {
+	const key = keyOf(deps, campaignId);
+	if (await deps.drafts.delete(key, revision)) return "discarded";
+	return (await deps.drafts.get(key)) ? "moved" : "none";
+}
 
 const isStale = (error: unknown) =>
 	error instanceof DeploymentRejected &&
@@ -212,44 +233,87 @@ export async function publishLiveCampaignDraft(
 
 	const [first, second] = writes;
 	if (!first) {
-		await deps.drafts.delete(key, draft.revision);
-		return { campaign, applied: [], pending: [] };
+		return {
+			campaign,
+			applied: [],
+			...(await settle(deps, draft, null, null)),
+		};
 	}
 	let landed: Body;
 	try {
 		landed = await first.send(draft.baseVersion);
 	} catch (error) {
-		if (isStale(error)) throw new ToolRefusal("rejected", STALE_DRAFT);
+		if (isStale(error))
+			throw new ToolRefusal("rejected", STALE_DRAFT, STALE_DRAFT_CARD);
 		throw error;
 	}
-	if (!second) {
-		await deps.drafts.delete(key, draft.revision);
-		return { campaign: landed, applied: [first.part], pending: [] };
-	}
 	const version = versionOf(landed) ?? null;
+	if (!second) {
+		const settled = await settle(deps, draft, version, null);
+		return { campaign: landed, applied: [first.part], ...settled };
+	}
 	try {
 		landed = await second.send(version);
 	} catch (error) {
-		await deps.drafts.put(
-			{
-				...key,
-				baseVersion: version,
-				settings: null,
-				page: draft.page,
-				pageKind: draft.pageKind,
-			},
-			draft.revision,
-		);
+		const kept = { settings: null, page: draft.page, pageKind: draft.pageKind };
+		const settled = await settle(deps, draft, version, kept);
 		if (!isStepFailure(error)) throw error;
 		return {
 			campaign: landed,
 			applied: [first.part],
-			pending: [second.part],
-			failure: failureDetail(error),
+			pending: settled.pending,
+			failure: settled.failure ?? failureDetail(error),
 		};
 	}
-	await deps.drafts.delete(key, draft.revision);
-	return { campaign: landed, applied: [first.part, second.part], pending: [] };
+	const settled = await settle(deps, draft, versionOf(landed) ?? null, null);
+	return {
+		campaign: landed,
+		applied: [first.part, second.part],
+		...settled,
+	};
+}
+
+const SAVED_DURING_PUBLISH =
+	"An edit saved while this was publishing is kept as a draft; publish again to send it.";
+const NOT_CLEARED =
+	"These edits went live, but the connector couldn't clear its draft of them, so they may still show as pending.";
+
+const partsOf = (d: Pick<CampaignDraft, "settings" | "page">): DraftPart[] => [
+	...(isBody(d.settings) ? (["settings"] as const) : []),
+	...(d.page !== null ? (["page"] as const) : []),
+];
+
+/**
+ * Leaves the store as the publish left the campaign: `kept`, the parts still
+ * to go live, on `version`, or no draft. A draft saved since `read` holds
+ * what just went live plus its own edit, so it stays, moved onto `version`,
+ * and is answered pending.
+ */
+async function settle(
+	deps: DraftDeps,
+	read: CampaignDraft,
+	version: string | null,
+	kept: Pick<CampaignDraft, "settings" | "page" | "pageKind"> | null,
+): Promise<{ pending: DraftPart[]; failure?: string }> {
+	const key = keyOf(deps, read.campaignId);
+	try {
+		const done = kept
+			? await deps.drafts.put(
+					{ ...key, baseVersion: version, ...kept },
+					read.revision,
+				)
+			: await deps.drafts.delete(key, read.revision);
+		if (done) return { pending: kept ? partsOf(kept) : [] };
+		const newer = await deps.drafts.get(key);
+		if (!newer) return { pending: [] };
+		const { updatedAt: _, revision, ...rest } = newer;
+		await deps.drafts.put({ ...rest, baseVersion: version }, revision);
+		return { pending: partsOf(newer), failure: SAVED_DURING_PUBLISH };
+	} catch (error) {
+		const errorName = error instanceof Error ? error.name : "unknown";
+		log({ kind: "error", where: "mcp", errorName });
+		return { pending: partsOf(kept ?? read), failure: NOT_CLEARED };
+	}
 }
 
 async function write(

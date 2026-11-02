@@ -33,8 +33,6 @@ export interface CampaignDrafts {
 	 * draft changed since it was read, so read it again.
 	 */
 	put(draft: CampaignDraftWrite, read: number | null): Promise<boolean>;
-	/** @deprecated Overwrites a draft saved since the caller read it: pass the revision read. */
-	put(draft: CampaignDraftWrite): Promise<boolean>;
 	/**
 	 * Whether a draft was removed. Given the revision the caller read, removes
 	 * the draft only while it is still that one; without, whichever is stored.
@@ -70,7 +68,7 @@ export function campaignDrafts(db: Db): CampaignDrafts {
 				revision: Number(row.revision),
 			};
 		},
-		async put(d: CampaignDraftWrite, read?: number | null) {
+		async put(d, read) {
 			const parts = [
 				d.baseVersion,
 				d.settings === null ? null : JSON.stringify(d.settings),
@@ -85,15 +83,10 @@ export function campaignDrafts(db: Db): CampaignDrafts {
 							sql: `${INSERT} ON CONFLICT DO NOTHING`,
 							args: [...key, ...parts, firstRevision()],
 						}
-					: read === undefined
-						? {
-								sql: `${INSERT} ON CONFLICT DO UPDATE SET base_version = excluded.base_version, settings = excluded.settings, page = excluded.page, page_kind = excluded.page_kind, updated_at = excluded.updated_at, revision = excluded.revision`,
-								args: [...key, ...parts, firstRevision()],
-							}
-						: {
-								sql: "UPDATE campaign_draft SET base_version = ?, settings = ?, page = ?, page_kind = ?, updated_at = ?, revision = revision + 1 WHERE user_id = ? AND origin = ? AND campaign_id = ? AND revision = ?",
-								args: [...parts, ...key, read],
-							},
+					: {
+							sql: "UPDATE campaign_draft SET base_version = ?, settings = ?, page = ?, page_kind = ?, updated_at = ?, revision = revision + 1 WHERE user_id = ? AND origin = ? AND campaign_id = ? AND revision = ?",
+							args: [...parts, ...key, read],
+						},
 			);
 			return rowsAffected > 0;
 		},

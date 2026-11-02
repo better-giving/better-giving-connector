@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { memoryDrafts } from "../../test/memory-drafts";
-import type { CallAnswer } from "../deployment";
+import { type CallAnswer, DeploymentRejected } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
 import { ACTIONS } from "./actions";
@@ -226,4 +226,84 @@ test("get_profile answers with the connection's user id and org name, as structu
 			/^\{"kind":"tool","tool":"get_profile","outcome":"ok","ms":\d+\}$/,
 		),
 	]);
+});
+
+const cardRefusal = async (
+	tool: string,
+	refusal: DeploymentRejected,
+	input: Record<string, unknown> = { id: "cmp_1" },
+) =>
+	(
+		await runTool(
+			specOf(tool),
+			{ ...connection(), platform: true },
+			input,
+			answering(refusal),
+			"en-US",
+		)
+	).content;
+
+test("a card button's refusal is a sentence for the operator, never the site's problem JSON", async () => {
+	const ended = await cardRefusal(
+		"app_end_campaign",
+		new DeploymentRejected(409, {
+			code: "campaign_ended",
+			title: "Campaign ended",
+		}),
+	);
+	const stale = await cardRefusal(
+		"app_save_campaign_edit",
+		new DeploymentRejected(409, { code: "stale_read", title: "Stale read" }),
+		{
+			id: "cmp_1",
+			expectedVersion: "3",
+			page: { pageKind: "blocks", blocks: [] },
+		},
+	);
+	const invalid = await cardRefusal(
+		"app_publish_campaign",
+		new DeploymentRejected(422, {
+			code: "invalid",
+			errors: [
+				{ path: "settings.goal", message: "A goal is required." },
+				{ path: "settings.end_date", message: "An end date is required." },
+			],
+		}),
+		{ id: "cmp_1", giftsGoTo: null },
+	);
+
+	expect(ended).toEqual([
+		{
+			type: "text",
+			text: "Nothing changed: this campaign has ended, and an ended campaign stays ended.",
+		},
+	]);
+	expect(stale).toEqual([
+		{
+			type: "text",
+			text: "Nothing was saved: this campaign changed on the site after the card read it. Open the campaign again to see it as it is now, then make the change again.",
+		},
+	]);
+	expect(invalid).toEqual([
+		{
+			type: "text",
+			text: "Give's Better Giving didn't accept this: A goal is required. An end date is required.",
+		},
+	]);
+});
+
+test("a refusal with nothing to word says the site refused, and a model tool still gets the problem itself", async () => {
+	const bare = await cardRefusal(
+		"app_end_campaign",
+		new DeploymentRejected(403, { code: "forbidden" }),
+	);
+	const forModel = await cardRefusal(
+		"show_campaign_results",
+		new DeploymentRejected(403, { code: "forbidden" }),
+	);
+
+	expect(bare).toEqual([
+		{ type: "text", text: "Give's Better Giving refused this request." },
+	]);
+	expect(forModel).toEqual([{ type: "text", text: '{"code":"forbidden"}' }]);
 });

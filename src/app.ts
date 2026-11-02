@@ -23,7 +23,14 @@ export type AppDeps = {
 export function createApp(deps: AppDeps): Hono {
 	const connections = connectionStore(deps.db, deps.env.CONNECTION_KEY_SECRET);
 	const client = deploymentClient({ fetch: deps.fetch });
-	const auth = createAuth({ db: deps.db, connections, env: deps.env, client });
+	const drafts = campaignDrafts(deps.db);
+	const auth = createAuth({
+		db: deps.db,
+		connections,
+		drafts,
+		env: deps.env,
+		client,
+	});
 
 	const app = new Hono();
 	const toAuth = (c: { req: { raw: Request } }) => auth.handler(c.req.raw);
@@ -49,7 +56,7 @@ export function createApp(deps: AppDeps): Hono {
 		"/cron",
 		cronRoutes({
 			auth,
-			drafts: campaignDrafts(deps.db),
+			drafts,
 			secret: deps.env.CRON_SECRET,
 		}),
 	);
@@ -60,7 +67,7 @@ export function createApp(deps: AppDeps): Hono {
 			auth,
 			connections,
 			client,
-			drafts: campaignDrafts(deps.db),
+			drafts,
 			fetch: deps.fetch,
 			resource: new URL("/mcp", deps.env.PUBLIC_URL),
 		}),

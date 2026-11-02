@@ -1,5 +1,6 @@
 import {
 	bearerAuthChallengeResponse,
+	CLIENT_CAPABILITIES_META_KEY,
 	createMcpHandler,
 	getOAuthProtectedResourceMetadataUrl,
 	McpServer,
@@ -23,7 +24,7 @@ import { log } from "../log";
 import { actionsFor, LIVE_EDITS_DRAFT } from "./actions";
 import { LOCAL_TOOLS } from "./local";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
-import { loggedName, type ToolSpec } from "./spec";
+import { isAppOnly, loggedName, type ToolSpec } from "./spec";
 import { registerWidgetResources } from "./widget-resources";
 
 export type McpDeps = {
@@ -181,10 +182,31 @@ function connectionServer(
 			server,
 			served.filter((s) => !isRead(s)),
 		);
-	server.server.setRequestHandler("tools/list", () => ({
-		tools: specs.map(listed),
-	}));
+	server.server.setRequestHandler("tools/list", (_request, ctx) => {
+		const shown =
+			rendersApps(ctx.mcpReq.envelope) === false
+				? specs.filter((spec) => !isAppOnly(spec))
+				: specs;
+		return { tools: shown.map(listed) };
+	});
 	return server;
+}
+
+const MCP_APPS = "io.modelcontextprotocol/ui";
+const MCP_APP_MIME = "text/html;profile=mcp-app";
+
+// Whether the client renders MCP Apps, as a 2026-07-28 request declares in its
+// envelope; null for a 2025 request, whose capabilities came with an
+// initialize this per-request server never saw. The ext-apps helper for this
+// lives in a package only src/widgets/ may import.
+function rendersApps(envelope: object | undefined): boolean | null {
+	if (envelope === undefined || !(CLIENT_CAPABILITIES_META_KEY in envelope))
+		return null;
+	const declared = (envelope as Record<string, unknown>)[
+		CLIENT_CAPABILITIES_META_KEY
+	] as { extensions?: Record<string, { mimeTypes?: unknown }> } | undefined;
+	const mimeTypes = declared?.extensions?.[MCP_APPS]?.mimeTypes;
+	return Array.isArray(mimeTypes) && mimeTypes.includes(MCP_APP_MIME);
 }
 
 // null `actions` (a connection made before this was stored, or a hello that

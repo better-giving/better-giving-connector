@@ -31,22 +31,40 @@ export function cronRoutes(deps: CronDeps): Hono {
 	app.get("/sweep", async (c) => {
 		const clock = deps.clock ?? (() => performance.now());
 		const started = clock();
+		const failures: unknown[] = [];
 		let connections = 0;
-		let more: boolean;
-		do {
-			const batch = await deps.auth.sweep();
-			connections += batch.connections;
-			more = batch.more;
-		} while (more && clock() - started < SWEEP_BUDGET_MS);
-		const drafts = await deps.drafts.deleteIdleSince(
-			new Date(Date.now() - DRAFT_IDLE_MS),
-		);
+		try {
+			let more: boolean;
+			do {
+				const batch = await deps.auth.sweep();
+				connections += batch.connections;
+				more = batch.more;
+			} while (more && clock() - started < SWEEP_BUDGET_MS);
+		} catch (error) {
+			failures.push(error);
+		}
+		let drafts = 0;
+		try {
+			drafts = await deps.drafts.deleteIdleSince(
+				new Date(Date.now() - DRAFT_IDLE_MS),
+			);
+		} catch (error) {
+			failures.push(error);
+		}
 		log({
 			kind: "sweep",
 			connections,
 			drafts,
 			ms: Math.round(clock() - started),
 		});
+		for (const error of failures) {
+			log({
+				kind: "error",
+				where: "sweep",
+				errorName: error instanceof Error ? error.name : "unknown",
+			});
+		}
+		if (failures.length > 0) return c.json({ error: "internal_error" }, 500);
 		return c.json({ connections, drafts }, 200);
 	});
 	return app;

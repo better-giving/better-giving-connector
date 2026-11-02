@@ -79,12 +79,17 @@ export type LocalCall = {
 	fetch: typeof fetch;
 };
 
-/** A refusal a composed tool words itself: answered as an error with `text`, logged under `outcome`. */
+/**
+ * A refusal a composed tool words itself: answered as an error with `text`,
+ * or with `cardText` to a card's button where one is given, logged under
+ * `outcome`.
+ */
 export class ToolRefusal extends Error {
 	override readonly name = "ToolRefusal";
 	constructor(
 		readonly outcome: ToolOutcome,
 		readonly text: string,
+		readonly cardText?: string,
 	) {
 		super("The tool refused the call.");
 	}
@@ -112,3 +117,9 @@ export const isActionSpec = (spec: ToolSpec): spec is ActionSpec =>
 /** The name a tool's log line carries: its action, or a local tool's own name. */
 export const loggedName = (spec: ToolSpec): ActionName | LocalToolName =>
 	isActionSpec(spec) ? spec.action : spec.tool;
+
+/** A tool only a widget's buttons call (`ui.visibility: ["app"]`): the model never sees it. */
+export function isAppOnly(spec: ToolSpec): boolean {
+	const ui = spec._meta.ui as { visibility?: readonly string[] } | undefined;
+	return ui?.visibility?.length === 1 && ui.visibility[0] === "app";
+}

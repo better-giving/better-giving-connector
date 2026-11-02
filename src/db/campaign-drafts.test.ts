@@ -22,13 +22,16 @@ test("get returns the draft put, with updatedAt set to now", async () => {
 	const store = campaignDrafts(db);
 	const before = Date.now();
 
-	await store.put({
-		...KEY,
-		baseVersion: "17",
-		settings: { title: "Spring drive", goal: 5000 },
-		page: [{ type: "text", body: "Hello" }],
-		pageKind: "blocks",
-	});
+	await store.put(
+		{
+			...KEY,
+			baseVersion: "17",
+			settings: { title: "Spring drive", goal: 5000 },
+			page: [{ type: "text", body: "Hello" }],
+			pageKind: "blocks",
+		},
+		null,
+	);
 
 	const draft = await store.get(KEY);
 	expect(draft).toEqual({
@@ -46,21 +49,29 @@ test("get returns the draft put, with updatedAt set to now", async () => {
 
 test("put over an existing draft replaces the whole row, leaving one", async () => {
 	const store = campaignDrafts(db);
-	await store.put({
-		...KEY,
-		baseVersion: "17",
-		settings: { title: "Spring drive" },
-		page: "<p>Hello</p>",
-		pageKind: "content",
-	});
+	await store.put(
+		{
+			...KEY,
+			baseVersion: "17",
+			settings: { title: "Spring drive" },
+			page: "<p>Hello</p>",
+			pageKind: "content",
+		},
+		null,
+	);
+	const read = await store.get(KEY);
+	if (!read) throw new Error("no draft");
 
-	await store.put({
-		...KEY,
-		baseVersion: null,
-		settings: { goal: 9000 },
-		page: null,
-		pageKind: null,
-	});
+	await store.put(
+		{
+			...KEY,
+			baseVersion: null,
+			settings: { goal: 9000 },
+			page: null,
+			pageKind: null,
+		},
+		read.revision,
+	);
 
 	expect(await store.get(KEY)).toMatchObject({
 		baseVersion: null,
@@ -85,13 +96,16 @@ test("drafts differing in user, origin or campaign are kept apart", async () => 
 		{ ...KEY, campaignId: "camp-2" },
 	];
 	for (const [i, key] of keys.entries()) {
-		await store.put({
-			...key,
-			baseVersion: String(i),
-			settings: null,
-			page: null,
-			pageKind: null,
-		});
+		await store.put(
+			{
+				...key,
+				baseVersion: String(i),
+				settings: null,
+				page: null,
+				pageKind: null,
+			},
+			null,
+		);
 	}
 
 	for (const [i, key] of keys.entries()) {
@@ -152,8 +166,8 @@ test("a first put, expecting no draft, writes nothing over one stored since", as
 test("delete removes that draft alone and says whether one was there", async () => {
 	const store = campaignDrafts(db);
 	const other = { ...KEY, campaignId: "camp-2" };
-	await store.put({ ...KEY, ...EMPTY });
-	await store.put({ ...other, ...EMPTY });
+	await store.put({ ...KEY, ...EMPTY }, null);
+	await store.put({ ...other, ...EMPTY }, null);
 
 	expect(await store.delete(KEY)).toBe(true);
 	expect(await store.delete(KEY)).toBe(false);
@@ -213,11 +227,11 @@ test("deleteIdleSince removes only drafts last put before the cutoff, counting t
 	vi.useFakeTimers({ toFake: ["Date"] });
 	try {
 		vi.setSystemTime(cutoff.getTime() - 1);
-		await store.put({ ...old, ...EMPTY });
+		await store.put({ ...old, ...EMPTY }, null);
 		vi.setSystemTime(cutoff);
-		await store.put({ ...atCutoff, ...EMPTY });
+		await store.put({ ...atCutoff, ...EMPTY }, null);
 		vi.setSystemTime(cutoff.getTime() + 1);
-		await store.put({ ...fresh, ...EMPTY });
+		await store.put({ ...fresh, ...EMPTY }, null);
 	} finally {
 		vi.useRealTimers();
 	}
@@ -233,9 +247,9 @@ test("deleteForUser removes every draft of that user across origins, counting th
 	const store = campaignDrafts(db);
 	const otherOrigin = { ...KEY, origin: "https://other.example.org" as Origin };
 	const otherUser = { ...KEY, userId: "user-2" };
-	await store.put({ ...KEY, ...EMPTY });
-	await store.put({ ...otherOrigin, ...EMPTY });
-	await store.put({ ...otherUser, ...EMPTY });
+	await store.put({ ...KEY, ...EMPTY }, null);
+	await store.put({ ...otherOrigin, ...EMPTY }, null);
+	await store.put({ ...otherUser, ...EMPTY }, null);
 
 	expect(await store.deleteForUser("user-1")).toBe(2);
 
@@ -246,13 +260,16 @@ test("deleteForUser removes every draft of that user across origins, counting th
 
 test("a part whose stored JSON no longer parses reads as null, a page with its kind", async () => {
 	const store = campaignDrafts(db);
-	await store.put({
-		...KEY,
-		baseVersion: "3",
-		settings: { title: "Spring drive" },
-		page: [{ type: "text" }],
-		pageKind: "blocks",
-	});
+	await store.put(
+		{
+			...KEY,
+			baseVersion: "3",
+			settings: { title: "Spring drive" },
+			page: [{ type: "text" }],
+			pageKind: "blocks",
+		},
+		null,
+	);
 	await db.execute("UPDATE campaign_draft SET page = '[{\"type\":'");
 
 	expect(await store.get(KEY)).toMatchObject({
@@ -273,12 +290,15 @@ test.each([
 		const store = campaignDrafts(db);
 
 		await expect(
-			store.put({
-				...KEY,
-				...EMPTY,
-				page,
-				pageKind: pageKind as "blocks" | null,
-			}),
+			store.put(
+				{
+					...KEY,
+					...EMPTY,
+					page,
+					pageKind: pageKind as "blocks" | null,
+				},
+				null,
+			),
 		).rejects.toThrow(/CHECK constraint/);
 
 		expect(await store.get(KEY)).toBeNull();

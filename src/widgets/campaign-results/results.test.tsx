@@ -1,10 +1,10 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
-import { flush, startHost } from "../test-dom";
+import { startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignResults } from "./results";
 
@@ -21,7 +21,9 @@ async function show(data: CampaignResultsData, context: McpUiHostContext = {}) {
 		"Loading results…",
 	);
 	await bridge.sendToolResult({ content: [], structuredContent: data });
-	await flush(10);
+	await vi.waitFor(() =>
+		expect(root.textContent).not.toContain("Loading results…"),
+	);
 	return { bridge, root };
 }
 
@@ -60,9 +62,10 @@ describe("campaign results", () => {
 		const { bridge, root } = await show(RESULTS_LIVE);
 		bridge.onopenlink = async () => ({ isError: true });
 		button(root, "View page").click();
-		await flush(10);
-		expect(root.querySelector('[role="alert"]')?.textContent).toMatch(
-			/couldn't open/i,
+		await vi.waitFor(() =>
+			expect(root.querySelector('[role="alert"]')?.textContent).toMatch(
+				/couldn't open/i,
+			),
 		);
 	});
 
@@ -72,9 +75,10 @@ describe("campaign results", () => {
 			{ locale: "de-DE" },
 		);
 		button(root, "End campaign").click();
-		await flush(10);
-		expect(root.querySelector(".confirm p")?.textContent).toContain(
-			"1.234 donors have given",
+		await vi.waitFor(() =>
+			expect(root.querySelector(".confirm p")?.textContent).toContain(
+				"1.234 donors have given",
+			),
 		);
 	});
 
@@ -92,19 +96,23 @@ describe("campaign results", () => {
 	it("puts focus back on End campaign when the confirm closes", async () => {
 		const { root } = await show(RESULTS_LIVE);
 		button(root, "End campaign").click();
-		await flush(10);
+		await vi.waitFor(() => expect(button(root, "Keep it live")).toBeTruthy());
 		button(root, "Keep it live").click();
-		await flush(10);
-		expect(document.activeElement).toBe(button(root, "End campaign"));
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(button(root, "End campaign")),
+		);
 
 		button(root, "End campaign").click();
-		await flush(10);
+		await vi.waitFor(() =>
+			expect(root.querySelector(".confirm")).not.toBeNull(),
+		);
 		root
 			.querySelector(".confirm")
 			?.dispatchEvent(
 				new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
 			);
-		await flush(10);
-		expect(document.activeElement).toBe(button(root, "End campaign"));
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(button(root, "End campaign")),
+		);
 	});
 });

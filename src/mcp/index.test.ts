@@ -4,7 +4,7 @@ import {
 	type FakeDeployment,
 	fakeDeployment,
 } from "../../test/fake-deployment";
-import { mcpRequest, rpc } from "../../test/harness";
+import { MCP_APPS_CLIENT, mcpRequest, rpc } from "../../test/harness";
 import { memoryDrafts } from "../../test/memory-drafts";
 import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
 import { advance, freshDb, MINUTE } from "../../test/support";
@@ -189,6 +189,61 @@ test("tools/list offers a Platform deployment's tools from the tool names its he
 	await reconnect(actions);
 
 	expect((await toolNames()).sort()).toEqual([...PLATFORM_TOOLS].sort());
+});
+
+const APP_ONLY = LOCAL_TOOLS.filter(
+	(s) =>
+		JSON.stringify(
+			(s._meta.ui as { visibility?: string[] } | undefined)?.visibility,
+		) === '["app"]',
+).map((s) => s.tool);
+const STANDALONE_APP_ONLY = APP_ONLY.filter((tool) =>
+	STANDALONE_LOCAL.some((s) => s.tool === tool),
+);
+
+const listedTo = async (
+	version: "2026-07-28" | "2025-06-18",
+	capabilities?: Record<string, unknown>,
+) => {
+	const res = await route.request(
+		new Request(
+			"https://connect.example/",
+			mcpRequest(version, "Bearer any", "tools/list", {}, 1, capabilities),
+		),
+	);
+	return (await rpc(res)).result.tools.map((t: { name: string }) => t.name);
+};
+
+test("a client that declares no MCP Apps support is not offered the cards' button tools", async () => {
+	await reconnect(null);
+
+	const names = await listedTo("2026-07-28", {});
+
+	expect(APP_ONLY).toContain("app_end_campaign");
+	for (const tool of APP_ONLY) expect(names).not.toContain(tool);
+	expect(names).toContain("show_campaign_results");
+	expect(names).toContain("end_campaign");
+});
+
+test("a client that declares MCP Apps support is offered the cards' button tools", async () => {
+	await reconnect(null);
+
+	const names = await listedTo("2026-07-28", MCP_APPS_CLIENT);
+
+	for (const tool of STANDALONE_APP_ONLY) expect(names).toContain(tool);
+});
+
+test("a 2025 client, whose capabilities this request doesn't carry, is offered the cards' button tools, each saying the chat never calls it", async () => {
+	await reconnect(null);
+
+	const names = await listedTo("2025-06-18");
+
+	for (const tool of STANDALONE_APP_ONLY) {
+		expect(names).toContain(tool);
+		expect(LOCAL_TOOLS.find((s) => s.tool === tool)?.description, tool).toMatch(
+			/Only the card calls this tool/,
+		);
+	}
 });
 
 const READ_TOOLS: string[] = [...ACTIONS, ...LOCAL_TOOLS]

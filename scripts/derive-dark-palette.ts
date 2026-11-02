@@ -7,7 +7,7 @@
 // pins, installed outside this repo (nothing is added to package.json):
 //
 //   mkdir -p /tmp/radix-deps && cd /tmp/radix-deps && echo '{"private":true}' > package.json
-//   npm install --ignore-scripts @radix-ui/colors@3.0.0 colorjs.io@0.5.2 bezier-easing@2.1.0
+//   pnpm add --ignore-scripts @radix-ui/colors@3.0.0 colorjs.io@0.5.2 bezier-easing@2.1.0
 //
 // Run from the repo root:
 //

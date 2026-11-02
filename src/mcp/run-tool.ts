@@ -19,6 +19,7 @@ import { answerText } from "./answer";
 import {
 	type ActionSpec,
 	isActionSpec,
+	isAppOnly,
 	type LocalAnswer,
 	loggedName,
 	type SummaryContext,
@@ -193,7 +194,10 @@ async function failure(
 	ctx: RunToolContext,
 ): Promise<Settled> {
 	const org = connection.orgName;
-	if (error instanceof ToolRefusal) return said(error.outcome, error.text);
+	if (error instanceof ToolRefusal) {
+		const card = isAppOnly(spec) ? error.cardText : undefined;
+		return said(error.outcome, card ?? error.text);
+	}
 	if (error instanceof KeyRefused) {
 		await ctx.dropConnection(connection.userId);
 		return said(
@@ -223,6 +227,9 @@ async function failure(
 			"server_error",
 			check === undefined ? problem : `${problem}\n\n${check}`,
 		);
+	}
+	if (error instanceof DeploymentRejected && isAppOnly(spec)) {
+		return said("rejected", cardRefusal(error, org));
 	}
 	if (error instanceof DeploymentRejected) {
 		// What a refusal says to do next is worded for the action that was
@@ -314,6 +321,22 @@ function platformNextStep(
 		return "Nothing was saved: the hero photo must be one uploaded for this campaign. Make a link with create_photo_upload_link and have the operator upload the photo there; it becomes the campaign's hero, which get_campaign then shows. Otherwise send the hero as get_campaign returns it, or null.";
 	}
 	return null;
+}
+
+// A card shows the text as its error line, to the operator, who can't act on
+// the problem JSON a model reads.
+function cardRefusal(error: DeploymentRejected, org: string): string {
+	const problem = error.problem;
+	if (error.status === 409 && problem?.code === "stale_read")
+		return "Nothing was saved: this campaign changed on the site after the card read it. Open the campaign again to see it as it is now, then make the change again.";
+	if (error.status === 409 && problem?.code === "campaign_ended")
+		return "Nothing changed: this campaign has ended, and an ended campaign stays ended.";
+	const reason = problem?.errors?.length
+		? problem.errors.map((e) => e.message).join(" ")
+		: (problem?.detail ?? problem?.title);
+	return reason
+		? `${org}'s Better Giving didn't accept this: ${reason}`
+		: `${org}'s Better Giving refused this request.`;
 }
 
 function unexpected(

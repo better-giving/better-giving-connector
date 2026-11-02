@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
-import { flush, mount } from "../test-dom";
+import { describe, expect, it, vi } from "vitest";
+import { mount } from "../test-dom";
 import { ImageWithPlaceholder, isAllowedImage } from "./image";
 
 const ORIGINS = [
@@ -82,8 +82,7 @@ describe("ImageWithPlaceholder", () => {
 			/>,
 		);
 		img(root)?.dispatchEvent(new Event("error"));
-		await flush();
-		expect(img(root)).toBeNull();
+		await vi.waitFor(() => expect(img(root)).toBeNull());
 		expect(placeholder(root)).not.toBeNull();
 	});
 });

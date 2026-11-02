@@ -13,7 +13,12 @@ import {
 	type WidgetName,
 } from "../widgets/model";
 import { ADD, DESTRUCTIVE, OVERWRITES, READ } from "./actions";
-import { discardCampaignDraft, isLive, readCampaign } from "./campaign-drafts";
+import {
+	discardCampaignDraft,
+	isLive,
+	pendingDraft,
+	readCampaign,
+} from "./campaign-drafts";
 import { createCampaignWithPreset } from "./campaign-presets";
 import {
 	BLOCKS_EDIT,
@@ -56,21 +61,26 @@ const appMeta = (invoking: string, invoked: string): ToolMeta => ({
 	"openai/widgetAccessible": true,
 });
 
+// A host that ignores `_meta.ui` lists an app-only tool to its model as any
+// other; the description is then what keeps the model from pressing it.
+const CARD_ONLY =
+	"Only the card calls this tool, when the operator presses its button; never call it from the chat.";
+
 const answer = (structured: Record<string, unknown>) => ({
 	text: JSON.stringify(structured),
 	structured,
 });
 
 const id = z.string().min(1);
+// ChatGPT's file param: its submission check wants all four fields declared,
+// only the first two required.
 const photoFile = z.strictObject({
 	download_url: z.url({ protocol: /^https$/ }),
 	file_id: z.string().min(1),
+	mime_type: z.string().optional(),
+	file_name: z.string().optional(),
 });
 const PHOTO_PARAM = ["photo"];
-
-const need = {
-	read: ["campaigns.get", "results.summary"],
-} as const;
 
 const money = (m: { amount: string; currency: string }, locale: string) =>
 	formatMoney(m.amount, m.currency, locale);
@@ -128,16 +138,18 @@ const SHOW_CAMPAIGNS: LocalSpec = {
 			const { campaigns } = body as CampaignsData;
 			if (campaigns.length === 0) return "No campaigns";
 			const live = campaigns.filter((k) => k.status === "published").length;
-			const cents = campaigns.reduce(
-				(sum, k) => sum + Math.round(Number(k.raised.amount) * 100),
-				0,
-			);
-			const total = money(
-				{
-					amount: (cents / 100).toFixed(2),
-					currency: campaigns[0]?.raised.currency ?? "USD",
-				},
-				locale,
+			const cents = new Map<string, number>();
+			for (const { raised } of campaigns) {
+				const sum = cents.get(raised.currency) ?? 0;
+				cents.set(
+					raised.currency,
+					sum + Math.round(Number(raised.amount) * 100),
+				);
+			}
+			const total = new Intl.ListFormat(locale).format(
+				[...cents].map(([currency, sum]) =>
+					money({ amount: (sum / 100).toFixed(2), currency }, locale),
+				),
 			);
 			return `${campaigns.length} campaigns, ${live} live, ${total} raised`;
 		},
@@ -236,9 +248,9 @@ const SHOW_PHOTO: LocalSpec = {
 		const given = photoFile.optional().parse(call.input.photo);
 		const file = given
 			? {
-					name: "Photo",
+					name: given.file_name ?? "Photo",
 					size: 0,
-					type: "image/*",
+					type: given.mime_type ?? "image/*",
 					previewUrl: null,
 					downloadUrl: given.download_url,
 				}
@@ -324,8 +336,7 @@ const { app_create_campaign, app_publish_campaign, app_end_campaign } =
 const APP_CREATE_CAMPAIGN: LocalSpec = {
 	tool: "app_create_campaign",
 	title: "Create a campaign draft from a preset",
-	description:
-		"The campaign presets card's Create draft button: makes a draft campaign with the preset's goal, end date, suggested amounts and starter story.",
+	description: `The campaign presets card's Create draft button: makes a draft campaign with the preset's goal, end date, suggested amounts and starter story. ${CARD_ONLY}`,
 	input: app_create_campaign.args,
 	output: {
 		schema: CreateResult,
@@ -354,8 +365,7 @@ const APP_CREATE_CAMPAIGN: LocalSpec = {
 const APP_PUBLISH_CAMPAIGN: LocalSpec = {
 	tool: "app_publish_campaign",
 	title: "Publish a campaign from its card",
-	description:
-		"The results card's Publish button: puts a draft campaign live, or sends a live campaign's saved draft edits.",
+	description: `The results card's Publish button: puts a draft campaign live, or sends a live campaign's saved draft edits. ${CARD_ONLY}`,
 	input: app_publish_campaign.args,
 	output: {
 		schema: CampaignResultsData,
@@ -384,8 +394,7 @@ const APP_PUBLISH_CAMPAIGN: LocalSpec = {
 const APP_END_CAMPAIGN: LocalSpec = {
 	tool: "app_end_campaign",
 	title: "End a campaign from its card",
-	description:
-		"The results card's End campaign button, pressed after its inline confirm: ends the campaign for good; it stops taking gifts.",
+	description: `The results card's End campaign button, pressed after its inline confirm: ends the campaign for good; it stops taking gifts. ${CARD_ONLY}`,
 	input: app_end_campaign.args,
 	output: {
 		schema: CampaignResultsData,
@@ -406,7 +415,7 @@ const APP_END_CAMPAIGN: LocalSpec = {
 const APP_GET_CAMPAIGN_EDITOR: LocalSpec = {
 	tool: "app_get_campaign_editor",
 	title: "Reload a campaign in the editor",
-	description: "The editor's refresh: the campaign's page, draft included.",
+	description: `The editor's refresh: the campaign's page, draft included. ${CARD_ONLY}`,
 	input: APP_TOOLS.app_get_campaign_editor.args,
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: READ,
@@ -420,8 +429,7 @@ const APP_GET_CAMPAIGN_EDITOR: LocalSpec = {
 const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 	tool: "app_save_campaign_edit",
 	title: "Save an editor change",
-	description:
-		"The editor's save: a live campaign keeps the change as a draft until it is published; a draft campaign is written through.",
+	description: `The editor's save: a live campaign keeps the change as a draft until it is published; a draft campaign is written through. ${CARD_ONLY}`,
 	input: APP_TOOLS.app_save_campaign_edit.args,
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: OVERWRITES,
@@ -463,8 +471,7 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 const APP_DISCARD_CAMPAIGN_DRAFT: LocalSpec = {
 	tool: "app_discard_campaign_draft",
 	title: "Discard a campaign's draft edits from the editor",
-	description:
-		"The editor's Discard draft: drops the saved draft edits of a live campaign.",
+	description: `The editor's Discard draft: drops the saved draft edits of a live campaign. ${CARD_ONLY}`,
 	input: APP_TOOLS.app_discard_campaign_draft.args,
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: DESTRUCTIVE,
@@ -473,7 +480,10 @@ const APP_DISCARD_CAMPAIGN_DRAFT: LocalSpec = {
 	platformOnly: true,
 	async run(call) {
 		const campaignId = String(call.input.id);
-		await discardCampaignDraft(call, campaignId);
+		// The editor's arguments carry no draft revision, so this drops the
+		// draft stored now, not necessarily the one the editor shows.
+		const shown = await pendingDraft(call, campaignId);
+		if (shown) await discardCampaignDraft(call, campaignId, shown.revision);
 		return answer(await editorData(call, campaignId));
 	},
 };
@@ -481,8 +491,7 @@ const APP_DISCARD_CAMPAIGN_DRAFT: LocalSpec = {
 const APP_SET_CAMPAIGN_PHOTO: LocalSpec = {
 	tool: "app_set_campaign_photo",
 	title: "Set a cover photo from its card",
-	description:
-		"The photo card's Set as cover: uploads the dropped photo as the campaign's cover.",
+	description: `The photo card's Set as cover: uploads the dropped photo as the campaign's cover. ${CARD_ONLY}`,
 	input: APP_TOOLS.app_set_campaign_photo.args,
 	output: {
 		schema: z.strictObject({
@@ -510,8 +519,7 @@ const APP_SET_CAMPAIGN_PHOTO: LocalSpec = {
 const APP_PHOTO_UPLOAD_LINK: LocalSpec = {
 	tool: "app_photo_upload_link",
 	title: "Get an upload link from the photo card",
-	description:
-		"The photo card's Open upload link: a single-use link, good for 15 minutes, to upload the campaign's cover on the site.",
+	description: `The photo card's Open upload link: a single-use link, good for 15 minutes, to upload the campaign's cover on the site. ${CARD_ONLY}`,
 	input: APP_TOOLS.app_photo_upload_link.args,
 	output: {
 		schema: z.strictObject({ url: z.string(), expiresAt: z.string() }),
@@ -526,7 +534,14 @@ const APP_PHOTO_UPLOAD_LINK: LocalSpec = {
 	_meta: appMeta("Getting an upload link…", "Upload link ready"),
 	needs: ["photos.upload_link"],
 	async run(call) {
-		return answer(await uploadLink(call, String(call.input.id)));
+		const link = await uploadLink(call, String(call.input.id));
+		if (link === null) {
+			throw new ToolRefusal(
+				"rejected",
+				"The site's upload page isn't on the connected site, so no link was made.",
+			);
+		}
+		return answer(link);
 	},
 };
 
@@ -546,5 +561,3 @@ export const WIDGET_TOOLS: readonly LocalSpec[] = [
 	APP_SET_CAMPAIGN_PHOTO,
 	APP_PHOTO_UPLOAD_LINK,
 ];
-
-void need;

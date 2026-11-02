@@ -218,12 +218,12 @@
 									},
 									{
 										"group": [
-											"../db",
-											"../db/**",
-											"../auth",
-											"../auth/**",
-											"../mcp",
-											"../mcp/**"
+											"../**/db",
+											"../**/db/**",
+											"../**/auth",
+											"../**/auth/**",
+											"../**/mcp",
+											"../**/mcp/**"
 										],
 										"message": "src/deployment/ imports nothing from src/db/, src/auth/ or src/mcp/."
 									}
@@ -276,12 +276,57 @@
 											"../**/site/**",
 											"../**/env",
 											"../**/env/**",
+											"../**/env.*",
 											"../**/log",
 											"../**/log/**",
+											"../**/log.*",
 											"../**/secret",
-											"../**/secret/**"
+											"../**/secret/**",
+											"../**/secret.*"
 										],
 										"message": "src/widgets/ is browser code: it imports nothing from src/db/, src/auth/, src/mcp/, src/deployment/, src/connect/, src/site/, src/env.ts, src/log.ts or src/secret.ts."
+									},
+									{
+										"group": ["node:*"],
+										"message": "src/widgets/ is browser code: no node:* imports."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/format.ts", "src/presets/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"better-auth": "Import better-auth only inside src/auth/.",
+									"@libsql/client": "Import @libsql/client only inside src/db/.",
+									"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/.",
+									"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/."
+								},
+								"patterns": [
+									{
+										"group": ["better-auth/**", "@better-auth/**"],
+										"message": "Import better-auth only inside src/auth/."
+									},
+									{
+										"group": ["@modelcontextprotocol/**"],
+										"message": "Import @modelcontextprotocol/server only inside src/mcp/ and @modelcontextprotocol/ext-apps only inside src/widgets/."
+									},
+									{
+										"group": ["@libsql/client/**"],
+										"message": "Import @libsql/client only inside src/db/."
+									},
+									{
+										"group": ["node:*"],
+										"message": "src/format.ts and src/presets/ are shared with the widgets: no node:* imports."
 									}
 								]
 							}

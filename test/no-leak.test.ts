@@ -849,7 +849,15 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			},
 			end_date: day(19),
 		});
-		const dropped = await callTool(bearer, "discard_campaign_draft", { id });
+		const read = await callTool(bearer, "get_campaign", { id });
+		const pending = read.structuredContent?.pendingDraft as
+			| { revision: number }
+			| undefined;
+		const revision = pending?.revision;
+		const dropped = await callTool(bearer, "discard_campaign_draft", {
+			id,
+			revision,
+		});
 		const droppedFromCard = await callTool(
 			bearer,
 			"app_discard_campaign_draft",
@@ -927,10 +935,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		];
 
 		const answered: Record<string, unknown> = {};
+		const results: Record<string, Record<string, unknown> | undefined> = {};
 		for (const [name, args] of calls) {
 			const raw = await rpc(
 				await world.sendAs(bearer, "tools/call", { name, arguments: args }),
 			);
+			results[name] = raw.result;
 			answered[name] = raw.result
 				? raw.result.isError === true
 					? "error"
@@ -938,9 +948,18 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 				: "rpc error";
 		}
 		expect(Object.keys(answered)).toEqual(calls.map(([name]) => name));
-		expect(
-			Object.entries(answered).filter(([, how]) => how === "rpc error"),
-		).toEqual([]);
+		// the planted photo address is off the deployment's origin and unserved,
+		// so both photo tools take their refusal branch; every other tool succeeds
+		expect(answered).toEqual({
+			...Object.fromEntries(calls.map(([name]) => [name, "ok"])),
+			app_set_campaign_photo: "error",
+		});
+		expect(results.set_campaign_photo?.structuredContent).toMatchObject({
+			uploaded: false,
+		});
+		expect(JSON.stringify(results.app_set_campaign_photo?.content)).toContain(
+			"The photo wasn't set",
+		);
 		expectCleanScenario();
 	});
 
@@ -1409,7 +1428,9 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 	]) {
 		expect(outcomes("connect", "outcome")).toContain(outcome);
 	}
-	expect(errorSites).toEqual(new Set(["mcp", "connect", "app", "disconnect"]));
+	expect(errorSites).toEqual(
+		new Set(["mcp", "connect", "app", "disconnect", "sweep"]),
+	);
 	expect(new Set(trace.map((e) => e.sink))).toEqual(
 		new Set(["output", "header", "body"]),
 	);

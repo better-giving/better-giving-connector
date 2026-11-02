@@ -3,9 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenAiGlobals } from "./host";
 import { startHost as start } from "./test-dom";
 
-/** Let queued transport messages land. */
-const settle = () => new Promise((r) => setTimeout(r, 10));
-
 afterEach(() => {
 	delete document.documentElement.dataset.theme;
 	vi.restoreAllMocks();
@@ -22,10 +19,9 @@ describe("host context", () => {
 		const seen = vi.fn();
 		host.subscribe(seen);
 		await bridge.sendHostContextChange({ theme: "light" });
-		await settle();
+		await vi.waitFor(() => expect(seen).toHaveBeenCalled());
 		expect(document.documentElement.dataset.theme).toBe("light");
 		expect(host.context().theme).toBe("light");
-		expect(seen).toHaveBeenCalled();
 	});
 
 	it("takes the bridge's theme, locale and display mode over window.openai's", async () => {
@@ -85,16 +81,18 @@ describe("tool input and result", () => {
 			content: [{ type: "text", text: "3 campaigns" }],
 			structuredContent: { n: 3 },
 		});
-		await settle();
+		await vi.waitFor(() =>
+			expect(host.toolResult()).toEqual({
+				ok: true,
+				data: { n: 3 },
+				text: "3 campaigns",
+			}),
+		);
 		expect(host.toolInput()).toEqual({ status: "live" });
-		expect(host.toolResult()).toEqual({
-			ok: true,
-			data: { n: 3 },
-			text: "3 campaigns",
-		});
 		await bridge.sendToolResult({ content: [], structuredContent: { n: 4 } });
-		await settle();
-		expect(host.toolResult()).toMatchObject({ data: { n: 4 } });
+		await vi.waitFor(() =>
+			expect(host.toolResult()).toMatchObject({ data: { n: 4 } }),
+		);
 	});
 
 	it("turns an error result into the tool's own sentence", async () => {
@@ -103,11 +101,12 @@ describe("tool input and result", () => {
 			isError: true,
 			content: [{ type: "text", text: "Reconnect Better Giving." }],
 		});
-		await settle();
-		expect(host.toolResult()).toEqual({
-			ok: false,
-			error: "Reconnect Better Giving.",
-		});
+		await vi.waitFor(() =>
+			expect(host.toolResult()).toEqual({
+				ok: false,
+				error: "Reconnect Better Giving.",
+			}),
+		);
 	});
 
 	it("starts from window.openai's toolOutput until the bridge sends one", async () => {
@@ -259,11 +258,12 @@ describe("display mode, links and follow-ups", () => {
 		const sizes: unknown[] = [];
 		bridge.onsizechange = (size) => sizes.push(size);
 		host.reportSize();
-		await settle();
-		expect(sizes.at(-1)).toEqual({
-			width: expect.any(Number),
-			height: expect.any(Number),
-		});
+		await vi.waitFor(() =>
+			expect(sizes.at(-1)).toEqual({
+				width: expect.any(Number),
+				height: expect.any(Number),
+			}),
+		);
 	});
 });
 

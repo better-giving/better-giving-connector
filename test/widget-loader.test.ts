@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import html from "./fixtures/widget/entry.tsx?widget";
 
@@ -42,5 +44,38 @@ describe("?widget import", () => {
 		expect(count(html, /<script/gi)).toBe(1);
 		expect(html).not.toContain("<!--");
 		expect(html).toContain("<\\/script>\\x3C!-- \\x3Cscript>");
+	});
+});
+
+// The node hook behind `pnpm dev` and `pnpm widget-shots`, run the way they
+// run it: tsx with scripts/binary-register.mjs.
+describe("?widget import through scripts/widget-hook.mjs", () => {
+	const root = join(__dirname, "..");
+	const importWidget = (specifier: string) =>
+		spawnSync(
+			join(root, "node_modules/.bin/tsx"),
+			[
+				"--import",
+				"./scripts/binary-register.mjs",
+				"-e",
+				`const m = await import(${JSON.stringify(specifier)}); process.stdout.write(m.default)`,
+			],
+			{ cwd: root, encoding: "utf8" },
+		);
+
+	it("resolves a relative specifier to the same document as the vitest plugin", () => {
+		const run = importWidget("./test/fixtures/widget/entry.tsx?widget");
+		expect(run.stderr).toBe("");
+		expect(run.status).toBe(0);
+		expect(run.stdout).toBe(html);
+	});
+
+	it("resolves an absolute specifier", () => {
+		const run = importWidget(
+			`${join(root, "test/fixtures/widget/entry.tsx")}?widget`,
+		);
+		expect(run.stderr).toBe("");
+		expect(run.status).toBe(0);
+		expect(run.stdout).toBe(html);
 	});
 });
