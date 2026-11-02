@@ -2561,7 +2561,7 @@
 		{
 			"name": "show_photo",
 			"title": "Show a campaign's photo",
-			"description": "Shows a campaign's cover photo and, when the operator dropped a photo into the chat, a card to crop it and set it as the cover.",
+			"description": "Shows a campaign's cover photo and, when the operator dropped a photo into the chat, a card to set it as the cover.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",

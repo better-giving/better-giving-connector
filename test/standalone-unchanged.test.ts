@@ -17,13 +17,13 @@ import { freshDb } from "./support";
 // Standalone connection sees and sends what it did before them.
 //
 // standalone-tools.json is the part that must not move: tools/list and the
-// instructions as they stood when this branch began (d1a35fb's, plus each
-// tool's title and annotations), every description and input schema included.
+// instructions as they stood at d1a35fb, plus each tool's title and
+// annotations, every description and input schema included.
 // It is never re-dumped; a deliberate Standalone change edits the entry it
-// changes, and `git diff main -- test/standalone-tools.json` shows exactly
-// that. standalone-additions.json is what this branch added on top, each
-// piece named: an outputSchema and _meta on every tool, six overwriting tools
-// no longer destructiveHint, create_campaign's optional preset, and the tools
+// changes, and `git diff d1a35fb -- test/standalone-tools.json` shows exactly
+// that. standalone-additions.json is what was added on top, each piece named:
+// an outputSchema and _meta on every tool, six overwriting tools no longer
+// destructiveHint, create_campaign's optional preset, and the tools
 // added since. Those may be re-dumped when a tool is added.
 
 let db: Db;

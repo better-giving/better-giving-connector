@@ -21,7 +21,6 @@ The mockup images could not be opened in the build environment, so this compares
 **03 Results card**
 - Draft: readiness checklist, "Gifts go to" and Publish / Preview match. "Gifts go to" is a select above the buttons, not in the footer.
 - Live: raised vs goal with a progress bar, donors, average and median gift, last 7 days against the previous 7 with a sparkline. End campaign is the red-outline button; the confirm states the effect, the donor count and that it cannot be undone, focus starts on Keep it live, and only the filled red button ends the campaign.
-- The sparkline has no axis or tooltip.
 
 **04 Editor**
 - Left: draggable block list (with up/down buttons and remove), Add block, and the selected block's fields. Right: live donor-page preview with a desktop/phone toggle. The header has Close, the draft chip, "Saved · v14", Save and Publish.
@@ -34,7 +33,6 @@ The mockup images could not be opened in the build environment, so this compares
 - 16:9 cover, file name, size and type, editable alt text and Set as cover match. Where the host takes no file the card offers Open upload link instead.
 - Not built: Adjust crop. The upload sends the file as it is, so a crop control would promise something the connector does not do.
 - Account section: the connected nonprofit (from `get_profile`) and Disconnect. Disconnect asks the chat how to disconnect, because disconnecting is the host's own flow. There is no list of other orgs (the deployment has none), as the brief decided.
-- The status lines, the locale table and the host-drawn parts of the mockup sheet are not widgets and are not built.
 
 ## Across all widgets
 - Widget UI uses the system font and host radii; brand colour carries the meaning, as DESIGN.md says. The dark half is the repo's own addition (Platform's palette is light only); the donor-page preview stays light in dark hosts.

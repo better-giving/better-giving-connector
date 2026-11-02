@@ -224,7 +224,7 @@ const SHOW_PHOTO: LocalSpec = {
 	tool: RENDER_TOOLS.photo.tool,
 	title: "Show a campaign's photo",
 	description:
-		"Shows a campaign's cover photo and, when the operator dropped a photo into the chat, a card to crop it and set it as the cover.",
+		"Shows a campaign's cover photo and, when the operator dropped a photo into the chat, a card to set it as the cover.",
 	input: z.strictObject({
 		campaign_id: id,
 		photo: photoFile.optional(),
