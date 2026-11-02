@@ -30,6 +30,7 @@ export type McpDeps = {
 	connections: Connections;
 	client: DeploymentClient;
 	drafts: CampaignDrafts;
+	fetch: typeof fetch;
 	/** This endpoint's own URL, the resource its tokens are issued for. */
 	resource: URL;
 };
@@ -82,6 +83,8 @@ export function mcpRoute(deps: McpDeps): Hono {
 				connectionServer(session, who.readOnly, {
 					client: deps.client,
 					drafts: deps.drafts,
+					publicOrigin: deps.resource.origin,
+					fetch: deps.fetch,
 					dropConnection: deps.auth.dropConnection,
 				}),
 			{ onerror: logError },

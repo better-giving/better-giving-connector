@@ -220,7 +220,7 @@ async function setFormAmounts(
 
 const MAX_FORM_PAGES = 50;
 
-async function findCampaignForm(
+export async function findCampaignForm(
 	{ connection, client }: DeploymentDeps,
 	campaignId: string,
 ): Promise<Body | null> {

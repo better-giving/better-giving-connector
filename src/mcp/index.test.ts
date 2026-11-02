@@ -71,6 +71,7 @@ beforeEach(async () => {
 		connections: store,
 		drafts: memoryDrafts(),
 		client,
+		fetch,
 		resource: new URL("https://connect.example/mcp"),
 	});
 	return () => db.close();
@@ -482,6 +483,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 				};
 			},
 		},
+		fetch,
 		resource: new URL("https://connect.example/mcp"),
 	});
 

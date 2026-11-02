@@ -40,7 +40,13 @@ function WidgetRoot<S extends z.ZodType>(props: {
 }) {
 	const { host, schema, View } = props;
 	const [, setVersion] = useState(0);
-	useEffect(() => host.subscribe(() => setVersion((v) => v + 1)), [host]);
+	useEffect(() => {
+		const off = host.subscribe(() => setVersion((v) => v + 1));
+		// a result or context that arrived between the first render and this
+		// subscription notified no one; render again so it is read
+		setVersion((v) => v + 1);
+		return off;
+	}, [host]);
 
 	const { locale, touch } = host.context();
 	useEffect(() => {

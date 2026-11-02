@@ -193,7 +193,7 @@ export const READ: Hints = {
 	openWorldHint: false,
 };
 // Creates a new record or link. Calling it again adds another.
-const ADD: Hints = {
+export const ADD: Hints = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	idempotentHint: false,
@@ -201,14 +201,14 @@ const ADD: Hints = {
 };
 // The deployment replays these two when the arguments match, so a retry
 // does not add a second campaign or gift.
-const REPLAYS: Hints = {
+export const REPLAYS: Hints = {
 	...ADD,
 	idempotentHint: true,
 };
 // Overwrites the fields sent: a page, a form, or a campaign's settings. The
 // same call again does not stack: the fields hold the values sent. What it
 // replaced is an edit the operator asked for, so it is not destructive.
-const OVERWRITES: Hints = {
+export const OVERWRITES: Hints = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	idempotentHint: true,

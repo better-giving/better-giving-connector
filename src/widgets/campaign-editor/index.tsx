@@ -1,11 +1,6 @@
 /** @jsxImportSource hono/jsx/dom */
-// Placeholder entry so html.ts can bundle every widget; the Campaign editor builder replaces it.
 import { CampaignEditorData } from "../model";
-import { EmptyState } from "../ui/states";
 import { startWidget } from "../ui/widget";
+import { CampaignEditor } from "./editor";
 
-void startWidget(
-	CampaignEditorData,
-	() => <EmptyState title="Campaign editor isn't built yet" />,
-	"Loading…",
-);
+void startWidget(CampaignEditorData, CampaignEditor, "Opening the editor…");

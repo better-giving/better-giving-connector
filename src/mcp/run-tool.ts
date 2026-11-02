@@ -29,6 +29,10 @@ import {
 export type RunToolContext = {
 	client: Pick<DeploymentClient, "call">;
 	drafts: CampaignDrafts;
+	/** This service's own origin: where the widgets' images may come from. */
+	publicOrigin: string;
+	/** The network for the few requests that aren't `/connector/v1` calls: a photo's download and its upload. */
+	fetch: typeof fetch;
 	dropConnection(userId: string): Promise<void>;
 };
 
@@ -122,6 +126,8 @@ async function settle(
 			input,
 			client: ctx.client,
 			drafts: ctx.drafts,
+			publicOrigin: ctx.publicOrigin,
+			fetch: ctx.fetch,
 		};
 		const answered = ({ text, structured }: LocalAnswer) =>
 			ok(present(spec, text, structured, { locale, input, replayed: false }));

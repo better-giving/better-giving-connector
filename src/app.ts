@@ -61,6 +61,7 @@ export function createApp(deps: AppDeps): Hono {
 			connections,
 			client,
 			drafts: campaignDrafts(deps.db),
+			fetch: deps.fetch,
 			resource: new URL("/mcp", deps.env.PUBLIC_URL),
 		}),
 	);

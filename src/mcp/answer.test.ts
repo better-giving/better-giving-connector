@@ -38,6 +38,8 @@ test("a count that never answers falls back to the plain lead after 3 seconds an
 		{
 			client: { call: () => new Promise(() => {}) },
 			drafts: memoryDrafts(),
+			publicOrigin: "https://app.connect.better.giving",
+			fetch,
 			dropConnection: async () => {},
 		},
 		"en-US",
@@ -70,6 +72,8 @@ test("a count that answers leaves no timer behind", async () => {
 				}),
 			},
 			drafts: memoryDrafts(),
+			publicOrigin: "https://app.connect.better.giving",
+			fetch,
 			dropConnection: async () => {},
 		},
 		"en-US",

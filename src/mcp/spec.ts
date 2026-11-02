@@ -75,6 +75,8 @@ export type LocalCall = {
 	input: Record<string, unknown>;
 	client: Pick<DeploymentClient, "call">;
 	drafts: CampaignDrafts;
+	publicOrigin: string;
+	fetch: typeof fetch;
 };
 
 /** A refusal a composed tool words itself: answered as an error with `text`, logged under `outcome`. */

@@ -61,6 +61,8 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		const ctx: RunToolContext = {
 			client,
 			drafts: memoryDrafts(),
+			publicOrigin: "https://app.connect.better.giving",
+			fetch,
 			dropConnection: async () => {
 				dropped = true;
 			},

@@ -62,6 +62,8 @@ export interface Host {
 	sendFollowUp(prompt: string): Promise<void>;
 	/** Asks for fullscreen; resolves with the mode the host actually set. */
 	requestFullscreen(): Promise<DisplayMode>;
+	/** Asks to go back inline (the editor's Close); resolves with the mode the host actually set. */
+	exitFullscreen(): Promise<DisplayMode>;
 	/** Tells the host the document's size now (the bridge also does this on every resize). */
 	reportSize(): void;
 	openLink(url: string): Promise<void>;
@@ -202,6 +204,17 @@ export async function connectHost(
 			if (openai?.requestDisplayMode) {
 				const set = await openai.requestDisplayMode({ mode: "fullscreen" });
 				return set?.mode ?? "fullscreen";
+			}
+			return context().displayMode;
+		},
+		async exitFullscreen() {
+			const ctx = bridgeContext();
+			if (ctx.availableDisplayModes?.includes("inline")) {
+				return (await app.requestDisplayMode({ mode: "inline" })).mode;
+			}
+			if (openai?.requestDisplayMode) {
+				const set = await openai.requestDisplayMode({ mode: "inline" });
+				return set?.mode ?? "inline";
 			}
 			return context().displayMode;
 		},

@@ -38,6 +38,8 @@ const answering = (answer: CallAnswer | Error) => ({
 		},
 	},
 	drafts: memoryDrafts(),
+	publicOrigin: "https://app.connect.better.giving",
+	fetch,
 	dropConnection: async () => {},
 });
 
@@ -207,6 +209,8 @@ test("get_profile answers with the connection's user id and org name, as structu
 		{
 			client: { call },
 			drafts: memoryDrafts(),
+			publicOrigin: "https://app.connect.better.giving",
+			fetch,
 			dropConnection: async () => {},
 		},
 		"en-US",
