@@ -33,7 +33,7 @@ Compared against `01`-`04` of the approved mockups. The chat shell around each c
 - The composer and the assistant's last reply are drawn by the host.
 
 **05 Photo card and account panel.** Matches: the 16:9 cover with file details, editable alt text and Set as cover; an account panel with the connected nonprofit (initials tile, name, "Connected" pill) and a Disconnect link. States: `account` is the panel under the current cover with no dropped photo.
-- No list of other nonprofits, no roles and no "View only" label. Nothing the connector can read returns a person's other nonprofits or roles: the site's `/connector/v1` has no such action, hello names one nonprofit, and a connection is one key for one site. So the mockup's Cebu Food Bank and Malinao School Fund rows, the per-row Switch buttons and "Signed in as <email>" are not built, and none is invented.
+- No list of other nonprofits, no roles and no "View only" label. Nothing the connector can read returns a person's other nonprofits or roles: the site's `/connector/v1` has no such action, hello names one nonprofit, and a connection is one key for one site. So the mockup's Cebu Food Bank and Malinao School Fund rows, the per-row Switch buttons and "Signed in as <email>" are not built.
 - The closest real thing: a "Switch nonprofit" row. It asks the chat to walk the person through connecting a different nonprofit; the host's connect flow then asks for the site, and the new connection replaces the old one.
 - Disconnect also asks the chat, because removing the connector is the host's own action.
 - The mockup's connected row also shows the person's role and the site's address; the connector does not hold either for display.

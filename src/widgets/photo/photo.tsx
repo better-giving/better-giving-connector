@@ -51,7 +51,7 @@ function Account() {
 				</span>
 				<div class="account-who">
 					<p class="account-name">{name ?? "…"}</p>
-					<p class="account-label">Connected nonprofit</p>
+					<p class="account-label">Nonprofit</p>
 				</div>
 				<span class="connected-pill">Connected</span>
 			</div>
