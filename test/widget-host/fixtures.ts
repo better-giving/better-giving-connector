@@ -350,6 +350,16 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 				}),
 			},
 		},
+		account: {
+			result: {
+				structuredContent: { ...PHOTO, file: null, canUpload: false },
+			},
+			calls: {
+				get_profile: () => ({
+					structuredContent: { id: "u1", name: "Bayanihan Relief Network" },
+				}),
+			},
+		},
 		none: {
 			result: {
 				structuredContent: { ...PHOTO, file: null, canUpload: false },

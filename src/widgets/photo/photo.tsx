@@ -13,31 +13,87 @@ const kilobytes = (bytes: number, locale: string) =>
 		? `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(bytes / 1_000_000)} MB`
 		: `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(bytes / 1000)} KB`;
 
-/** The connected account: its name, and where to disconnect it. */
+const initials = (name: string) =>
+	name
+		.split(/\s+/)
+		.filter(Boolean)
+		.slice(0, 2)
+		.map((w) => [...w][0]?.toUpperCase() ?? "")
+		.join("");
+
+/**
+ * The connected account. The service knows one nonprofit per connection and
+ * no list of the person's others, so switching asks the chat to start the
+ * host's own connect flow, where the next nonprofit is picked.
+ */
 function Account() {
 	const { host } = useSession();
 	const [name, setName] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
 	useEffect(() => {
 		void callTool(host, "get_profile", {}).then((res) => {
 			if (res.ok) setName(res.data.name);
 		});
 	}, [host]);
+	const ask = (prompt: string) => {
+		setError(null);
+		host
+			.sendFollowUp(prompt)
+			.catch(() =>
+				setError("Couldn't ask the chat. Ask it in your own words instead."),
+			);
+	};
 	return (
-		<section class="account" aria-label="Connected account">
-			<div>
-				<p class="account-label">Connected account</p>
-				<p class="account-name">{name ?? "…"}</p>
+		<section class="account" aria-label="Account">
+			<div class="account-row account-current">
+				<span class="avatar" aria-hidden="true">
+					{name ? initials(name) : ""}
+				</span>
+				<div class="account-who">
+					<p class="account-name">{name ?? "…"}</p>
+					<p class="account-label">Connected nonprofit</p>
+				</div>
+				<span class="connected-pill">Connected</span>
 			</div>
-			<Button
-				variant="secondary"
-				onClick={() =>
-					void host.sendFollowUp(
-						"I want to disconnect Better Giving from this chat. Where do I do that?",
-					)
-				}
-			>
-				Disconnect
-			</Button>
+			<div class="account-row">
+				<div class="account-who">
+					<p class="account-name">Another nonprofit?</p>
+					<p class="account-label">
+						Connect a different one; you pick it when you sign in.
+					</p>
+				</div>
+				<Button
+					variant="secondary"
+					onClick={() =>
+						ask(
+							"I want to connect a different Better Giving nonprofit. Walk me through switching.",
+						)
+					}
+				>
+					Switch nonprofit
+				</Button>
+			</div>
+			<div class="account-row account-foot">
+				<span class="account-label">
+					Disconnecting removes this nonprofit from the chat.
+				</span>
+				<button
+					type="button"
+					class="link-btn"
+					onClick={() =>
+						ask(
+							"I want to disconnect Better Giving from this chat. Where do I do that?",
+						)
+					}
+				>
+					Disconnect
+				</button>
+			</div>
+			{error && (
+				<p class="error-line" role="alert">
+					{error}
+				</p>
+			)}
 		</section>
 	);
 }

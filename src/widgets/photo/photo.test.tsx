@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PHOTO } from "../../../test/widget-host/fixtures";
 import { PhotoData } from "../model";
-import { startHost } from "../test-dom";
+import { flush, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { PhotoCard } from "./photo";
 
@@ -28,7 +28,7 @@ async function show(data: PhotoData) {
 			"Harbor Food Bank",
 		),
 	);
-	return { root, called };
+	return { root, called, bridge };
 }
 
 const button = (root: HTMLElement, text: string) => {
@@ -52,6 +52,23 @@ describe("photo card", () => {
 			),
 		);
 		expect(called.map((c) => c.name)).toContain("app_set_campaign_photo");
+	});
+
+	it("shows the connected nonprofit and asks the chat to start a switch or a disconnect, with no invented org list", async () => {
+		const { root, bridge } = await show(PHOTO);
+		const asked: string[] = [];
+		bridge.onmessage = async (params: unknown) => {
+			asked.push(JSON.stringify(params));
+			return {};
+		};
+		expect(root.querySelector(".avatar")?.textContent).toBe("HF");
+		expect(root.querySelector(".connected-pill")?.textContent).toBe(
+			"Connected",
+		);
+		expect(root.querySelectorAll(".account-row").length).toBe(3);
+		button(root, "Switch nonprofit").click();
+		await flush(10);
+		expect(asked.join()).toContain("different Better Giving nonprofit");
 	});
 
 	it("offers the upload link where the host takes no file", async () => {
