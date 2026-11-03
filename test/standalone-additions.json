@@ -2494,6 +2494,18 @@
 					"pendingDraft": {
 						"type": "boolean"
 					},
+					"draftRevision": {
+						"anyOf": [
+							{
+								"type": "integer",
+								"minimum": -9007199254740991,
+								"maximum": 9007199254740991
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
 					"draftsLiveEdits": {
 						"type": "boolean"
 					},
@@ -2538,6 +2550,7 @@
 					"campaign",
 					"page",
 					"pendingDraft",
+					"draftRevision",
 					"draftsLiveEdits",
 					"formAmounts",
 					"imageOrigins",
@@ -2929,6 +2942,9 @@
 								"type": "null"
 							}
 						]
+					},
+					"replayed": {
+						"type": "boolean"
 					}
 				},
 				"required": ["campaign", "steps", "failedStep"],
@@ -3660,6 +3676,18 @@
 					"pendingDraft": {
 						"type": "boolean"
 					},
+					"draftRevision": {
+						"anyOf": [
+							{
+								"type": "integer",
+								"minimum": -9007199254740991,
+								"maximum": 9007199254740991
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
 					"draftsLiveEdits": {
 						"type": "boolean"
 					},
@@ -3704,6 +3732,7 @@
 					"campaign",
 					"page",
 					"pendingDraft",
+					"draftRevision",
 					"draftsLiveEdits",
 					"formAmounts",
 					"imageOrigins",
@@ -3842,6 +3871,18 @@
 									}
 								},
 								"required": ["pageKind", "content"]
+							}
+						]
+					},
+					"draftRevision": {
+						"anyOf": [
+							{
+								"type": "integer",
+								"minimum": -9007199254740991,
+								"maximum": 9007199254740991
+							},
+							{
+								"type": "null"
 							}
 						]
 					}
@@ -3999,6 +4040,18 @@
 					"pendingDraft": {
 						"type": "boolean"
 					},
+					"draftRevision": {
+						"anyOf": [
+							{
+								"type": "integer",
+								"minimum": -9007199254740991,
+								"maximum": 9007199254740991
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
 					"draftsLiveEdits": {
 						"type": "boolean"
 					},
@@ -4043,6 +4096,7 @@
 					"campaign",
 					"page",
 					"pendingDraft",
+					"draftRevision",
 					"draftsLiveEdits",
 					"formAmounts",
 					"imageOrigins",

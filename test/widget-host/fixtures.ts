@@ -279,6 +279,7 @@ export const EDITOR: CampaignEditorData = {
 		],
 	},
 	pendingDraft: false,
+	draftRevision: null,
 	draftsLiveEdits: true,
 	formAmounts: [usd("25.00"), usd("50.00"), usd("100.00")],
 	imageOrigins: IMAGE_ORIGINS,

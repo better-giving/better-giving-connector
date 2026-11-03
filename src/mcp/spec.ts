@@ -67,6 +67,8 @@ export type ActionSpec<Tool extends string = string> = Common & {
 export type LocalAnswer = {
 	text: string;
 	structured: Record<string, unknown>;
+	/** A keyed write the site answered as a replay of an earlier call. */
+	replayed?: boolean;
 };
 
 export type LocalCall = {

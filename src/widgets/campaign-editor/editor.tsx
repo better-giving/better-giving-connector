@@ -117,6 +117,7 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 			id: campaign.id,
 			expectedVersion: campaign.version,
 			page,
+			draftRevision: data.draftRevision,
 		});
 		setBusy(null);
 		if (!res.ok) {
@@ -159,6 +160,7 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 		setError(null);
 		const res = await callTool(host, "app_discard_campaign_draft", {
 			id: campaign.id,
+			draftRevision: data.draftRevision,
 		});
 		setBusy(null);
 		if (!res.ok) {

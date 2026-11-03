@@ -228,7 +228,8 @@ export async function resultsData(
 		readiness,
 		programs,
 		giftsGoTo: str(campaign.gifts_go_to),
-		pendingDraft: (await pendingDraft(c, id)) !== null,
+		// a draft left behind by a campaign that has since ended never goes live
+		pendingDraft: isLive(campaign) && (await pendingDraft(c, id)) !== null,
 	};
 }
 
@@ -308,6 +309,7 @@ export async function editorData(
 		},
 		page,
 		pendingDraft: draft !== null,
+		draftRevision: draft?.revision ?? null,
 		draftsLiveEdits: c.connection.platform,
 		formAmounts: amounts,
 		imageOrigins: imageOrigins(c),

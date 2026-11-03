@@ -3,7 +3,7 @@ import type { ActionName } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
 import type { LocalCall } from "./spec";
-import { resultsData } from "./widget-data";
+import { editorData, resultsData } from "./widget-data";
 
 const origin = parseOrigin("https://give.example.org");
 if (!origin) throw new Error("bad origin");
@@ -90,6 +90,62 @@ test("a campaign with more gifts than the read reaches shows no median, and its 
 			)
 			.map((s) => s.input),
 	).toEqual([{ campaign_id: "cmp_1", from: daysAgo(13), limit: 100 }]);
+});
+
+test("an ended campaign's leftover draft isn't offered to publish", async () => {
+	const { call } = scripted({
+		"campaigns.get": () => ({ id: "cmp_1", title: "Coats", status: "ended" }),
+		"results.summary": () => ({
+			total: usd("0.00"),
+			donor_count: 0,
+			gift_count: 0,
+		}),
+		"donations.list": () => ({ data: [], next_cursor: null }),
+	});
+	call.drafts.get = async () => ({
+		userId: "user_1",
+		origin,
+		campaignId: "cmp_1",
+		settings: { goal: usd("5000.00") },
+		page: null,
+		pageKind: null,
+		baseVersion: "3",
+		updatedAt: new Date(),
+		revision: 1,
+	});
+
+	const data = await resultsData(call, "cmp_1");
+
+	expect(data.pendingDraft).toBe(false);
+});
+
+test("the editor carries a live campaign's draft revision, and none for an ended campaign's leftover", async () => {
+	const status = { value: "published" };
+	const { call } = scripted({
+		"campaigns.get": () => ({
+			id: "cmp_1",
+			title: "Coats",
+			status: status.value,
+		}),
+	});
+	call.drafts.get = async () => ({
+		userId: "user_1",
+		origin,
+		campaignId: "cmp_1",
+		settings: null,
+		page: [],
+		pageKind: "blocks",
+		baseVersion: "3",
+		updatedAt: new Date(),
+		revision: 917,
+	});
+
+	const live = await editorData(call, "cmp_1");
+	status.value = "ended";
+	const ended = await editorData(call, "cmp_1");
+
+	expect(live.draftRevision).toBe(917);
+	expect(ended.draftRevision).toBeNull();
 });
 
 test("a campaign whose gifts all fit in the read shows their median", async () => {

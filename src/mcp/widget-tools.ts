@@ -340,10 +340,12 @@ const APP_CREATE_CAMPAIGN: LocalSpec = {
 	input: app_create_campaign.args,
 	output: {
 		schema: CreateResult,
-		summary: (body) => {
+		summary: (body, { replayed }) => {
 			const data = body as CreateResult;
-			return data.failedStep
-				? `Partly created: ${data.campaign.title}, ${data.failedStep} step failed`
+			if (data.failedStep)
+				return `${replayed ? "Already created" : "Partly created"}: ${data.campaign.title}, ${data.failedStep} step failed`;
+			return replayed
+				? `Already created: ${data.campaign.title}`
 				: `Draft created: ${data.campaign.title}`;
 		},
 	},
@@ -358,7 +360,7 @@ const APP_CREATE_CAMPAIGN: LocalSpec = {
 			end_date: preset.endDate,
 			suggested_amounts: preset.suggestedAmounts as never,
 		});
-		return answer(created);
+		return { ...answer(created), replayed: created.replayed };
 	},
 };
 
@@ -456,6 +458,7 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 			id: campaignId,
 			expectedVersion,
 			page,
+			draftRevision,
 		} = APP_TOOLS.app_save_campaign_edit.args.parse(call.input);
 		// Standalone's content action takes no version.
 		const version =
@@ -470,6 +473,7 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 		const kept = call.connection.platform
 			? await composeLiveEdit(isBlocks ? BLOCKS_EDIT : CONTENT_EDIT, {
 					rebase: false,
+					draftRevision,
 				})({ ...call, input })
 			: null;
 		if (kept === null) {
@@ -483,6 +487,11 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 	},
 };
 
+const DISCARD_MOVED =
+	"Nothing was dropped: this campaign's draft changed after the editor read it.";
+const DISCARD_MOVED_CARD =
+	"Nothing was dropped: this campaign's draft edits changed elsewhere while you were editing. Close the editor and open it again to see them, then discard them if you still want to.";
+
 const APP_DISCARD_CAMPAIGN_DRAFT: LocalSpec = {
 	tool: "app_discard_campaign_draft",
 	title: "Discard a campaign's draft edits from the editor",
@@ -494,11 +503,17 @@ const APP_DISCARD_CAMPAIGN_DRAFT: LocalSpec = {
 	needs: ["campaigns.get"],
 	platformOnly: true,
 	async run(call) {
-		const campaignId = String(call.input.id);
-		// The editor's arguments carry no draft revision, so this drops the
-		// draft stored now, not necessarily the one the editor shows.
-		const shown = await pendingDraft(call, campaignId);
-		if (shown) await discardCampaignDraft(call, campaignId, shown.revision);
+		const { id: campaignId, draftRevision } =
+			APP_TOOLS.app_discard_campaign_draft.args.parse(call.input);
+		// A card sending no revision drops the draft stored now, not
+		// necessarily the one it shows.
+		const read =
+			draftRevision === undefined
+				? ((await pendingDraft(call, campaignId))?.revision ?? null)
+				: draftRevision;
+		const outcome = await discardCampaignDraft(call, campaignId, read);
+		if (outcome === "moved" || (outcome === "none" && draftRevision != null))
+			throw new ToolRefusal("rejected", DISCARD_MOVED, DISCARD_MOVED_CARD);
 		return answer(await editorData(call, campaignId));
 	},
 };

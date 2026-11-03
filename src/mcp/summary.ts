@@ -170,7 +170,7 @@ export const OUTPUTS = {
 	create_campaign: output(campaignCreated, (k, { replayed }) => {
 		const title = k.campaign?.title ?? k.title;
 		if (k.failedStep)
-			return `Partly created: ${title}, ${k.failedStep} step failed`;
+			return `${replayed ? "Already created" : "Partly created"}: ${title}, ${k.failedStep} step failed`;
 		return replayed ? `Already created: ${title}` : `Draft created: ${title}`;
 	}),
 	update_campaign_blocks: output(campaign, (k) => `Page saved: ${k.title}`),

@@ -130,8 +130,14 @@ async function settle(
 			publicOrigin: ctx.publicOrigin,
 			fetch: ctx.fetch,
 		};
-		const answered = ({ text, structured }: LocalAnswer) =>
-			ok(present(spec, text, structured, { locale, input, replayed: false }));
+		const answered = ({ text, structured, replayed }: LocalAnswer) =>
+			ok(
+				present(spec, text, structured, {
+					locale,
+					input,
+					replayed: replayed ?? false,
+				}),
+			);
 		if (!isActionSpec(spec)) return answered(await spec.run(call));
 		const composed = await spec.compose?.(call);
 		if (composed) return answered(composed);

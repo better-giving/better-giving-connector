@@ -36,7 +36,10 @@ export const CONTENT_EDIT: EditOf = (input) => ({
 
 /** An edit to a live campaign is kept as its draft; to any other campaign it is sent as usual (null). */
 export const composeLiveEdit =
-	(editOf: EditOf, options?: { rebase?: boolean }) =>
+	(
+		editOf: EditOf,
+		options?: { rebase?: boolean; draftRevision?: number | null },
+	) =>
 	async (call: LocalCall): Promise<LocalAnswer | null> => {
 		const { input } = call;
 		const saved = await saveLiveCampaignEdit(
@@ -68,7 +71,9 @@ export async function composeGetCampaign(
 	const lines = [fromSite(call.connection.orgName)];
 	if (pending) {
 		lines.push(
-			"This live campaign has draft edits donors don't see yet, under pendingDraft; publish_campaign sends them once the operator says yes.",
+			isLive(campaign)
+				? "This live campaign has draft edits donors don't see yet, under pendingDraft; publish_campaign sends them once the operator says yes."
+				: "This campaign has ended, so its draft edits can no longer be published; discard_campaign_draft drops them.",
 		);
 	}
 	lines.push(JSON.stringify(structured));

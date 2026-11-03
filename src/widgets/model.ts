@@ -144,6 +144,8 @@ export const CreateResult = z.object({
 		}),
 	),
 	failedStep: CreateStep.nullable(),
+	/** A draft under this title already existed; absent from results that predate the field. */
+	replayed: z.boolean().optional(),
 });
 export type CreateResult = z.infer<typeof CreateResult>;
 
@@ -194,6 +196,8 @@ export const CampaignEditorData = z.object({
 	/** The draft when one is pending, else the published page. */
 	page: Page,
 	pendingDraft: z.boolean(),
+	/** The pending draft's revision as this read found it, else null; the card sends it back on save and discard. */
+	draftRevision: z.int().nullable(),
 	/** True where a live campaign's saves wait as a draft until it is published (Platform); false where they go live at once (Standalone). */
 	draftsLiveEdits: z.boolean(),
 	/** The donation form's suggested amounts. */
@@ -237,6 +241,9 @@ export type PhotoData = z.infer<typeof PhotoData>;
 // strict, as every other tool's input is: a key the server doesn't read is refused, not dropped
 const CampaignId = z.strictObject({ id: z.string() });
 
+/** CampaignEditorData.draftRevision as the card last read it: a draft changed since, or one appearing where it read none, is refused. Omitted, whichever draft is stored is taken. */
+const DraftRevision = z.int().nullable().optional();
+
 export const APP_TOOLS = {
 	app_create_campaign: {
 		args: z.strictObject({
@@ -257,11 +264,12 @@ export const APP_TOOLS = {
 		args: CampaignId.extend({
 			expectedVersion: z.string().nullable(),
 			page: Page,
+			draftRevision: DraftRevision,
 		}),
 		result: CampaignEditorData,
 	},
 	app_discard_campaign_draft: {
-		args: CampaignId,
+		args: CampaignId.extend({ draftRevision: DraftRevision }),
 		result: CampaignEditorData,
 	},
 	app_set_campaign_photo: {

@@ -137,6 +137,7 @@ describe("open_campaign_editor data", () => {
 			url: null,
 		},
 		pendingDraft: false,
+		draftRevision: null,
 		draftsLiveEdits: true,
 		formAmounts: [usd("25.00")],
 		imageOrigins: [],
@@ -244,5 +245,16 @@ describe("app-only tools", () => {
 				failedStep: "publish",
 			}).success,
 		).toBe(false);
+	});
+
+	it("reads a create result's replayed flag, and a result without one", () => {
+		const result = {
+			campaign: { id: "c9", title: "Year-end appeal", status: "draft" },
+			steps: [{ step: "create", status: "done" }],
+			failedStep: null,
+		};
+		const parse = (r: object) => APP_TOOLS.app_create_campaign.result.parse(r);
+		expect(parse({ ...result, replayed: true }).replayed).toBe(true);
+		expect(parse(result).replayed).toBeUndefined();
 	});
 });
