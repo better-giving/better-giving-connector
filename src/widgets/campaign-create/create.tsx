@@ -104,12 +104,21 @@ function Recommendations(props: { data: CampaignCreateData }) {
 }
 
 function Created(props: { result: CreateResult; onOpen: () => void }) {
-	const { campaign, steps, failedStep } = props.result;
+	const { campaign, steps, failedStep, replayed } = props.result;
+	const filledIn = steps.some(
+		(s) => s.step !== "create" && s.status === "done",
+	);
+	const eyebrow = replayed
+		? "Draft already existed"
+		: failedStep
+			? "Draft created, not finished"
+			: "Draft created";
 	return (
-		<Card class="created" label="Draft created">
-			<p class="eyebrow">
-				{failedStep ? "Draft created, not finished" : "Draft created"}
-			</p>
+		<Card
+			class="created"
+			label={replayed ? "Draft already existed" : "Draft created"}
+		>
+			<p class="eyebrow">{eyebrow}</p>
 			<h3 class="title">{campaign.title}</h3>
 			<ul class="checks">
 				{steps.map((s) => (
@@ -124,11 +133,21 @@ function Created(props: { result: CreateResult; onOpen: () => void }) {
 						}
 						word={s.status === "skipped" ? "Skipped" : undefined}
 					>
-						{STEP_LABEL[s.step]}
+						{replayed && s.step === "create"
+							? "Draft with this title found"
+							: STEP_LABEL[s.step]}
 						{s.detail ? <span class="muted"> · {s.detail}</span> : null}
 					</Check>
 				))}
 			</ul>
+			{replayed && (
+				<p class="muted">
+					A draft with this title already existed.{" "}
+					{filledIn
+						? "Only what is ticked above was filled in; the rest was left as it was."
+						: "Nothing on it was changed."}
+				</p>
+			)}
 			<p class="muted">
 				It is a draft, so donors can't see it until you publish.
 			</p>

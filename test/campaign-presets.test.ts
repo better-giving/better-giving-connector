@@ -154,10 +154,63 @@ describe("on Platform", () => {
 				{ step: "page", status: "done" },
 			],
 			failedStep: null,
+			replayed: false,
 		});
 		expect(result.content[0]?.text).toMatch(
 			/^Created a draft campaign "Flood relief" for Hope Shelter/,
 		);
+	});
+
+	test("the same preset create again replays onto the first draft, overwrites nothing, and says no new draft was made", async () => {
+		await tool("create_campaign", { title: "Flood relief", preset: PRESET });
+		const story = "Our own words.";
+		await tool("update_campaign_blocks", {
+			id: "cmp_1",
+			blocks: [
+				{ type: "title", text: "Flood relief" },
+				{ type: "story", text: story },
+				{ type: "hero", image_url: null },
+				{ type: "goal-bar", goal: PRESET.goal },
+			],
+		});
+		deployment.calls.length = 0;
+
+		const result = await tool("create_campaign", {
+			title: "Flood relief",
+			preset: PRESET,
+		});
+
+		expect(result.isError).toBeUndefined();
+		expect(writes().filter((w) => w.method !== "GET")).toEqual([
+			expect.objectContaining({
+				method: "POST",
+				path: "/connector/v1/campaigns",
+			}),
+		]);
+		expect(result.structuredContent).toMatchObject({
+			replayed: true,
+			failedStep: null,
+		});
+		expect(result.content[0]?.text).toMatch(
+			/^A draft campaign "Flood relief" already exists for Hope Shelter, so no new one was made\./,
+		);
+		expect(result.content[1]?.text).toBe("Already created: Flood relief");
+	});
+
+	test("the card's Create draft pressed again for the same title says the draft already exists", async () => {
+		const args = {
+			title: "Flood relief",
+			theme: "emergency",
+			goal: PRESET.goal,
+			endDate: PRESET.end_date,
+			suggestedAmounts: PRESET.suggested_amounts,
+		};
+		await tool("app_create_campaign", args);
+
+		const again = await tool("app_create_campaign", args);
+
+		expect(again.structuredContent).toMatchObject({ replayed: true });
+		expect(again.content[1]?.text).toBe("Already created: Flood relief");
 	});
 
 	test("a campaign with no form gets one made for it, holding the amounts", async () => {
@@ -389,6 +442,25 @@ describe("on Standalone", () => {
 			detail: expect.stringContaining("goal or end date"),
 		});
 		expect(result.structuredContent?.failedStep).toBeNull();
+		db.close();
+	});
+
+	test("the answer's first line names only the steps that finished", async () => {
+		await serve({
+			platform: false,
+			actions: CONTENT_ACTIONS.filter((a) => a !== "campaigns.update_settings"),
+		});
+
+		const result = await tool("create_campaign", {
+			title: "Flood relief",
+			preset: PRESET,
+		});
+
+		const [first, second] = (result.content[0]?.text ?? "").split("\n");
+		expect(first).toBe(
+			`Created a draft campaign "Flood relief" for Hope Shelter from the emergency appeal preset: 3 suggested amounts and a starter story for the operator to replace. Donors can't see it until it's published.`,
+		);
+		expect(second).toMatch(/^Skipped the settings step: /);
 		db.close();
 	});
 });

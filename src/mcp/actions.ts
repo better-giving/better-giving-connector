@@ -92,6 +92,7 @@ async function composePreset({ connection, client, input, locale }: LocalCall) {
 	return {
 		text: presetCreatedText(created, chosen, connection.orgName, locale),
 		structured: created,
+		replayed: created.replayed,
 	};
 }
 const page = {

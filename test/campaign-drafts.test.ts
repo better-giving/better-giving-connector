@@ -753,6 +753,22 @@ test("the editor shows the campaign's page, not a leftover draft, once the campa
 	expect(opened.page.blocks).toEqual(k.blocks);
 });
 
+test("get_campaign on an ended campaign with a leftover draft says the draft can't be published and how to drop it", async () => {
+	const k = await liveWithDraft();
+	await tool("end_campaign", { id: k.id });
+
+	const result = await tool("get_campaign", { id: k.id });
+
+	const text = result.content[0]?.text ?? "";
+	expect(text).toMatch(
+		/has ended, so its draft edits can no longer be published; discard_campaign_draft drops them/,
+	);
+	expect(text).not.toMatch(/publish_campaign sends them/);
+	expect(result.structuredContent?.pendingDraft).toMatchObject({
+		page_kind: "blocks",
+	});
+});
+
 test("the editor says a Platform campaign's live edits wait as a draft, and a Standalone one's don't", async () => {
 	const k = await live();
 	const standalone = await standaloneSession();
@@ -776,4 +792,173 @@ test("the editor says a Platform campaign's live edits wait as a draft, and a St
 	expect(await description(() => standalone.send("tools/list", {}))).toMatch(
 		/donors see a live campaign's edits as soon as they're saved/,
 	);
+});
+
+type Editor = { draftRevision: number | null; pendingDraft: boolean };
+
+const openEditor = async (id: string) =>
+	(await tool("app_get_campaign_editor", { id })).structuredContent as Editor;
+
+test("the editor carries the revision of the draft it shows, and null when there is none", async () => {
+	const bare = await openEditor((await live()).id);
+	const k = await liveWithDraft();
+
+	expect(bare.draftRevision).toBeNull();
+	expect((await openEditor(k.id)).draftRevision).toBe(await revisionOf(k.id));
+});
+
+const CARD_DRAFT_MOVED =
+	"Nothing was saved: this campaign's draft edits changed elsewhere while you were editing. Close the editor and open it again to see them, then make the change again.";
+
+const cardSave = (k: Campaign, story: string, draftRevision?: number | null) =>
+	tool("app_save_campaign_edit", {
+		id: k.id,
+		expectedVersion: k.version,
+		page: { pageKind: "blocks", blocks: withStory(k, story) },
+		...(draftRevision === undefined ? {} : { draftRevision }),
+	});
+
+test("the editor card's save onto a draft the chat edited since the card read it is refused, and the chat's edit stays", async () => {
+	const k = await liveWithDraft();
+	const opened = await openEditor(k.id);
+	await tool("update_campaign_blocks", {
+		id: k.id,
+		blocks: withStory(k, "From the chat."),
+	});
+	const before = (await get(k.id)).pendingDraft;
+
+	const result = await cardSave(k, "From the card.", opened.draftRevision);
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toBe(CARD_DRAFT_MOVED);
+	expect((await get(k.id)).pendingDraft).toEqual(before);
+	expect(writes()).toEqual([]);
+});
+
+test("the editor card's save at the draft's revision is kept, and answers the new revision for its next save", async () => {
+	const k = await liveWithDraft();
+	const opened = await openEditor(k.id);
+
+	const first = await cardSave(k, "First.", opened.draftRevision);
+	const next = (first.structuredContent as Editor).draftRevision;
+	const second = await cardSave(k, "Second.", next);
+
+	expect(first.isError).toBeUndefined();
+	expect(next).not.toBe(opened.draftRevision);
+	expect(second.isError).toBeUndefined();
+	expect((second.structuredContent as Editor).draftRevision).toBe(
+		await revisionOf(k.id),
+	);
+	expect(writes()).toEqual([]);
+});
+
+test("the editor card that read no draft has its save refused once the chat has started one", async () => {
+	const k = await live();
+	const opened = await openEditor(k.id);
+	await tool("update_campaign_settings", { id: k.id, goal: usd("7000.00") });
+	const before = (await get(k.id)).pendingDraft;
+
+	const result = await cardSave(k, "From the card.", opened.draftRevision);
+
+	expect(opened.draftRevision).toBeNull();
+	expect(result.content[0]?.text).toBe(CARD_DRAFT_MOVED);
+	expect((await get(k.id)).pendingDraft).toEqual(before);
+});
+
+test("the editor card's save of a draft the chat deleted since the card read it is refused, and no draft is started", async () => {
+	const k = await liveWithDraft();
+	const opened = await openEditor(k.id);
+	await tool("discard_campaign_draft", {
+		id: k.id,
+		revision: await revisionOf(k.id),
+	});
+
+	const result = await cardSave(k, "From the card.", opened.draftRevision);
+
+	expect(result.content[0]?.text).toBe(CARD_DRAFT_MOVED);
+	expect(await countRows(db, "campaign_draft")).toBe(0);
+});
+
+test("an editor card that sends no draft revision saves onto whichever draft is stored, as before", async () => {
+	const k = await liveWithDraft();
+	await tool("update_campaign_settings", { id: k.id, goal: usd("7000.00") });
+
+	const result = await cardSave(k, "From the card.");
+
+	expect(result.isError).toBeUndefined();
+	expect((await get(k.id)).pendingDraft).toMatchObject({
+		settings: { goal: usd("7000.00") },
+		page: withStory(k, "From the card."),
+	});
+});
+
+const CARD_DISCARD_MOVED =
+	"Nothing was dropped: this campaign's draft edits changed elsewhere while you were editing. Close the editor and open it again to see them, then discard them if you still want to.";
+
+const cardDiscard = (id: string, draftRevision?: number | null) =>
+	tool("app_discard_campaign_draft", {
+		id,
+		...(draftRevision === undefined ? {} : { draftRevision }),
+	});
+
+test("the editor card's discard of a draft the chat edited since the card read it is refused, and the chat's edit stays", async () => {
+	const k = await liveWithDraft();
+	const opened = await openEditor(k.id);
+	await tool("update_campaign_settings", { id: k.id, goal: usd("7000.00") });
+	const before = (await get(k.id)).pendingDraft;
+
+	const result = await cardDiscard(k.id, opened.draftRevision);
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toBe(CARD_DISCARD_MOVED);
+	expect((await get(k.id)).pendingDraft).toEqual(before);
+});
+
+test("the editor card's discard at the draft's revision drops it and shows the live page", async () => {
+	const k = await liveWithDraft();
+	const opened = await openEditor(k.id);
+
+	const result = await cardDiscard(k.id, opened.draftRevision);
+
+	expect(result.isError).toBeUndefined();
+	expect(result.structuredContent).toMatchObject({
+		pendingDraft: false,
+		draftRevision: null,
+	});
+	expect(await countRows(db, "campaign_draft")).toBe(0);
+	expect(writes()).toEqual([]);
+});
+
+test("the editor card's discard of a draft already dropped elsewhere is refused, so the card reloads", async () => {
+	const k = await liveWithDraft();
+	const opened = await openEditor(k.id);
+	await tool("discard_campaign_draft", {
+		id: k.id,
+		revision: await revisionOf(k.id),
+	});
+
+	const result = await cardDiscard(k.id, opened.draftRevision);
+
+	expect(result.content[0]?.text).toBe(CARD_DISCARD_MOVED);
+});
+
+test("the editor card that read no draft has its discard refused once the chat has started one", async () => {
+	const k = await live();
+	const opened = await openEditor(k.id);
+	await tool("update_campaign_settings", { id: k.id, goal: usd("7000.00") });
+
+	const result = await cardDiscard(k.id, opened.draftRevision);
+
+	expect(result.content[0]?.text).toBe(CARD_DISCARD_MOVED);
+	expect(await countRows(db, "campaign_draft")).toBe(1);
+});
+
+test("an editor card that sends no draft revision drops whichever draft is stored, as before", async () => {
+	const k = await liveWithDraft();
+	await tool("update_campaign_settings", { id: k.id, goal: usd("7000.00") });
+
+	const result = await cardDiscard(k.id);
+
+	expect(result.isError).toBeUndefined();
+	expect(await countRows(db, "campaign_draft")).toBe(0);
 });

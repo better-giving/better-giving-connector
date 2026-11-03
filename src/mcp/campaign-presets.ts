@@ -38,6 +38,8 @@ export type PresetCreated = {
 	campaign: { id: string; title: string; version?: string; status: string };
 	steps: PresetStepResult[];
 	failedStep: PresetStep | null;
+	/** The site answered the create with a draft an earlier call under this title made. */
+	replayed: boolean;
 };
 
 export type DeploymentDeps = {
@@ -89,7 +91,8 @@ class StepSkipped extends Error {
  * throws as a plain create's would; one after it ends the run there and is
  * reported in the result, the draft left as it stands (donors can't see it).
  * A create the site replays onto a campaign that is no longer a draft throws
- * a ToolRefusal and writes nothing.
+ * a ToolRefusal and writes nothing; onto a draft, it fills in only what that
+ * draft still lacks.
  */
 export async function createCampaignWithPreset(
 	deps: DeploymentDeps,
@@ -104,10 +107,10 @@ export async function createCampaignWithPreset(
 	let campaign = bodyOf(created.body);
 	const id = String(campaign.id);
 	// A replayed create answers with the campaign as it was first made, by an
-	// earlier call under the same title; dressing it again would overwrite
-	// whatever the operator has done to it since, so only a draft is dressed.
-	const madeHere = created.status !== 200;
-	if (!madeHere) {
+	// earlier call under the same title. Only a draft is dressed, and only
+	// where it is still empty, so the operator's own changes since stand.
+	const replayed = created.status === 200;
+	if (replayed) {
 		campaign = bodyOf(
 			(await client.call(connection, "campaigns.get", { id })).body,
 		);
@@ -120,35 +123,55 @@ export async function createCampaignWithPreset(
 		}
 	}
 
-	const run: Record<Exclude<PresetStep, "create">, () => Promise<void>> = {
+	// A step resolves with a detail when it did only part of its write.
+	const run: Record<
+		Exclude<PresetStep, "create">,
+		() => Promise<string | undefined>
+	> = {
 		settings: async () => {
 			if (!serves("campaigns.update_settings"))
 				throw new StepSkipped(
 					"This site doesn't set a campaign's goal or end date through the connector.",
 				);
+			const settings = bodyOf(campaign.settings);
+			const unset = {
+				...(replayed && settings.goal ? {} : { goal: preset.goal }),
+				...(replayed && settings.end_date ? {} : { end_date: preset.end_date }),
+			};
+			if (Object.keys(unset).length === 0)
+				throw new StepSkipped(
+					"The campaign already has a goal and an end date, so they were left as they are.",
+				);
 			const answer = await client.call(
 				connection,
 				"campaigns.update_settings",
-				{
-					id,
-					goal: preset.goal,
-					end_date: preset.end_date,
-					...versioned(campaign),
-				},
+				{ id, ...unset, ...versioned(campaign) },
 			);
 			campaign = bodyOf(answer.body);
+			if (!("goal" in unset))
+				return "Set the end date only: the campaign already had a goal.";
+			if (!("end_date" in unset))
+				return "Set the goal only: the campaign already had an end date.";
+			return undefined;
 		},
-		form: () =>
-			setFormAmounts(
+		form: async () => {
+			await setFormAmounts(
 				deps,
 				serves,
 				id,
 				title,
 				preset.suggested_amounts,
-				madeHere,
-			),
+				replayed,
+			);
+			return undefined;
+		},
 		page: async () => {
+			if (replayed && hasStory(campaign))
+				throw new StepSkipped(
+					"The campaign's page already has a story, so it was left as it is.",
+				);
 			campaign = await starterPage(deps, serves, campaign, id, preset.theme);
+			return undefined;
 		},
 	};
 
@@ -164,8 +187,12 @@ export async function createCampaignWithPreset(
 			continue;
 		}
 		try {
-			await run[step]();
-			steps.push({ step, status: "done" });
+			const detail = await run[step]();
+			steps.push({
+				step,
+				status: "done",
+				...(detail === undefined ? {} : { detail }),
+			});
 		} catch (error) {
 			if (error instanceof StepSkipped) {
 				steps.push({ step, status: "skipped", detail: error.message });
@@ -186,24 +213,42 @@ export async function createCampaignWithPreset(
 		},
 		steps,
 		failedStep,
+		replayed,
 	};
 }
 
+// A story block with text, any text block, or a content story.
+function hasStory(campaign: Body): boolean {
+	const blocks = Array.isArray(campaign.blocks) ? campaign.blocks : [];
+	const inBlocks = blocks.some(
+		(b) =>
+			isBody(b) &&
+			(b.type === "text" ||
+				(b.type === "story" && typeof b.text === "string" && b.text !== "")),
+	);
+	return inBlocks || bodyOf(campaign.content).story != null;
+}
+
 // The campaign's own form (its campaign_id is the campaign's) takes the
-// amounts; a campaign with none gets one made with them.
+// amounts; a campaign with none gets one made with them. A replayed
+// campaign's existing form is left alone: it may already take gifts.
 async function setFormAmounts(
 	{ connection, client }: DeploymentDeps,
 	serves: (action: ActionName) => boolean,
 	campaignId: string,
 	title: string,
 	amounts: Money[],
-	campaignMadeHere: boolean,
+	replayed: boolean,
 ): Promise<void> {
 	if (!serves("forms.list"))
 		throw new StepSkipped(
 			"This site doesn't list its donation forms through the connector.",
 		);
 	const form = await findCampaignForm({ connection, client }, campaignId);
+	if (form && replayed)
+		throw new StepSkipped(
+			"The campaign already has a donation form, so its amounts were left as they are.",
+		);
 	// Platform keeps amounts as money, Standalone as decimal strings.
 	const platformShape = form
 		? Object.hasOwn(form, "suggested_amounts")
@@ -222,10 +267,9 @@ async function setFormAmounts(
 			...(typeof form.updated_at === "string"
 				? { updated_at: form.updated_at }
 				: {}),
-			// Platform holds a change to a live form for a confirm. Only a form
-			// whose campaign this call made skips it; a replayed campaign's form
-			// may already take gifts, so its hold stands and fails the step.
-			...(connection.platform && campaignMadeHere ? { confirm: true } : {}),
+			// Platform holds a change to a live form for a confirm; this form's
+			// campaign was made by this call, so no gift has reached it yet.
+			...(connection.platform ? { confirm: true } : {}),
 		});
 		return;
 	}
@@ -283,6 +327,8 @@ async function starterPage(
 				await client.call(connection, "campaigns.update_content", {
 					id,
 					story: storyDocument(story),
+					// Standalone's content action takes no version.
+					...(connection.platform ? versioned(campaign) : {}),
 				})
 			).body,
 		);
@@ -337,31 +383,75 @@ export function presetCreatedText(
 	org: string,
 	locale: string,
 ): string {
-	const { campaign, steps, failedStep } = created;
+	const { campaign, steps, failedStep, replayed } = created;
 	const lines: string[] = [];
+	const exists = `A draft campaign "${campaign.title}" already exists for ${org}, so no new one was made.`;
 	if (failedStep === null) {
-		const goal = formatMoney(preset.goal.amount, preset.goal.currency, locale);
-		const ends = formatDate(preset.end_date, locale);
-		lines.push(
-			`Created a draft campaign "${campaign.title}" for ${org} from the ${THEMES[preset.theme].label.toLowerCase()} preset: goal ${goal}, ending ${ends}, with ${preset.suggested_amounts.length} suggested amounts and a starter story for the operator to replace. Donors can't see it until it's published.`,
-		);
+		// a step that did only part of its write says so on its own line
+		const done = (step: PresetStep) =>
+			steps.some(
+				(s) => s.step === step && s.status === "done" && s.detail === undefined,
+			);
+		const made = [
+			...(done("settings")
+				? [
+						`goal ${formatMoney(preset.goal.amount, preset.goal.currency, locale)}`,
+						`ending ${formatDate(preset.end_date, locale)}`,
+					]
+				: []),
+			...(done("form")
+				? [`${preset.suggested_amounts.length} suggested amounts`]
+				: []),
+			...(done("page") ? ["a starter story for the operator to replace"] : []),
+		];
+		const listed =
+			made.length < 2
+				? made.join("")
+				: `${made.slice(0, -1).join(", ")} and ${made.at(-1)}`;
+		const from = `the ${THEMES[preset.theme].label.toLowerCase()} preset`;
+		const unseen = "Donors can't see it until it's published.";
+		if (!replayed) {
+			lines.push(
+				`Created a draft campaign "${campaign.title}" for ${org} from ${from}${listed === "" ? "" : `: ${listed}`}. ${unseen}`,
+			);
+		} else if (listed !== "") {
+			lines.push(
+				`${exists} Filled in what it was missing from ${from}: ${listed}. ${unseen}`,
+			);
+		} else {
+			const changed = steps.some(
+				(s) => s.step !== "create" && s.status === "done",
+			);
+			lines.push(
+				changed
+					? `${exists} ${unseen}`
+					: `${exists} Nothing on it was changed.`,
+			);
+		}
+		for (const s of steps) {
+			if (s.step !== "create" && s.detail !== undefined)
+				lines.push(
+					s.status === "done"
+						? s.detail
+						: `Skipped the ${s.step} step: ${s.detail}`,
+				);
+		}
 	} else {
 		const failed = steps.find((s) => s.step === failedStep);
+		// the failed step and the ones after it, never tried
 		const left = steps
-			.filter((s) => s.status !== "done" && s.step !== "create")
+			.slice(steps.findIndex((s) => s.step === failedStep))
 			.map(
 				(s) =>
 					`${s.step} with ${STEP_TOOLS[s.step as keyof typeof STEP_TOOLS]}`,
 			);
+		const lead = replayed
+			? `${exists} Filling in what it lacked stopped: the ${failedStep} step failed.`
+			: `Partly created "${campaign.title}" for ${org}: the ${failedStep} step failed.`;
 		lines.push(
-			`Partly created "${campaign.title}" for ${org}: the ${failedStep} step failed. ${failed?.detail ?? ""} The draft exists, donors can't see it, and nothing was undone. Finish it by setting the ${left.join(", then ")}.`,
+			`${lead} ${failed?.detail ?? ""} The draft exists, donors can't see it, and nothing was undone. Finish it by setting the ${left.join(", then ")}.`,
 		);
 	}
-	const skipped = steps.filter(
-		(s) => s.status === "skipped" && failedStep === null,
-	);
-	for (const s of skipped)
-		lines.push(`Skipped the ${s.step} step: ${s.detail}`);
 	lines.push(JSON.stringify(created));
 	return lines.join("\n");
 }

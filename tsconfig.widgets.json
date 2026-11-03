@@ -4,7 +4,9 @@
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"lib": ["ES2023", "DOM", "DOM.Iterable"],
-		"types": []
+		"types": [],
+		// scripts/widget-html.mjs bundles with hono/jsx/dom unless a file's pragma says otherwise.
+		"jsxImportSource": "hono/jsx/dom"
 	},
 	"include": ["src/widgets", "test/fixtures/widget"],
 	"exclude": []

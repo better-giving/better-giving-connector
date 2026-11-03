@@ -854,9 +854,23 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			| { revision: number }
 			| undefined;
 		const revision = pending?.revision;
+		const savedFromCard = await callTool(bearer, "app_save_campaign_edit", {
+			id,
+			expectedVersion: null,
+			draftRevision: revision,
+			page: {
+				pageKind: "blocks",
+				blocks: [{ type: "text", body: arg("card-draft-body") }],
+			},
+		});
+		const refusedFromCard = await callTool(
+			bearer,
+			"app_discard_campaign_draft",
+			{ id, draftRevision: revision },
+		);
 		const dropped = await callTool(bearer, "discard_campaign_draft", {
 			id,
-			revision,
+			revision: savedFromCard.structuredContent?.draftRevision,
 		});
 		const droppedFromCard = await callTool(
 			bearer,
@@ -867,6 +881,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		);
 
 		expect(edited.structuredContent?.saved).toBe("draft");
+		expect(savedFromCard.isError).toBeUndefined();
+		expect(refusedFromCard.isError).toBe(true);
 		expect(dropped.structuredContent).toEqual({ discarded: true });
 		expect(droppedFromCard.isError).toBeUndefined();
 		// the draft held back from the deployment, then dropped

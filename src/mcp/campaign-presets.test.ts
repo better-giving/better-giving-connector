@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
-import type { ActionName } from "../deployment";
+import { type ActionName, DeploymentRejected } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
+import { storyDocument, THEMES } from "../presets/themes";
 import { Secret } from "../secret";
 import { createCampaignWithPreset, type Preset } from "./campaign-presets";
 import type { ToolConnection } from "./run-tool";
@@ -100,16 +101,17 @@ test("the campaign's form is found by paging forms.list with next_cursor", async
 	});
 });
 
-test("a create that replays an earlier one reads the campaign afresh, so the settings write carries its current version", async () => {
+test("a replayed create reads the draft afresh and fills in only what it still lacks, on its current version", async () => {
 	const { sent, client } = scripted({
 		"campaigns.create": () => CAMPAIGN,
-		"campaigns.get": () => ({ ...CAMPAIGN, version: "8" }),
-		"campaigns.update_settings": () => ({ ...CAMPAIGN, version: "9" }),
-		"forms.list": () => ({
-			data: [{ id: "frm_b", campaign_id: "cmp_9", suggested_amounts: [] }],
-			next_cursor: null,
+		"campaigns.get": () => ({
+			...CAMPAIGN,
+			version: "8",
+			settings: { goal: usd("900.00"), end_date: null },
 		}),
-		"forms.update": () => ({}),
+		"campaigns.update_settings": () => ({ ...CAMPAIGN, version: "9" }),
+		"forms.list": () => ({ data: [], next_cursor: null }),
+		"forms.create": () => ({}),
 		"campaigns.update_blocks": () => ({ ...CAMPAIGN, version: "10" }),
 	});
 
@@ -119,16 +121,99 @@ test("a create that replays an earlier one reads the campaign afresh, so the set
 		PRESET,
 	);
 
+	expect(created.replayed).toBe(true);
 	expect(
 		sent.find((s) => s.action === "campaigns.update_settings")?.input,
-	).toMatchObject({ expected_version: "8" });
-	expect(created.campaign.version).toBe("10");
-	// the form belongs to a campaign an earlier call made, so a live form's
-	// confirm is left to the site
+	).toEqual({ id: "cmp_9", end_date: "2026-12-02", expected_version: "8" });
+	expect(created.steps[1]).toEqual({
+		step: "settings",
+		status: "done",
+		detail: "Set the end date only: the campaign already had a goal.",
+	});
+	expect(sent.map((s) => s.action)).toContain("forms.create");
 	expect(
-		sent.find((s) => s.action === "forms.update")?.input,
-	).not.toHaveProperty("confirm");
+		sent.find((s) => s.action === "campaigns.update_blocks")?.input,
+	).toMatchObject({ expected_version: "9" });
+	expect(created.campaign.version).toBe("10");
 });
+
+test("a replayed create onto a draft already filled in overwrites nothing and says it replayed", async () => {
+	const { sent, client } = scripted({
+		"campaigns.create": () => CAMPAIGN,
+		"campaigns.get": () => ({
+			...CAMPAIGN,
+			version: "8",
+			settings: { goal: usd("900.00"), end_date: "2027-01-15" },
+			blocks: [{ type: "story", text: "Our own words." }],
+		}),
+		"forms.list": () => ({
+			data: [{ id: "frm_b", campaign_id: "cmp_9", suggested_amounts: [] }],
+			next_cursor: null,
+		}),
+	});
+
+	const created = await createCampaignWithPreset(
+		{ connection, client },
+		"Giving day",
+		PRESET,
+	);
+
+	expect(created.replayed).toBe(true);
+	expect(created.failedStep).toBeNull();
+	expect(created.steps.map((s) => s.status)).toEqual([
+		"done",
+		"skipped",
+		"skipped",
+		"skipped",
+	]);
+	expect(sent.map((s) => s.action)).toEqual([
+		"campaigns.create",
+		"campaigns.get",
+		"forms.list",
+	]);
+});
+
+const replaced = new DeploymentRejected(422, {
+	title: "replaced",
+	code: "replaced",
+});
+
+test.each([
+	[true, { expected_version: "5" }],
+	[false, {}],
+])(
+	"the story sent as content after blocks answer replaced carries the version on Platform (%s) alone",
+	async (platform, version) => {
+		const { sent, client } = scripted(
+			{
+				"campaigns.create": () => CAMPAIGN,
+				"campaigns.update_settings": () => ({ ...CAMPAIGN, version: "5" }),
+				"forms.list": () => ({ data: [], next_cursor: null }),
+				"forms.create": () => ({}),
+				"campaigns.update_blocks": () => {
+					throw replaced;
+				},
+				"campaigns.update_content": () => ({ ...CAMPAIGN, version: "6" }),
+			},
+			{ "campaigns.create": 201 },
+		);
+
+		const created = await createCampaignWithPreset(
+			{ connection: { ...connection, platform }, client },
+			"Giving day",
+			PRESET,
+		);
+
+		expect(created.failedStep).toBeNull();
+		expect(
+			sent.find((s) => s.action === "campaigns.update_content")?.input,
+		).toEqual({
+			id: "cmp_9",
+			story: storyDocument(THEMES.giving_day.story),
+			...version,
+		});
+	},
+);
 
 test("a replayed create on a campaign that is no longer a draft leaves it untouched and says it exists", async () => {
 	const { sent, client } = scripted({

@@ -124,13 +124,18 @@ export function mergeDraft(
  * version. Any other `expectedVersion` is refused as stale. With `rebase`
  * false, a draft the campaign has moved past is refused instead of moved: the
  * editor card shows the draft, never the site's change it would overwrite.
+ * Given `draftRevision`, the edit lands only on the draft at that revision,
+ * or where there is none when it is null; omitted, on whichever is stored.
  */
 export async function saveLiveCampaignEdit(
 	deps: DraftDeps,
 	campaignId: string,
 	edit: DraftEdit,
 	expectedVersion?: string,
-	{ rebase = true }: { rebase?: boolean } = {},
+	{
+		rebase = true,
+		draftRevision,
+	}: { rebase?: boolean; draftRevision?: number | null } = {},
 ): Promise<SavedDraft | null> {
 	const campaign = await readCampaign(deps, campaignId);
 	if (!isLive(campaign)) return null;
@@ -140,6 +145,10 @@ export async function saveLiveCampaignEdit(
 	}
 	const key = keyOf(deps, campaignId);
 	const stored = await deps.drafts.get(key);
+	const read = stored?.revision ?? null;
+	if (draftRevision !== undefined && draftRevision !== read) {
+		throw new ToolRefusal("rejected", DRAFT_MOVED, DRAFT_MOVED_CARD);
+	}
 	if (!rebase && stored && stored.baseVersion !== current) {
 		throw new ToolRefusal("rejected", STALE_BASE);
 	}
@@ -147,7 +156,7 @@ export async function saveLiveCampaignEdit(
 		stored && expectedVersion === undefined ? stored.baseVersion : current;
 	const kept = await deps.drafts.put(
 		{ ...key, baseVersion, ...mergeDraft(stored, edit) },
-		stored?.revision ?? null,
+		read,
 	);
 	if (!kept) throw new ToolRefusal("rejected", DRAFT_MOVED, DRAFT_MOVED_CARD);
 	return { saved: "draft", campaign_id: campaignId, base_version: baseVersion };
@@ -171,15 +180,17 @@ export async function pendingDraft(
 
 /**
  * Drops the campaign's draft while it is still the one at `revision`:
- * "moved" when a save has replaced it since, "none" when there is no draft.
+ * "moved" when a save has replaced it since, or one exists where `revision`
+ * is null (none was read); "none" when there is no draft.
  */
 export async function discardCampaignDraft(
 	deps: Pick<DraftDeps, "connection" | "drafts">,
 	campaignId: string,
-	revision: number,
+	revision: number | null,
 ): Promise<"discarded" | "moved" | "none"> {
 	const key = keyOf(deps, campaignId);
-	if (await deps.drafts.delete(key, revision)) return "discarded";
+	if (revision !== null && (await deps.drafts.delete(key, revision)))
+		return "discarded";
 	return (await deps.drafts.get(key)) ? "moved" : "none";
 }
 
