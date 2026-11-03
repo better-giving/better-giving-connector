@@ -124,8 +124,8 @@ export function mergeDraft(
  * version. Any other `expectedVersion` is refused as stale. With `rebase`
  * false, a draft the campaign has moved past is refused instead of moved: the
  * editor card shows the draft, never the site's change it would overwrite.
- * Given `draftRevision`, the edit lands only on the draft at that revision,
- * or where there is none when it is null; omitted, on whichever is stored.
+ * Given `draftRevision`, the edit lands only if the stored draft is at that
+ * revision (null: only if there is none); omitted, on whichever is stored.
  */
 export async function saveLiveCampaignEdit(
 	deps: DraftDeps,
