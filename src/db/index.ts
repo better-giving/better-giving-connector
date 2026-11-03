@@ -17,6 +17,13 @@ export function createDb(cfg: { url: string; authToken?: string }): Db {
 	return createHttpClient(config);
 }
 
+export {
+	type CampaignDraft,
+	type CampaignDraftKey,
+	type CampaignDrafts,
+	type CampaignDraftWrite,
+	campaignDrafts,
+} from "./campaign-drafts";
 export { type Connection, type Connections, connections } from "./connections";
 export {
 	ConnectionKeySecretMismatch,

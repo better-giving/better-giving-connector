@@ -1,0 +1,11 @@
+{
+	// Browser code gets DOM types and no node globals. DOM in the main project
+	// collides with node's CryptoKey (src/db/key-cipher.ts), so it lives here.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ES2023", "DOM", "DOM.Iterable"],
+		"types": []
+	},
+	"include": ["src/widgets", "test/fixtures/widget"],
+	"exclude": []
+}

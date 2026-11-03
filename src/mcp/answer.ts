@@ -1,15 +1,16 @@
 import type { CallAnswer } from "../deployment";
 import { isKeyedAction } from "../deployment";
-import type { ActionSpec } from "./actions";
+import { formatMoney } from "../format";
 import type { RunToolContext, ToolConnection } from "./run-tool";
+import type { ActionSpec } from "./spec";
 
 const REPLAY_PREFIX =
 	"Already done: this matches an earlier call with the same details, so nothing new was recorded. The original result follows.";
 
 /**
  * A successful call as the chat reads it: a lead line naming the org, then
- * the deployment's JSON as it sent it. Never throws: a body it can't
- * summarize gets the generic lead.
+ * the deployment's JSON as it sent it. Money in the lead is formatted for
+ * `locale`. Never throws: a body it can't summarize gets the generic lead.
  */
 export async function answerText(
 	spec: ActionSpec,
@@ -17,6 +18,7 @@ export async function answerText(
 	input: Record<string, unknown>,
 	answer: CallAnswer,
 	ctx: RunToolContext,
+	locale: string,
 ): Promise<string> {
 	const replayed = isKeyedAction(spec.action) && answer.status === 200;
 	const lead = await leadOf(
@@ -26,6 +28,7 @@ export async function answerText(
 		answer.body,
 		replayed,
 		ctx,
+		locale,
 	).catch(() => null);
 	const lines = [lead ?? generic(connection.orgName)];
 	if (replayed) lines.push(REPLAY_PREFIX);
@@ -55,6 +58,7 @@ async function leadOf(
 	body: unknown,
 	replayed: boolean,
 	ctx: RunToolContext,
+	locale: string,
 ): Promise<string | null> {
 	const org = connection.orgName;
 	switch (spec.action) {
@@ -66,7 +70,7 @@ async function leadOf(
 			// A replay's "Created…" would contradict the replay line below it.
 			return replayed ? null : createdLead(org, input, body);
 		case "results.summary":
-			return resultsLead(org, input, body, () =>
+			return resultsLead(org, input, body, locale, () =>
 				ctx.client.call(connection, "results.summary", {}),
 			);
 		case "donations.list":
@@ -188,24 +192,21 @@ function scope(input: Record<string, unknown>): string {
 	return campaign ? `${range} for campaign ${campaign}` : range;
 }
 
-function money(value: unknown): string | null {
+function money(value: unknown, locale: string): string | null {
 	if (!isBody(value)) return null;
-	const amount = Number(value.amount);
+	const amount = text(value.amount);
 	const currency = text(value.currency);
-	if (!Number.isFinite(amount) || currency === undefined) return null;
+	if (amount === undefined || currency === undefined) return null;
 	try {
-		return new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-		}).format(amount);
+		return formatMoney(amount, currency, locale);
 	} catch {
 		return null;
 	}
 }
 
-const giftsOf = (body: unknown) => {
+const giftsOf = (body: unknown, locale: string) => {
 	if (!isBody(body) || typeof body.gift_count !== "number") return null;
-	const total = money(body.total);
+	const total = money(body.total, locale);
 	return total === null ? null : { count: body.gift_count, total };
 };
 
@@ -213,9 +214,10 @@ async function resultsLead(
 	org: string,
 	input: Record<string, unknown>,
 	body: unknown,
+	locale: string,
 	unfiltered: Unfiltered,
 ): Promise<string | null> {
-	const gifts = giftsOf(body);
+	const gifts = giftsOf(body, locale);
 	if (gifts === null) return null;
 	const within = scope(input);
 	if (gifts.count > 0) {
@@ -223,7 +225,7 @@ async function resultsLead(
 	}
 	if (within === "") return `${org} has no gifts recorded yet.`;
 	const none = `${org} had no gifts${within}.`;
-	const all = giftsOf(await readUnfiltered(unfiltered));
+	const all = giftsOf(await readUnfiltered(unfiltered), locale);
 	if (all === null) return none;
 	if (all.count === 0) return `${org} has no gifts recorded yet.`;
 	return `${none} All time, it has ${plural(all.count, "gift", "gifts")} totaling ${all.total}; widen the range or leave the filters out to see them.`;

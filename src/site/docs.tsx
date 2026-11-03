@@ -1,4 +1,6 @@
+import type { LocalToolName } from "../log";
 import { ACTIONS, type ToolName } from "../mcp/actions";
+import { LOCAL_TOOLS } from "../mcp/local";
 import { Page } from "./page";
 
 const TOOL_CLASSES = ["Read", "Write", "Sensitive write"] as const;
@@ -120,11 +122,71 @@ const TOOL_DOCS: Record<ToolName, ToolDoc> = {
 	},
 };
 
-const TOOL_ROWS = TOOL_CLASSES.flatMap((toolClass) =>
-	ACTIONS.filter((spec) => TOOL_DOCS[spec.tool].class === toolClass).map(
+const CARD = "Opens a card in the chat. Changes nothing.";
+const CARD_BUTTON = "Called by a button on a card, not by your AI assistant.";
+
+// The connector's own tools, keyed by name for the same reason.
+const LOCAL_DOCS: Record<LocalToolName, ToolDoc> = {
+	get_profile: { class: "Read", effects: "None." },
+	recommend_campaign_presets: { class: "Read", effects: "None." },
+	discard_campaign_draft: {
+		class: "Sensitive write",
+		effects:
+			"Throws away saved edits to a live campaign that were not published. Donors never saw them.",
+	},
+	show_campaign_create: { class: "Read", effects: CARD },
+	show_campaigns: { class: "Read", effects: CARD },
+	show_campaign_results: { class: "Read", effects: CARD },
+	open_campaign_editor: { class: "Read", effects: CARD },
+	show_photo: { class: "Read", effects: CARD },
+	set_campaign_photo: {
+		class: "Sensitive write",
+		effects:
+			"Sets a campaign's cover from a photo you dropped into the chat (a JPEG, PNG or WebP image). If it cannot, it returns a single-use upload link instead. On a live campaign donors see the new cover right away.",
+		errors: [ENDED],
+	},
+	app_create_campaign: {
+		class: "Write",
+		effects: `Creates a draft campaign from a preset. ${CARD_BUTTON}`,
+	},
+	app_publish_campaign: {
+		class: "Sensitive write",
+		effects: `Publishes a draft campaign, or sends a live campaign's saved edits live. ${CARD_BUTTON}`,
+	},
+	app_end_campaign: {
+		class: "Sensitive write",
+		effects: `Ends a campaign for good, after the card's confirmation. ${CARD_BUTTON}`,
+	},
+	app_get_campaign_editor: {
+		class: "Read",
+		effects: `None. ${CARD_BUTTON}`,
+	},
+	app_save_campaign_edit: {
+		class: "Write",
+		effects: `Saves an editor change. On a live campaign it stays a draft until published. ${CARD_BUTTON}`,
+	},
+	app_discard_campaign_draft: {
+		class: "Sensitive write",
+		effects: `Throws away a live campaign's unpublished edits. ${CARD_BUTTON}`,
+	},
+	app_set_campaign_photo: {
+		class: "Sensitive write",
+		effects: `Sets a campaign's cover from the photo card. ${CARD_BUTTON}`,
+	},
+	app_photo_upload_link: {
+		class: "Sensitive write",
+		effects: `Makes a single-use upload link for the photo card. ${CARD_BUTTON}`,
+	},
+};
+
+const TOOL_ROWS = TOOL_CLASSES.flatMap((toolClass) => [
+	...ACTIONS.filter((spec) => TOOL_DOCS[spec.tool].class === toolClass).map(
 		(spec) => ({ tool: spec.tool, ...TOOL_DOCS[spec.tool] }),
 	),
-);
+	...LOCAL_TOOLS.filter(
+		(spec) => LOCAL_DOCS[spec.tool].class === toolClass,
+	).map((spec) => ({ tool: spec.tool, ...LOCAL_DOCS[spec.tool] })),
+]);
 
 export function DocsPage() {
 	return (
@@ -320,6 +382,17 @@ export function DocsPage() {
 					</tbody>
 				</table>
 			</div>
+
+			<h3>Cards in the chat</h3>
+			<p>
+				In your AI assistant, some answers open a card: presets for a new
+				campaign, your campaigns with progress, a campaign's results, an editor
+				with a live preview of the donor page, and a photo card. The cards are
+				served from <code>https://app.connect.better.giving</code> and load
+				images only from there and from Better Giving's photo storage. They
+				reach your account only through the tools above, and publishing or
+				ending a campaign from a card asks you to confirm first.
+			</p>
 
 			<h3>Errors any tool can return</h3>
 			<ul>

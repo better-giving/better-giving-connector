@@ -36,7 +36,8 @@
 						"paths": {
 							"better-auth": "Import better-auth only inside src/auth/.",
 							"@libsql/client": "Import @libsql/client only inside src/db/.",
-							"@modelcontextprotocol/server": "Import @modelcontextprotocol/* only inside src/mcp/."
+							"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/.",
+							"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/."
 						},
 						"patterns": [
 							{
@@ -45,7 +46,7 @@
 							},
 							{
 								"group": ["@modelcontextprotocol/**"],
-								"message": "Import @modelcontextprotocol/* only inside src/mcp/."
+								"message": "Import @modelcontextprotocol/server only inside src/mcp/ and @modelcontextprotocol/ext-apps only inside src/widgets/."
 							},
 							{
 								"group": ["@libsql/client/**"],
@@ -98,12 +99,14 @@
 							"level": "error",
 							"options": {
 								"paths": {
-									"@libsql/client": "Import @libsql/client only inside src/db/."
+									"@libsql/client": "Import @libsql/client only inside src/db/.",
+									"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/.",
+									"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/."
 								},
 								"patterns": [
 									{
 										"group": ["@modelcontextprotocol/**"],
-										"message": "Import @modelcontextprotocol/* only inside src/mcp/."
+										"message": "Import @modelcontextprotocol/server only inside src/mcp/ and @modelcontextprotocol/ext-apps only inside src/widgets/."
 									},
 									{
 										"group": ["@libsql/client/**"],
@@ -125,7 +128,9 @@
 							"level": "error",
 							"options": {
 								"paths": {
-									"better-auth": "Import better-auth only inside src/auth/."
+									"better-auth": "Import better-auth only inside src/auth/.",
+									"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/.",
+									"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/."
 								},
 								"patterns": [
 									{
@@ -134,7 +139,7 @@
 									},
 									{
 										"group": ["@modelcontextprotocol/**"],
-										"message": "Import @modelcontextprotocol/* only inside src/mcp/."
+										"message": "Import @modelcontextprotocol/server only inside src/mcp/ and @modelcontextprotocol/ext-apps only inside src/widgets/."
 									},
 									{
 										"group": ["@better-auth/**"],
@@ -157,7 +162,8 @@
 							"options": {
 								"paths": {
 									"better-auth": "Import better-auth only inside src/auth/.",
-									"@libsql/client": "Import @libsql/client only inside src/db/."
+									"@libsql/client": "Import @libsql/client only inside src/db/.",
+									"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/."
 								},
 								"patterns": [
 									{
@@ -171,6 +177,10 @@
 									{
 										"group": ["@better-auth/**"],
 										"message": "Import better-auth only inside src/auth/."
+									},
+									{
+										"group": ["@modelcontextprotocol/ext-apps/**"],
+										"message": "Import @modelcontextprotocol/ext-apps only inside src/widgets/."
 									}
 								]
 							}
@@ -190,7 +200,8 @@
 								"paths": {
 									"better-auth": "Import better-auth only inside src/auth/.",
 									"@libsql/client": "Import @libsql/client only inside src/db/.",
-									"@modelcontextprotocol/server": "Import @modelcontextprotocol/* only inside src/mcp/."
+									"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/.",
+									"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/."
 								},
 								"patterns": [
 									{
@@ -199,7 +210,7 @@
 									},
 									{
 										"group": ["@modelcontextprotocol/**"],
-										"message": "Import @modelcontextprotocol/* only inside src/mcp/."
+										"message": "Import @modelcontextprotocol/server only inside src/mcp/ and @modelcontextprotocol/ext-apps only inside src/widgets/."
 									},
 									{
 										"group": ["@libsql/client/**"],
@@ -207,14 +218,115 @@
 									},
 									{
 										"group": [
-											"../db",
-											"../db/**",
-											"../auth",
-											"../auth/**",
-											"../mcp",
-											"../mcp/**"
+											"../**/db",
+											"../**/db/**",
+											"../**/auth",
+											"../**/auth/**",
+											"../**/mcp",
+											"../**/mcp/**"
 										],
 										"message": "src/deployment/ imports nothing from src/db/, src/auth/ or src/mcp/."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/widgets/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"better-auth": "Import better-auth only inside src/auth/.",
+									"@libsql/client": "Import @libsql/client only inside src/db/.",
+									"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/."
+								},
+								"patterns": [
+									{
+										"group": ["better-auth/**", "@better-auth/**"],
+										"message": "Import better-auth only inside src/auth/."
+									},
+									{
+										"group": ["@libsql/client/**"],
+										"message": "Import @libsql/client only inside src/db/."
+									},
+									{
+										"group": ["@modelcontextprotocol/server/**"],
+										"message": "Import @modelcontextprotocol/server only inside src/mcp/."
+									},
+									{
+										"group": [
+											"../**/db",
+											"../**/db/**",
+											"../**/auth",
+											"../**/auth/**",
+											"../**/mcp",
+											"../**/mcp/**",
+											"../**/deployment",
+											"../**/deployment/**",
+											"../**/connect",
+											"../**/connect/**",
+											"../**/site",
+											"../**/site/**",
+											"../**/env",
+											"../**/env/**",
+											"../**/env.*",
+											"../**/log",
+											"../**/log/**",
+											"../**/log.*",
+											"../**/secret",
+											"../**/secret/**",
+											"../**/secret.*"
+										],
+										"message": "src/widgets/ is browser code: it imports nothing from src/db/, src/auth/, src/mcp/, src/deployment/, src/connect/, src/site/, src/env.ts, src/log.ts or src/secret.ts."
+									},
+									{
+										"group": ["node:*"],
+										"message": "src/widgets/ is browser code: no node:* imports."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/format.ts", "src/presets/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"better-auth": "Import better-auth only inside src/auth/.",
+									"@libsql/client": "Import @libsql/client only inside src/db/.",
+									"@modelcontextprotocol/server": "Import @modelcontextprotocol/server only inside src/mcp/.",
+									"@modelcontextprotocol/ext-apps": "Import @modelcontextprotocol/ext-apps only inside src/widgets/."
+								},
+								"patterns": [
+									{
+										"group": ["better-auth/**", "@better-auth/**"],
+										"message": "Import better-auth only inside src/auth/."
+									},
+									{
+										"group": ["@modelcontextprotocol/**"],
+										"message": "Import @modelcontextprotocol/server only inside src/mcp/ and @modelcontextprotocol/ext-apps only inside src/widgets/."
+									},
+									{
+										"group": ["@libsql/client/**"],
+										"message": "Import @libsql/client only inside src/db/."
+									},
+									{
+										"group": ["node:*"],
+										"message": "src/format.ts and src/presets/ are shared with the widgets: no node:* imports."
 									}
 								]
 							}

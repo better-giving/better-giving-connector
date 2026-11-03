@@ -52,6 +52,24 @@ export const PLATFORM_TOOLS = [
 	"get_donor",
 	"list_recurring_gifts",
 	"create_photo_upload_link",
+	"recommend_campaign_presets",
+	// the connector's own, offered whatever the hello lists
+	"get_profile",
+	"discard_campaign_draft",
+	"show_campaign_create",
+	"show_campaigns",
+	"show_campaign_results",
+	"open_campaign_editor",
+	"show_photo",
+	"set_campaign_photo",
+	"app_create_campaign",
+	"app_publish_campaign",
+	"app_end_campaign",
+	"app_get_campaign_editor",
+	"app_save_campaign_edit",
+	"app_discard_campaign_draft",
+	"app_set_campaign_photo",
+	"app_photo_upload_link",
 ];
 
 /** Each Platform tool's contract action, as the fake deployment serves it. */

@@ -35,7 +35,13 @@ import {
 	StoreDown,
 	seedDeadUsers,
 } from "../../test/support";
-import { type Connections, connections, type Db } from "../db";
+import {
+	type CampaignDrafts,
+	type Connections,
+	campaignDrafts,
+	connections,
+	type Db,
+} from "../db";
 import {
 	type DeploymentClient,
 	deploymentClient,
@@ -53,6 +59,7 @@ import {
 
 let db: Db;
 let store: Connections;
+let drafts: CampaignDrafts;
 let auth: AuthFacade;
 let call: Call;
 let ep: Endpoints;
@@ -64,7 +71,14 @@ beforeEach(async () => {
 	store = connections(db, env.CONNECTION_KEY_SECRET);
 	deployment = fakeDeployment();
 	deploymentApi = deploymentClient({ fetch: deployment.fetch });
-	auth = createAuth({ db, connections: store, env, client: deploymentApi });
+	drafts = campaignDrafts(db);
+	auth = createAuth({
+		db,
+		connections: store,
+		drafts,
+		env,
+		client: deploymentApi,
+	});
 	call = (req) => auth.handler(req);
 	ep = await discover(call, BASE);
 	return () => db.close();
@@ -738,6 +752,47 @@ test("after dropConnection the bearer and refresh token are refused and the row 
 	expect(await connectionRows(db)).toEqual(NO_CONNECTION_ROWS);
 });
 
+const draftOf = (userId: string, campaignId = "c1") => ({
+	userId,
+	origin: ORIGIN,
+	campaignId,
+	baseVersion: "3",
+	settings: { goal: { amount: "10.00", currency: "USD" } },
+	page: null,
+	pageKind: null,
+});
+
+test("dropConnection deletes the user's campaign drafts and keeps another user's", async () => {
+	const dropped = await connectedUser();
+	const kept = await connectedUser();
+	await drafts.put(draftOf(dropped, "c1"), null);
+	await drafts.put(draftOf(dropped, "c2"), null);
+	await drafts.put(draftOf(kept), null);
+
+	await auth.dropConnection(dropped);
+
+	expect(await drafts.get(draftOf(dropped, "c1"))).toBeNull();
+	expect(await drafts.get(draftOf(dropped, "c2"))).toBeNull();
+	expect(await drafts.get(draftOf(kept))).not.toBeNull();
+});
+
+test("a dropConnection whose draft delete fails leaves the rest to the next sweep", async () => {
+	const userId = await connectedUser();
+	await drafts.put(draftOf(userId), null);
+	vi.spyOn(drafts, "deleteForUser").mockRejectedValueOnce(
+		new StoreDown("store down"),
+	);
+
+	await expect(auth.dropConnection(userId)).rejects.toThrow(StoreDown);
+	expect(await countRows(db, "user")).toBe(1);
+	advance(61 * MINUTE);
+	const swept = await auth.sweep();
+
+	expect(swept.connections).toBe(1);
+	expect(await drafts.get(draftOf(userId))).toBeNull();
+	expect(await connectionRows(db)).toEqual(NO_CONNECTION_ROWS);
+});
+
 test("two connections' tokens resolve to their own connections", async () => {
 	const other = "https://other.example.org" as Origin;
 	const first = await tokensFor(ORIGIN);
@@ -802,6 +857,7 @@ function authFailingOn(failing: RegExp): AuthFacade {
 	return createAuth({
 		db: broken.db,
 		connections: store,
+		drafts: campaignDrafts(broken.db),
 		env,
 		client: deploymentApi,
 	});
@@ -856,6 +912,7 @@ test("a store blip during oauth-provider's startup seed is caught, not an unhand
 		const brokenAuth = createAuth({
 			db: broken.db,
 			connections: store,
+			drafts: campaignDrafts(broken.db),
 			env,
 			client: deploymentApi,
 		});
@@ -1025,6 +1082,7 @@ test("a failure after the user is created undoes the connection and rethrows", a
 	const flakyAuth = createAuth({
 		db,
 		connections: flaky,
+		drafts,
 		env,
 		client: deploymentApi,
 	});
@@ -1484,6 +1542,7 @@ test.each([
 			return createAuth({
 				db,
 				connections: flaky,
+				drafts,
 				env,
 				client: deploymentApi,
 			});

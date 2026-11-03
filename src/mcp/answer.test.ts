@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { memoryDrafts } from "../../test/memory-drafts";
 import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
 import { ACTIONS } from "./actions";
@@ -36,8 +37,12 @@ test("a count that never answers falls back to the plain lead after 3 seconds an
 		{ status: 200, body: empty },
 		{
 			client: { call: () => new Promise(() => {}) },
+			drafts: memoryDrafts(),
+			publicOrigin: "https://app.connect.better.giving",
+			fetch,
 			dropConnection: async () => {},
 		},
+		"en-US",
 	);
 	await vi.advanceTimersByTimeAsync(2_999);
 	const early = await Promise.race([text, Promise.resolve("pending")]);
@@ -66,8 +71,12 @@ test("a count that answers leaves no timer behind", async () => {
 					body: { data: [{ status: "draft" }], next_cursor: null },
 				}),
 			},
+			drafts: memoryDrafts(),
+			publicOrigin: "https://app.connect.better.giving",
+			fetch,
 			dropConnection: async () => {},
 		},
+		"en-US",
 	);
 
 	expect(vi.getTimerCount()).toBe(0);

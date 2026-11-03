@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { createApp } from "../src/app";
 import { ACTIONS } from "../src/mcp/actions";
+import { LOCAL_TOOLS } from "../src/mcp/local";
 import {
 	ALL_ACTIONS,
 	type FakeDeployment,
@@ -216,9 +217,9 @@ const deployments: FakeDeployment[] = [];
 // where a moved site answers hello, so a permanent hop is confirmed as a move
 let movedTo: FakeDeployment;
 
-async function startWorld() {
+async function startWorld(platform = false) {
 	const db = await freshDb();
-	const dep = fakeDeployment({ name: ORG });
+	const dep = fakeDeployment({ name: ORG, platform });
 	movedTo = fakeDeployment({ host: "moved.example.org", name: ORG });
 	deployments.push(dep, movedTo);
 	const net = sentinelled(fakeNetwork(dep, movedTo));
@@ -287,7 +288,27 @@ async function startWorld() {
 	};
 }
 
-type ToolResult = { isError?: boolean; content: { text: string }[] };
+type ToolResult = {
+	isError?: boolean;
+	content: { text: string }[];
+	structuredContent?: Record<string, unknown>;
+};
+const WIDGET_TOOL_NAMES = [
+	"show_campaign_create",
+	"show_campaigns",
+	"show_campaign_results",
+	"open_campaign_editor",
+	"show_photo",
+	"set_campaign_photo",
+	"app_create_campaign",
+	"app_publish_campaign",
+	"app_end_campaign",
+	"app_get_campaign_editor",
+	"app_save_campaign_edit",
+	"app_set_campaign_photo",
+	"app_photo_upload_link",
+];
+
 const callTool = async (
 	bearer: string,
 	name: string,
@@ -298,7 +319,8 @@ const callTool = async (
 			await world.sendAs(bearer, "tools/call", { name, arguments: args }),
 		)
 	).result;
-const textOf = (r: ToolResult) => r.content.map((c) => c.text).join("\n");
+// The text answer, the first content item; a success's summary line follows it.
+const textOf = (r: ToolResult) => r.content[0]?.text ?? "";
 // A success carries the deployment's JSON as its text's last line, below the lead.
 const answerOf = (r: ToolResult): Record<string, unknown> =>
 	JSON.parse(textOf(r).split("\n").at(-1) ?? "");
@@ -391,7 +413,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expect(sent?.authorization).toBe(`Bearer ${world.dep.issuedKeys[0]}`);
 		expect(result.isError).toBeUndefined();
 		expect(answerOf(result)).toMatchObject({ leak_probe: RESULT, note });
-		expect(textOf(result)).not.toContain(
+		expect(result.structuredContent).toEqual(answerOf(result));
+		expect(JSON.stringify(result)).not.toContain(
 			world.dep.issuedKeys[0] ?? "unreachable",
 		);
 		expectCleanScenario();
@@ -417,7 +440,10 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		const tools = await rpc(await world.sendAs(bearer, "tools/list"));
 
 		expect(init.result.instructions).toContain(ORG);
-		expect(tools.result.tools).toHaveLength(ACTIONS.length);
+		// the draft tool is a Platform connection's alone
+		expect(tools.result.tools).toHaveLength(
+			ACTIONS.length + LOCAL_TOOLS.filter((t) => !t.platformOnly).length,
+		);
 		expect(world.dep.issuedKeys).toHaveLength(1);
 		expectCleanScenario();
 	});
@@ -704,10 +730,22 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		const names = (tools: { name: string }[]) =>
 			tools.map((t) => t.name).toSorted();
-		expect(names(TOOLS.map(([name]) => ({ name })))).toEqual(names(listed));
-		expect(names(ACTIONS.map((a) => ({ name: a.tool })))).toEqual(
-			names(listed),
-		);
+		// get_profile, asking the deployment nothing, has its own scenario below.
+		expect(
+			names([
+				...TOOLS.map(([name]) => ({ name })),
+				{ name: "get_profile" },
+				{ name: "recommend_campaign_presets" },
+				...WIDGET_TOOL_NAMES.map((name) => ({ name })),
+			]),
+		).toEqual(names(listed));
+		expect(
+			names(
+				[...ACTIONS, ...LOCAL_TOOLS.filter((t) => !t.platformOnly)].map(
+					(a) => ({ name: a.tool }),
+				),
+			),
+		).toEqual(names(listed));
 	});
 
 	test("every tool succeeds with sentinel arguments against sentinel answers", async () => {
@@ -731,6 +769,15 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 				name,
 				probe: RESULT,
 			});
+			// The same JSON as the structured result, and a summary line after the text.
+			expect({ name, structured: result.structuredContent }).toEqual({
+				name,
+				structured: answer,
+			});
+			expect({ name, items: result.content.length }).toEqual({
+				name,
+				items: 2,
+			});
 			// The tool's own request, not an empty result's unfiltered follow-up.
 			const reached = JSON.stringify(world.dep.calls[sent]);
 			for (const value of mine)
@@ -743,6 +790,197 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		}
 		expect(ids.campaign).not.toBe("");
 		expect(ids.donor).not.toBe("");
+		expectCleanScenario();
+	});
+
+	test("get_profile answers the user id and org name alone, never the key or the site's address", async () => {
+		const bearer = await world.signIn();
+		const sent = world.dep.calls.length;
+
+		const result = await callTool(bearer, "get_profile", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(Object.keys(result.structuredContent ?? {})).toEqual(["id", "name"]);
+		expect(result.structuredContent?.name).toBe(ORG);
+		expect(result.content).toEqual([
+			{ type: "text", text: JSON.stringify(result.structuredContent) },
+		]);
+		expect(JSON.stringify(result)).not.toContain(world.dep.host);
+		expect(world.dep.calls.length).toBe(sent);
+		expectCleanScenario();
+	});
+
+	test("recommend_campaign_presets reads the history and answers it without the deployment's answers reaching a log line", async () => {
+		const bearer = await world.signIn();
+		for (let i = 0; i < 3; i++) {
+			world.dep.seedCampaign(arg(`past-campaign-${i}`), "ended");
+		}
+		world.dep.seedGift({ amount: "40.00", date: "2031-04-02" });
+		const sent = world.dep.calls.length;
+
+		const result = await callTool(bearer, "recommend_campaign_presets", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(result.structuredContent?.basedOnHistory).toBe(true);
+		expect(world.dep.calls.length).toBeGreaterThan(sent);
+		expectCleanScenario();
+	});
+
+	test("draft edits to a live campaign, their discard and their publish keep their content out of every log line and body", async () => {
+		world.db.close();
+		world = await startWorld(true);
+		const bearer = await world.signIn();
+		const created = await callTool(bearer, "create_campaign", {
+			title: arg("draft-title"),
+		});
+		const id = String(created.structuredContent?.id);
+		await callTool(bearer, "update_campaign_settings", {
+			id,
+			goal: money(),
+		});
+		await callTool(bearer, "publish_campaign", { id, gifts_go_to: null });
+		const sent = world.dep.calls.length;
+
+		const edited = await callTool(bearer, "update_campaign_settings", {
+			id,
+			goal: {
+				amount: plant("arg:draft-goal", "8123.45", true),
+				currency: "USD",
+			},
+			end_date: day(19),
+		});
+		const read = await callTool(bearer, "get_campaign", { id });
+		const pending = read.structuredContent?.pendingDraft as
+			| { revision: number }
+			| undefined;
+		const revision = pending?.revision;
+		const dropped = await callTool(bearer, "discard_campaign_draft", {
+			id,
+			revision,
+		});
+		const droppedFromCard = await callTool(
+			bearer,
+			"app_discard_campaign_draft",
+			{
+				id,
+			},
+		);
+
+		expect(edited.structuredContent?.saved).toBe("draft");
+		expect(dropped.structuredContent).toEqual({ discarded: true });
+		expect(droppedFromCard.isError).toBeUndefined();
+		// the draft held back from the deployment, then dropped
+		expect(
+			world.dep.calls
+				.slice(sent)
+				.filter((c) => c.method !== "GET")
+				.map((c) => c.path),
+		).toEqual([]);
+		expectCleanScenario();
+	});
+
+	test("the widget tools read, save, publish, end and set a photo without a deployment answer, an argument or a photo address reaching a log line", async () => {
+		const bearer = await world.signIn();
+		const live = world.dep.seedCampaign(arg("widget-live"), "published");
+		const drafted = world.dep.seedCampaign(arg("widget-draft"), "draft");
+		world.dep.seedGift({
+			amount: "40.00",
+			date: "2031-04-02",
+			campaign_id: live,
+		});
+		const photo = {
+			download_url: plant(
+				"arg:photo-url",
+				"https://files.example.org/leak-photo-url-8e3d.png",
+				true,
+			),
+			file_id: arg("photo-file"),
+		};
+		const calls: [string, Record<string, unknown>][] = [
+			["show_campaign_create", {}],
+			["show_campaigns", {}],
+			["show_campaign_results", { id: live }],
+			["open_campaign_editor", { id: live }],
+			["show_photo", { campaign_id: live }],
+			["set_campaign_photo", { campaign_id: drafted, photo }],
+			[
+				"app_create_campaign",
+				{
+					title: arg("preset-title"),
+					theme: "emergency",
+					goal: money(),
+					endDate: day(20),
+					suggestedAmounts: [money()],
+				},
+			],
+			["app_get_campaign_editor", { id: drafted }],
+			[
+				"app_save_campaign_edit",
+				{
+					id: drafted,
+					expectedVersion: null,
+					page: {
+						pageKind: "blocks",
+						blocks: [{ type: "text", body: arg("editor-body") }],
+					},
+				},
+			],
+			["app_publish_campaign", { id: drafted, giftsGoTo: null }],
+			["app_end_campaign", { id: drafted }],
+			[
+				"app_set_campaign_photo",
+				{ id: live, downloadUrl: photo.download_url, alt: arg("photo-alt") },
+			],
+			["app_photo_upload_link", { id: live }],
+		];
+
+		const answered: Record<string, unknown> = {};
+		const results: Record<string, Record<string, unknown> | undefined> = {};
+		for (const [name, args] of calls) {
+			const raw = await rpc(
+				await world.sendAs(bearer, "tools/call", { name, arguments: args }),
+			);
+			results[name] = raw.result;
+			answered[name] = raw.result
+				? raw.result.isError === true
+					? "error"
+					: "ok"
+				: "rpc error";
+		}
+		expect(Object.keys(answered)).toEqual(calls.map(([name]) => name));
+		// the planted photo address is off the deployment's origin and unserved,
+		// so both photo tools take their refusal branch; every other tool succeeds
+		expect(answered).toEqual({
+			...Object.fromEntries(calls.map(([name]) => [name, "ok"])),
+			app_set_campaign_photo: "error",
+		});
+		expect(results.set_campaign_photo?.structuredContent).toMatchObject({
+			uploaded: false,
+		});
+		expect(JSON.stringify(results.app_set_campaign_photo?.content)).toContain(
+			"The photo wasn't set",
+		);
+		expectCleanScenario();
+	});
+
+	test("an answer its output schema refuses is logged by tool name alone and answered as text", async () => {
+		const bearer = await world.signIn();
+		world.dep.intercept((req) =>
+			new URL(req.url).pathname === "/connector/v1/results"
+				? Response.json({ total: arg("odd-total") })
+				: undefined,
+		);
+		const from = trace.length;
+
+		const result = await callTool(bearer, "get_results", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(result.structuredContent).toBeUndefined();
+		expect(answerOf(result)).toMatchObject({ leak_probe: RESULT });
+		expect(loggedLines(from)).toContainEqual({
+			kind: "output_invalid",
+			tool: "results.summary",
+		});
 		expectCleanScenario();
 	});
 
@@ -1134,7 +1372,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 		expect(refused.map((r) => r.status)).toEqual([401, 401, 401]);
 		expect(accepted.status).toBe(200);
-		expect(await accepted.json()).toEqual({ connections: 0 });
+		expect(await accepted.json()).toEqual({ connections: 0, drafts: 0 });
 		expect(broken.status).toBe(500);
 		expectCleanScenario();
 	});
@@ -1153,7 +1391,17 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 		new Set(lines.filter((l) => l.kind === kind).map((l) => l[field]));
 	const errorSites = outcomes("error", "where");
 
-	expect(tools).toEqual(new Set(ACTIONS.map((a) => a.action)));
+	expect(tools).toEqual(
+		new Set([
+			...ACTIONS.map((a) => a.action),
+			...LOCAL_TOOLS.map((t) => t.tool),
+		]),
+	);
+	expect(
+		new Set(
+			lines.filter((l) => l.kind === "output_invalid").map((l) => l.tool),
+		),
+	).toEqual(new Set(["results.summary"]));
 	expect(outcomes("tool", "outcome")).toEqual(
 		new Set([
 			"ok",
@@ -1180,7 +1428,9 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 	]) {
 		expect(outcomes("connect", "outcome")).toContain(outcome);
 	}
-	expect(errorSites).toEqual(new Set(["mcp", "connect", "app", "disconnect"]));
+	expect(errorSites).toEqual(
+		new Set(["mcp", "connect", "app", "disconnect", "sweep"]),
+	);
 	expect(new Set(trace.map((e) => e.sink))).toEqual(
 		new Set(["output", "header", "body"]),
 	);

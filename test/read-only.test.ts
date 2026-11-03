@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { createApp } from "../src/app";
 import type { Db } from "../src/db";
 import { actionsFor } from "../src/mcp/actions";
+import { LOCAL_TOOLS } from "../src/mcp/local";
 import {
 	type FakeDeployment,
 	fakeDeployment,
@@ -63,7 +64,7 @@ const toolNames = async (bearer: string): Promise<string[]> =>
 		.sort();
 
 const readTools = (platform: boolean) =>
-	actionsFor(platform)
+	[...actionsFor(platform), ...LOCAL_TOOLS]
 		.filter((s) => s.annotations.readOnlyHint === true)
 		.map((s) => s.tool)
 		.sort();
@@ -71,7 +72,7 @@ const readTools = (platform: boolean) =>
 const expected = (platform: boolean) =>
 	platform
 		? [...PLATFORM_TOOLS].sort()
-		: actionsFor(false)
+		: [...actionsFor(false), ...LOCAL_TOOLS.filter((s) => !s.platformOnly)]
 				.map((s) => s.tool)
 				.sort();
 

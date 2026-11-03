@@ -9,17 +9,22 @@ import {
 import { BASE, env, mcpOpen, mcpRequest, rpc, warmUp } from "./harness";
 import type { Call } from "./oauth";
 import { connectFlow } from "./operator";
+import ADDITIONS from "./standalone-additions.json";
 import STANDALONE from "./standalone-tools.json";
 import { freshDb } from "./support";
 
 // Platform's writes change what Platform connections see and send; a
-// Standalone connection sees and sends what it did before them. The snapshot
-// is tools/list and the instructions as d1a35fb served them to a
-// Standalone connection serving every action, plus each tool's title in its
-// annotations, destructiveHint true on every tool that overwrites, and
-// openWorldHint true on every tool that writes. A deliberate Standalone
-// change edits the entry it changes; re-dumping the whole list would hide one
-// that isn't.
+// Standalone connection sees and sends what it did before them.
+//
+// standalone-tools.json is the part that must not move: tools/list and the
+// instructions as they stood at d1a35fb, plus each tool's title and
+// annotations, every description and input schema included.
+// It is never re-dumped; a deliberate Standalone change edits the entry it
+// changes, and `git diff d1a35fb -- test/standalone-tools.json` shows exactly
+// that. standalone-additions.json is what was added on top, each piece named:
+// an outputSchema and _meta on every tool, six overwriting tools no longer
+// destructiveHint, create_campaign's optional preset, and the tools
+// added since. Those may be re-dumped when a tool is added.
 
 let db: Db;
 let deployment: FakeDeployment;
@@ -52,8 +57,29 @@ test("tools/list and the instructions are as before, every description and input
 	const opened = await rpc(await call(mcpOpen("2025-06-18", bearer)));
 	const listed = await rpc(await send("tools/list"));
 
+	const before = new Map<string, Record<string, unknown>>(
+		STANDALONE.tools.map((t) => [t.name, t]),
+	);
+	const now = (name: string) => {
+		const kept = before.get(name);
+		if (!kept) return ADDITIONS.addedTools.find((t) => t.name === name);
+		const schema = structuredClone(kept.inputSchema) as {
+			properties: Record<string, unknown>;
+		};
+		if (name === "create_campaign")
+			schema.properties.preset = ADDITIONS.createCampaignPreset;
+		return {
+			...kept,
+			inputSchema: schema,
+			annotations: {
+				...(kept.annotations as object),
+				...(ADDITIONS.annotationChanges as Record<string, object>)[name],
+			},
+			...(ADDITIONS.changedTools as Record<string, object>)[name],
+		};
+	};
 	expect(opened.result.instructions).toBe(STANDALONE.instructions);
-	expect(listed.result.tools).toEqual(STANDALONE.tools);
+	expect(listed.result.tools).toEqual(ADDITIONS.order.map(now));
 });
 
 test("create_form sends no Idempotency-Key and is tried once while the site says in progress", async () => {

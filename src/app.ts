@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { createAuth } from "./auth";
 import { connectRoutes } from "./connect";
 import { cronRoutes } from "./cron";
-import { connections as connectionStore, type Db } from "./db";
+import { campaignDrafts, connections as connectionStore, type Db } from "./db";
 import { deploymentClient } from "./deployment";
 import type { Origin } from "./deployment/origin";
 import type { Env } from "./env";
@@ -23,7 +23,14 @@ export type AppDeps = {
 export function createApp(deps: AppDeps): Hono {
 	const connections = connectionStore(deps.db, deps.env.CONNECTION_KEY_SECRET);
 	const client = deploymentClient({ fetch: deps.fetch });
-	const auth = createAuth({ db: deps.db, connections, env: deps.env, client });
+	const drafts = campaignDrafts(deps.db);
+	const auth = createAuth({
+		db: deps.db,
+		connections,
+		drafts,
+		env: deps.env,
+		client,
+	});
 
 	const app = new Hono();
 	const toAuth = (c: { req: { raw: Request } }) => auth.handler(c.req.raw);
@@ -45,7 +52,14 @@ export function createApp(deps: AppDeps): Hono {
 			platformOrigin: deps.platformOrigin,
 		}),
 	);
-	app.route("/cron", cronRoutes({ auth, secret: deps.env.CRON_SECRET }));
+	app.route(
+		"/cron",
+		cronRoutes({
+			auth,
+			drafts,
+			secret: deps.env.CRON_SECRET,
+		}),
+	);
 	app.route("/", siteRoutes({ challenge: deps.env.OPENAI_APPS_CHALLENGE }));
 	app.route(
 		"/mcp",
@@ -53,6 +67,8 @@ export function createApp(deps: AppDeps): Hono {
 			auth,
 			connections,
 			client,
+			drafts,
+			fetch: deps.fetch,
 			resource: new URL("/mcp", deps.env.PUBLIC_URL),
 		}),
 	);

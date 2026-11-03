@@ -13,6 +13,7 @@ import {
 	zipStore,
 } from "../scripts/chatgpt-package";
 import { actionsFor } from "../src/mcp/actions";
+import { LOCAL_TOOLS } from "../src/mcp/local";
 
 /** WCAG relative-luminance contrast of a #RRGGBB color against white. */
 function contrastAgainstWhite(hex: string): number {
@@ -33,7 +34,7 @@ function contrastAgainstWhite(hex: string): number {
 // A deliberate package change updates these.
 const CURATED_SHA256: Record<string, string> = {
 	"plugin.json":
-		"2f25f729983bbf4d9956c03c38e49cbec6a7c5fee3746100e216ed21aa53d3c0",
+		"f595cd97e777c02a62fd3ef317ae5f24d5719361eee1b297198a8dc3483c7d77",
 	"mcp.json":
 		"358381dab7af77a6735d4337b26d2ada12800295c97e6d1fea0d66f618721f30",
 	"assets/icon.png":
@@ -49,7 +50,9 @@ const sha256 = (data: Buffer) =>
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
 
-const registeredTools = new Set(actionsFor(true).map((spec) => spec.tool));
+const registeredTools = new Set(
+	[...actionsFor(true), ...LOCAL_TOOLS].map((spec) => spec.tool),
+);
 
 const manifest = pluginManifest();
 const iface = manifest.extensions["com.openai"].interface;
@@ -84,7 +87,7 @@ test("plugin.json matches the packet's listing and the recommended listing value
 	expect(iface.logo).toBe("./assets/logo.png");
 	expect(iface.composerIcon).toBe("./assets/icon.png");
 	expect(review.commerce).toBe(false);
-	expect(review.test_cases.positive).toHaveLength(5);
+	expect(review.test_cases.positive).toHaveLength(8);
 	expect(review.test_cases.negative).toHaveLength(3);
 	expect(review.commerce_description).toMatch(/move money/);
 	expect(JSON.stringify(pluginManifest())).not.toMatch(

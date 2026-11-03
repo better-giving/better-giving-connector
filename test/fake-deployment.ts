@@ -154,6 +154,12 @@ export type FakeDeployment = {
 	 * spent, expired or unknown.
 	 */
 	uploadPhoto(link: string): string | null;
+	/** Whether a new campaign comes with a form of its own (the default), or has none until one is made for it. */
+	setCampaignForms(on: boolean): void;
+	/** Puts a campaign in place as if it had run, with no form of its own; its id. */
+	seedCampaign(title: string, status: CampaignStatus): string;
+	/** Puts a gift in place, to a campaign or to none, as if a donor had given it. */
+	seedGift(gift: { amount: string; date: string; campaign_id?: string }): void;
 };
 
 export type LostAnswer = "dropped" | "timeout" | "502";
@@ -280,6 +286,11 @@ export function fakeDeployment(
 			state.retryAfter = seconds;
 		},
 		uploadPhoto: (link) => uploadPhoto(state, link),
+		setCampaignForms: (on) => {
+			state.campaignForms = on;
+		},
+		seedCampaign: (title, status) => seedCampaign(state, title, status),
+		seedGift: (gift) => seedGift(state, gift),
 	};
 	return fake;
 }
@@ -416,6 +427,7 @@ function newState(host: string, name: string, platform: boolean) {
 		// A stalled create's connection drops before it answers.
 		dropStalled: false,
 		retryAfter: "5",
+		campaignForms: true,
 	};
 }
 
@@ -436,6 +448,56 @@ function uploadPhoto(state: State, link: string): string | null {
 	k.hero = url;
 	k.version++;
 	return url;
+}
+
+function seedCampaign(
+	state: State,
+	title: string,
+	status: CampaignStatus,
+): string {
+	const id = `cmp_${state.seq++}`;
+	state.campaigns.set(id, {
+		id,
+		title,
+		status,
+		everPublished: status !== "draft",
+		blocks: startingBlocks("frm_1"),
+		content: { heading: "" },
+		settings: {
+			goal: null,
+			end_date: null,
+			time_zone: null,
+			sharing: { message: null, channels: null },
+		},
+		created_at: "2024-01-01T00:00:00.000Z",
+		version: 1,
+		story: "",
+		hero: null,
+		uploads: [],
+	});
+	return id;
+}
+
+function seedGift(
+	state: State,
+	gift: { amount: string; date: string; campaign_id?: string },
+): void {
+	const donor: Donor = {
+		id: `dnr_${state.seq++}`,
+		name: "Seeded donor",
+		email: null,
+	};
+	state.donors.set(donor.id, donor);
+	const id = `don_${state.seq++}`;
+	state.donations.set(id, {
+		id,
+		amount: { amount: gift.amount, currency: "USD" },
+		date: gift.date,
+		donor_id: donor.id,
+		campaign_id: gift.campaign_id ?? null,
+		method: "card",
+		note: null,
+	});
 }
 
 const CODE_TTL_MS = 10 * 60_000;
@@ -1059,21 +1121,36 @@ function deploymentApp(state: State) {
 			);
 		}
 		const id = nextId("cmp");
-		const form: Form = {
-			id: nextId("frm"),
-			name: `${parsed.data.title} form`,
-			amounts: ["25.00", "50.00", "100.00"],
-			currency: "USD",
-			allow_recurring: true,
-			campaign_id: id,
-		};
-		state.forms.set(form.id, form);
+		const formId = nextId("frm");
+		const name = `${parsed.data.title} form`;
+		if (state.campaignForms) {
+			state.forms.set(
+				formId,
+				state.platform
+					? {
+							id: formId,
+							name,
+							campaign_id: id,
+							status: "live",
+							suggested_amounts: [],
+							updated_at: "2026-10-01T00:00:00.000Z",
+						}
+					: {
+							id: formId,
+							name,
+							amounts: ["25.00", "50.00", "100.00"],
+							currency: "USD",
+							allow_recurring: true,
+							campaign_id: id,
+						},
+			);
+		}
 		const k: Campaign = {
 			id,
 			title: parsed.data.title,
 			status: "draft",
 			everPublished: false,
-			blocks: startingBlocks(form.id),
+			blocks: startingBlocks(formId),
 			content: { heading: "" },
 			settings: {
 				goal: null,
@@ -1884,7 +1961,20 @@ function platformWrites(
 			return c.json(claim.form, 200);
 		}
 		const issues: Issue[] = [];
-		unknownKeys(body, FORM_WRITABLE, issues);
+		// campaign_id is taken on create, as the release brief states; unverified on real Platform
+		unknownKeys(body, [...FORM_WRITABLE, "campaign_id"], issues);
+		if (
+			Object.hasOwn(body, "campaign_id") &&
+			!(
+				body.campaign_id === null ||
+				(typeof body.campaign_id === "string" &&
+					state.campaigns.has(body.campaign_id))
+			)
+		)
+			issues.push({
+				path: "campaign_id",
+				message: "is the id of one of this nonprofit's campaigns, or null",
+			});
 		if (!Object.hasOwn(body, "name"))
 			issues.push({
 				path: "name",

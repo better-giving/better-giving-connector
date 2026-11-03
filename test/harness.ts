@@ -55,10 +55,18 @@ export const INITIALIZE = {
 export const MCP_VERSIONS = ["2026-07-28", "2025-06-18"] as const;
 export type McpVersion = (typeof MCP_VERSIONS)[number];
 
+/** What a client that renders MCP Apps declares, under the extension's id, as Claude and ChatGPT do. */
+export const MCP_APPS_CLIENT = {
+	extensions: {
+		"io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] },
+	},
+};
+
 /**
  * A JSON-RPC request as a chat app speaking `version` sends it. From
- * 2026-07-28 every request carries its version and the client in `_meta`, and
- * its method (and a tool call's name) again in headers.
+ * 2026-07-28 every request carries its version, the client and its
+ * `capabilities` in `_meta`, and its method (and a tool call's name) again in
+ * headers.
  */
 export function mcpRequest(
 	version: McpVersion,
@@ -66,13 +74,19 @@ export function mcpRequest(
 	method: string,
 	params?: Record<string, unknown>,
 	id = 1,
+	capabilities: Record<string, unknown> = MCP_APPS_CLIENT,
 ): Request {
 	if (version === "2025-06-18") {
 		return mcpPost({ jsonrpc: "2.0", id, method, params }, authorization, {
 			"mcp-protocol-version": version,
 		});
 	}
-	const name = method === "tools/call" ? params?.name : undefined;
+	const name =
+		method === "tools/call"
+			? params?.name
+			: method === "resources/read"
+				? params?.uri
+				: undefined;
 	return mcpPost(
 		{
 			jsonrpc: "2.0",
@@ -81,9 +95,10 @@ export function mcpRequest(
 			params: {
 				...params,
 				_meta: {
+					...(params?._meta as Record<string, unknown> | undefined),
 					[PROTOCOL_VERSION_META_KEY]: version,
 					[CLIENT_INFO_META_KEY]: CLIENT_INFO,
-					[CLIENT_CAPABILITIES_META_KEY]: {},
+					[CLIENT_CAPABILITIES_META_KEY]: capabilities,
 				},
 			},
 		},

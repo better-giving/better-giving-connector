@@ -1,6 +1,7 @@
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { createDb, type Db } from "./index";
 import { migrate } from "./migrate";
@@ -156,7 +157,10 @@ test("a legacy table without hashes is upgraded, applies the pending 0003, and s
 	await db.execute("CREATE TABLE connection (user_id TEXT) STRICT");
 	await db.execute("INSERT INTO connection (user_id) VALUES ('user-1')");
 
-	expect(await migrate(db)).toEqual(["0003_connection_actions.sql"]);
+	const shipped = await readdir(new URL("../../migrations/", import.meta.url));
+	expect(await migrate(db)).toEqual(
+		shipped.filter((f) => f >= "0003_connection_actions.sql").toSorted(),
+	);
 	expect(await migrate(db)).toEqual([]);
 	const { rows } = await db.execute(
 		"SELECT name, sha256 FROM schema_migration WHERE name = '0003_used_client.sql'",
@@ -166,6 +170,30 @@ test("a legacy table without hashes is upgraded, applies the pending 0003, and s
 		"SELECT actions FROM connection WHERE user_id = 'user-1'",
 	);
 	expect(existing.rows[0]?.actions).toBeNull();
+});
+
+test("0004 applies over a database at 0003, leaving its connection rows untouched", async () => {
+	const shipped = new URL("../../migrations/", import.meta.url);
+	const copy = (name: string) =>
+		copyFile(fileURLToPath(new URL(name, shipped)), join(dir, name));
+	await copy("0001_better_auth.sql");
+	await copy("0002_connection.sql");
+	await copy("0003_connection_actions.sql");
+	await migrate(db, dir);
+	await db.execute(
+		"INSERT INTO connection (user_id, origin, org_name, key_ct, actions, created_at) VALUES ('user-1', 'https://give.example.org', 'Example Org', 'v1.a.b.c', '[\"hello\"]', 1700000000000)",
+	);
+	const before = await db.execute("SELECT * FROM connection");
+
+	await copy("0004_campaign_draft.sql");
+	expect(await migrate(db, dir)).toEqual(["0004_campaign_draft.sql"]);
+
+	const after = await db.execute("SELECT * FROM connection");
+	expect(after.rows.map((r) => ({ ...r }))).toEqual(
+		before.rows.map((r) => ({ ...r })),
+	);
+	const drafts = await db.execute("SELECT count(*) AS n FROM campaign_draft");
+	expect(drafts.rows[0]?.n).toBe(0);
 });
 
 test("a legacy table recording a file that is gone, and not retired, is refused, naming it", async () => {

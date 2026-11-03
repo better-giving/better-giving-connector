@@ -4,7 +4,8 @@ import {
 	type FakeDeployment,
 	fakeDeployment,
 } from "../../test/fake-deployment";
-import { mcpRequest, rpc } from "../../test/harness";
+import { MCP_APPS_CLIENT, mcpRequest, rpc } from "../../test/harness";
+import { memoryDrafts } from "../../test/memory-drafts";
 import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
 import { advance, freshDb, MINUTE } from "../../test/support";
 import { type Connections, connections, type Db } from "../db";
@@ -13,6 +14,7 @@ import type { Origin } from "../deployment/origin";
 import type { Secret } from "../secret";
 import { ACTIONS } from "./actions";
 import { mcpRoute } from "./index";
+import { LOCAL_TOOLS } from "./local";
 
 // mcpRoute on its own: the real tools, a stub for who is signed in. The whole
 // service, OAuth included, is test/tools.test.ts's.
@@ -67,7 +69,9 @@ beforeEach(async () => {
 			},
 		},
 		connections: store,
+		drafts: memoryDrafts(),
 		client,
+		fetch,
 		resource: new URL("https://connect.example/mcp"),
 	});
 	return () => db.close();
@@ -142,6 +146,8 @@ test("the sign-in challenge names offline_access as the scope to request", async
 	);
 });
 
+const STANDALONE_LOCAL = LOCAL_TOOLS.filter((s) => s.platformOnly !== true);
+
 const toolNames = async (): Promise<string[]> =>
 	(await rpc(await send("tools/list"))).result.tools.map(
 		(t: { name: string }) => t.name,
@@ -152,7 +158,8 @@ test("a connection with no stated actions offers every tool", async () => {
 
 	const names = await toolNames();
 
-	expect(names).toHaveLength(ACTIONS.length);
+	expect(names).toHaveLength(ACTIONS.length + STANDALONE_LOCAL.length);
+	expect(names).toContain("get_profile");
 });
 
 test("tools/list offers only the tools whose action the deployment serves", async () => {
@@ -164,7 +171,10 @@ test("tools/list offers only the tools whose action the deployment serves", asyn
 	expect(names).not.toContain("create_photo_upload_link");
 	expect(names).toContain("publish_campaign");
 	expect(names).toContain("list_campaigns");
-	expect(names).toHaveLength(serves.length);
+	const offered = STANDALONE_LOCAL.filter((s) =>
+		s.needs.every((a) => (serves as string[]).includes(a)),
+	);
+	expect(names).toHaveLength(serves.length + offered.length);
 });
 
 test("tools/list offers a Platform deployment's tools from the tool names its hello lists", async () => {
@@ -181,9 +191,64 @@ test("tools/list offers a Platform deployment's tools from the tool names its he
 	expect((await toolNames()).sort()).toEqual([...PLATFORM_TOOLS].sort());
 });
 
-const READ_TOOLS: string[] = ACTIONS.filter(
-	(s) => s.annotations.readOnlyHint,
+const APP_ONLY = LOCAL_TOOLS.filter(
+	(s) =>
+		JSON.stringify(
+			(s._meta.ui as { visibility?: string[] } | undefined)?.visibility,
+		) === '["app"]',
 ).map((s) => s.tool);
+const STANDALONE_APP_ONLY = APP_ONLY.filter((tool) =>
+	STANDALONE_LOCAL.some((s) => s.tool === tool),
+);
+
+const listedTo = async (
+	version: "2026-07-28" | "2025-06-18",
+	capabilities?: Record<string, unknown>,
+) => {
+	const res = await route.request(
+		new Request(
+			"https://connect.example/",
+			mcpRequest(version, "Bearer any", "tools/list", {}, 1, capabilities),
+		),
+	);
+	return (await rpc(res)).result.tools.map((t: { name: string }) => t.name);
+};
+
+test("a client that declares no MCP Apps support is not offered the cards' button tools", async () => {
+	await reconnect(null);
+
+	const names = await listedTo("2026-07-28", {});
+
+	expect(APP_ONLY).toContain("app_end_campaign");
+	for (const tool of APP_ONLY) expect(names).not.toContain(tool);
+	expect(names).toContain("show_campaign_results");
+	expect(names).toContain("end_campaign");
+});
+
+test("a client that declares MCP Apps support is offered the cards' button tools", async () => {
+	await reconnect(null);
+
+	const names = await listedTo("2026-07-28", MCP_APPS_CLIENT);
+
+	for (const tool of STANDALONE_APP_ONLY) expect(names).toContain(tool);
+});
+
+test("a 2025 client, whose capabilities this request doesn't carry, is offered the cards' button tools, each saying the chat never calls it", async () => {
+	await reconnect(null);
+
+	const names = await listedTo("2025-06-18");
+
+	for (const tool of STANDALONE_APP_ONLY) {
+		expect(names).toContain(tool);
+		expect(LOCAL_TOOLS.find((s) => s.tool === tool)?.description, tool).toMatch(
+			/Only the card calls this tool/,
+		);
+	}
+});
+
+const READ_TOOLS: string[] = [...ACTIONS, ...LOCAL_TOOLS]
+	.filter((s) => s.annotations.readOnlyHint)
+	.map((s) => s.tool);
 
 test("a read-only token is offered only the read tools", async () => {
 	await reconnect(null);
@@ -259,7 +324,7 @@ test("every Standalone tool carries its title in its annotations", async () => {
 
 	const { tools } = (await rpc(await send("tools/list"))).result;
 
-	expect(tools).toHaveLength(ACTIONS.length);
+	expect(tools).toHaveLength(ACTIONS.length + STANDALONE_LOCAL.length);
 	for (const t of tools as ListedTool[]) {
 		expect(t.title).toMatch(/\S/);
 		expect(t.annotations.title).toBe(t.title);
@@ -286,12 +351,120 @@ test("every Platform tool carries its title in its annotations", async () => {
 	}
 });
 
-test("a connection serving no actions offers no tools", async () => {
+test("a connection serving no actions offers only the tools that need none", async () => {
 	await reconnect([]);
 
-	const list = await rpc(await send("tools/list"));
+	expect(await toolNames()).toEqual(["get_profile"]);
+});
 
-	expect(list.result.tools).toEqual([]);
+type ListedSchemas = {
+	name: string;
+	outputSchema: { type: string; additionalProperties: unknown };
+	_meta: Record<string, unknown>;
+};
+
+test.each([
+	["a full token", false],
+	["a read-only token", true],
+])(
+	"%s's tools/list carries every tool's output schema and _meta",
+	async (_, readOnlyToken) => {
+		await reconnect(null);
+		readOnly = readOnlyToken;
+
+		const { tools } = (await rpc(await send("tools/list"))).result;
+
+		expect(tools.length).toBeGreaterThan(LOCAL_TOOLS.length);
+		for (const t of tools as ListedSchemas[]) {
+			expect(t.outputSchema.type, t.name).toBe("object");
+			expect(t._meta["openai/toolInvocation/invoking"], t.name).toMatch(/…$/);
+			expect(t._meta["openai/toolInvocation/invoked"], t.name).toMatch(/\S/);
+		}
+	},
+);
+
+test("get_profile's output schema is exactly an id and a name, and it's the profile tool", async () => {
+	const { tools } = (await rpc(await send("tools/list"))).result;
+
+	const profile = tools.find((t: { name: string }) => t.name === "get_profile");
+
+	expect(profile._meta["openai/profile"]).toBe(true);
+	expect(profile.annotations).toMatchObject({
+		readOnlyHint: true,
+		destructiveHint: false,
+	});
+	expect(profile.outputSchema).toMatchObject({
+		type: "object",
+		additionalProperties: false,
+		required: ["id", "name"],
+	});
+	expect(Object.keys(profile.outputSchema.properties)).toEqual(["id", "name"]);
+});
+
+test("get_profile answers with the signed-in user's id and the org's name, and nothing of the origin or key", async () => {
+	const { result } = await rpc(
+		await send("tools/call", { name: "get_profile", arguments: {} }),
+	);
+
+	expect(result).toEqual({
+		content: [{ type: "text", text: `{"id":"${USER}","name":"Give Example"}` }],
+		structuredContent: { id: USER, name: "Give Example" },
+	});
+	expect(JSON.stringify(result)).not.toContain(deployment.host);
+	expect(JSON.stringify(result)).not.toContain(key.reveal());
+});
+
+test("the locale the chat app states in the call's _meta formats the money, and the currency stays", async () => {
+	deployment.intercept((req) =>
+		new URL(req.url).pathname === "/connector/v1/results"
+			? Response.json({
+					total: { amount: "1250.00", currency: "USD" },
+					gift_count: 2,
+					donor_count: 1,
+					campaigns: [],
+				})
+			: undefined,
+	);
+
+	const { result } = await rpc(
+		await send("tools/call", {
+			name: "get_results",
+			arguments: {},
+			_meta: { "openai/locale": "de-DE" },
+		}),
+	);
+
+	expect(result.content[0].text).toMatch(
+		/^Give Example raised 1\.250,00\u00a0\$ from 2 gifts\./,
+	);
+	expect(result.content[1].text).toBe(
+		"1.250,00\u00a0$ raised from 2 gifts by 1 donor",
+	);
+});
+
+test("a body its output schema refuses still answers the call, as text with no structured result", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	onTestFinished(() => {
+		vi.restoreAllMocks();
+	});
+	deployment.intercept((req) =>
+		new URL(req.url).pathname === "/connector/v1/results"
+			? Response.json({ total: 5 })
+			: undefined,
+	);
+
+	const { result } = await rpc(
+		await send("tools/call", { name: "get_results", arguments: {} }),
+	);
+
+	expect(result).toEqual({
+		content: [
+			{
+				type: "text",
+				text: `From Give Example's Better Giving site:\n{"total":5}`,
+			},
+		],
+	});
 });
 
 test("a connection serving no actions has instructions with no confirm clause", async () => {
@@ -356,6 +529,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 			dropConnection: async () => {},
 		},
 		connections: store,
+		drafts: memoryDrafts(),
 		client: {
 			...client,
 			hello: async (origin) => {
@@ -367,6 +541,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 				};
 			},
 		},
+		fetch,
 		resource: new URL("https://connect.example/mcp"),
 	});
 

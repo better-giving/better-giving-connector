@@ -56,7 +56,8 @@ const tool = async (
 ): Promise<Result> =>
 	(await rpc(await send("tools/call", { name, arguments: args }))).result;
 
-const textOf = (result: Result) => result.content.map((c) => c.text).join("\n");
+// The text answer: the first content item. A success's summary line follows it.
+const textOf = (result: Result) => result.content[0]?.text ?? "";
 /** The lead line naming the org, above the JSON. */
 const leadOf = (result: Result) => textOf(result).split("\n")[0];
 /** The deployment's JSON: the last line, below the lead. */
@@ -265,17 +266,19 @@ describe("campaign writes", () => {
 			id: k.id,
 			gifts_go_to: null,
 		});
+		deployment.calls.length = 0;
 		const moved = await tool("publish_campaign", {
 			id: k.id,
 			gifts_go_to: "prog_1",
 		});
 
 		expect(json(published)).toMatchObject({ status: "published" });
-		const { next, problem } = refusal(moved);
-		expect(next).toBe(
-			"This campaign is already live, so where its gifts go can't be changed here. The operator changes it in the Better Giving dashboard.",
-		);
-		expect(problem).toMatchObject({ code: "already_published" });
+		expect(moved.isError).toBeUndefined();
+		expect(textOf(moved).split("\n").slice(0, 2)).toEqual([
+			"Winter coats is already live, with no draft edits pending, so nothing changed.",
+			"Where its gifts go was left as it is: that is set at a campaign's first publish, and the operator changes it in the Better Giving dashboard.",
+		]);
+		expect(deployment.calls.filter((c) => c.method !== "GET")).toEqual([]);
 	});
 
 	test("end_campaign ends it, and every later write says an ended campaign stays ended", async () => {
@@ -834,4 +837,50 @@ describe("descriptions", () => {
 		expect(list).toContain("no need to list again");
 		expect(get).not.toContain("edit_url");
 	});
+});
+
+test("every Platform tool's success is also a structured result with a summary line", async () => {
+	const structured = async (
+		name: string,
+		args: Record<string, unknown> = {},
+	) => {
+		const result = (
+			await rpc(await send("tools/call", { name, arguments: args }))
+		).result;
+		expect({ name, isError: result.isError }).toEqual({
+			name,
+			isError: undefined,
+		});
+		expect({ name, structured: result.structuredContent }).toEqual({
+			name,
+			structured: json(result),
+		});
+		expect({ name, items: result.content.length }).toEqual({ name, items: 2 });
+		return result.structuredContent;
+	};
+
+	const { id } = await structured("create_campaign", { title: "Winter coats" });
+	for (const [name, args] of [
+		["list_campaigns", {}],
+		["get_campaign", { id }],
+		[
+			"update_campaign_settings",
+			{ id, goal: { amount: "500.00", currency: "USD" } },
+		],
+		["create_photo_upload_link", { target: { kind: "campaign", id } }],
+		["publish_campaign", { id, gifts_go_to: null }],
+		["end_campaign", { id }],
+		["get_donation_page", {}],
+		["get_block_catalog", {}],
+		["list_forms", {}],
+		["get_form", { id: "frm_1" }],
+		["update_form", { id: "frm_1", name: "Main" }],
+		["create_form", { name: "Gala" }],
+		["get_results", {}],
+		["list_donations", {}],
+		["list_donors", {}],
+		["list_recurring_gifts", {}],
+	] as const) {
+		await structured(name, args);
+	}
 });
