@@ -51,7 +51,7 @@ async function show(data: PhotoData, profile: Profile = HARBOR) {
 	if ("name" in profile) {
 		await vi.waitFor(() =>
 			expect(root.querySelector(".account-name")?.textContent).toBe(
-				profile.name,
+				profile.name.trim() ? profile.name : "Your nonprofit",
 			),
 		);
 	}
@@ -110,7 +110,7 @@ describe("photo card", () => {
 			).toBe(0);
 			expect(
 				[...account.querySelectorAll("button")].map((b) => b.textContent),
-			).toEqual(["Switch nonprofit", "Disconnect"]);
+			).toEqual(["Switch nonprofit", "How to disconnect"]);
 		});
 
 		it("asks the chat to start a switch, and only that", async () => {
@@ -122,7 +122,7 @@ describe("photo card", () => {
 
 		it("asks the chat how to disconnect, with its own prompt", async () => {
 			const { root, asked } = await show(PHOTO);
-			button(root, "Disconnect").click();
+			button(root, "How to disconnect").click();
 			await vi.waitFor(() => expect(asked.length).toBeGreaterThan(0));
 			expect(asked).toEqual([userMessage(DISCONNECT_PROMPT)]);
 		});
@@ -140,7 +140,7 @@ describe("photo card", () => {
 				asked.push(params);
 				return {};
 			};
-			button(root, "Disconnect").click();
+			button(root, "How to disconnect").click();
 			await vi.waitFor(() => expect(asked.length).toBe(1));
 			expect(root.querySelector('[role="alert"]')).toBeNull();
 		});
@@ -162,11 +162,14 @@ describe("photo card", () => {
 			},
 		);
 
-		// The current code renders "" for an empty name where a missing one shows "…".
-		it("renders an empty profile name as a blank avatar and a blank name", async () => {
+		it("falls back to a generic name for an empty profile name", async () => {
 			const { root } = await show(PHOTO, { name: "" });
+			await vi.waitFor(() =>
+				expect(root.querySelector(".account-name")?.textContent).toBe(
+					"Your nonprofit",
+				),
+			);
 			expect(root.querySelector(".avatar")?.textContent).toBe("");
-			expect(root.querySelector(".account-name")?.textContent).toBe("");
 		});
 
 		it("shows a placeholder until the profile arrives, with the buttons already working", async () => {
@@ -188,14 +191,18 @@ describe("photo card", () => {
 			expect(root.querySelector(".avatar")?.textContent).toBe("HF");
 		});
 
-		it("keeps the placeholder and working buttons when the profile call fails", async () => {
+		it("falls back to a generic name and keeps working buttons when the profile call fails", async () => {
 			const { root, called, asked } = await show(PHOTO, { failing: true });
 			await vi.waitFor(() =>
 				expect(called.map((c) => c.name)).toContain("get_profile"),
 			);
-			button(root, "Disconnect").click();
+			button(root, "How to disconnect").click();
 			await vi.waitFor(() => expect(asked.length).toBe(1));
-			expect(root.querySelector(".account-name")?.textContent).toBe("…");
+			await vi.waitFor(() =>
+				expect(root.querySelector(".account-name")?.textContent).toBe(
+					"Your nonprofit",
+				),
+			);
 			expect(root.querySelector(".avatar")?.textContent).toBe("");
 			expect(root.querySelector('[role="alert"]')).toBeNull();
 		});

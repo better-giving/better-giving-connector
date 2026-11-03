@@ -8,8 +8,10 @@ import {
 
 export type Called<T> = { ok: true; data: T } | { ok: false; error: string };
 
+// A write's change may have landed before its answer failed to parse, so a
+// blind retry could make it twice.
 const UNREADABLE =
-	"Better Giving answered, but the answer wasn't one this card can read. Try again in a moment.";
+	"Better Giving answered, but the answer wasn't one this card can read. Check the campaign before trying again.";
 
 /**
  * Calls an app-only (or get_profile) tool through the host and parses its

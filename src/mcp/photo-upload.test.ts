@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { Unreachable } from "../deployment";
 import { MAX_PHOTO_BYTES, setCampaignPhoto } from "./photo-upload";
 import { type LocalCall, ToolRefusal } from "./spec";
 import { WIDGET_TOOLS } from "./widget-tools";
@@ -17,7 +18,10 @@ function setup(options: {
 	upload?: () => Response;
 	/** The address that answers a redirect, which the stub follows or refuses as the caller's `redirect` option says. */
 	redirects?: "download" | "upload";
+	/** How campaigns.get answers the read after the upload. */
+	campaign?: () => Record<string, unknown>;
 }) {
+	const actions: string[] = [];
 	const seen: Seen[] = [];
 	const redirects: RequestInit["redirect"][] = [];
 	const fetchStub = (async (input: URL | string, init?: RequestInit) => {
@@ -44,19 +48,22 @@ function setup(options: {
 	const call = {
 		connection: { origin: ORIGIN },
 		client: {
-			call: async (_c: unknown, action: string) => ({
-				body:
-					action === "photos.upload_link"
-						? (options.link ?? {
-								url: options.linkUrl ?? `${ORIGIN}/photo-upload/tok`,
-								expires_at: "2031-04-02T10:15:00Z",
-							})
-						: { id: "cmp_1" },
-			}),
+			call: async (_c: unknown, action: string) => {
+				actions.push(action);
+				return {
+					body:
+						action === "photos.upload_link"
+							? (options.link ?? {
+									url: options.linkUrl ?? `${ORIGIN}/photo-upload/tok`,
+									expires_at: "2031-04-02T10:15:00Z",
+								})
+							: (options.campaign?.() ?? { id: "cmp_1" }),
+				};
+			},
 		},
 		fetch: fetchStub,
 	} as unknown as LocalCall;
-	return { call, seen, redirects };
+	return { call, seen, redirects, actions };
 }
 
 const photo = "https://files.example.org/p.png";
@@ -189,6 +196,63 @@ describe("setCampaignPhoto", () => {
 		expect(outcome).toMatchObject({
 			uploaded: false,
 			reason: "The photo isn't a JPEG, PNG or WebP image.",
+		});
+	});
+
+	test("takes the cover's address from the upload answer without reading the campaign again", async () => {
+		const { call, actions } = setup({});
+
+		await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(actions).toEqual(["photos.upload_link"]);
+	});
+
+	test("reads the cover's address from the campaign when the upload answer has none", async () => {
+		const { call } = setup({
+			upload: () => Response.json({}),
+			campaign: () => ({ id: "cmp_1", hero: { url: "https://cdn/hero.png" } }),
+		});
+
+		const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(outcome).toEqual({
+			uploaded: true,
+			imageUrl: "https://cdn/hero.png",
+		});
+	});
+
+	test("an upload the site took is still reported set when the campaign read after it fails", async () => {
+		const { call } = setup({
+			upload: () => Response.json({}),
+			campaign: () => {
+				throw new Unreachable();
+			},
+		});
+
+		const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(outcome).toEqual({ uploaded: true, imageUrl: null });
+	});
+
+	test("a photo whose download breaks off midway is refused with the link, not failed as the site's fault", async () => {
+		const { call } = setup({
+			file: () =>
+				new Response(
+					new ReadableStream({
+						start(controller) {
+							controller.enqueue(PNG);
+							controller.error(new TypeError("terminated"));
+						},
+					}),
+				),
+		});
+
+		const outcome = await setCampaignPhoto(call, "cmp_1", photo);
+
+		expect(outcome).toMatchObject({
+			uploaded: false,
+			reason: "The photo couldn't be downloaded from the chat.",
+			link: { url: `${ORIGIN}/photo-upload/tok` },
 		});
 	});
 

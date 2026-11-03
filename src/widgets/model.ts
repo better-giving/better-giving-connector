@@ -4,7 +4,7 @@
 // what the widgets parse, so nothing here may touch the DOM or node.
 
 import { z } from "zod";
-import { THEME_NAMES } from "../presets/themes";
+import { MAX_SUGGESTED_AMOUNTS, THEME_NAMES } from "../presets/themes";
 
 /** A decimal-string amount in its own currency, as every tool returns money. */
 export const Money = z.object({
@@ -194,6 +194,8 @@ export const CampaignEditorData = z.object({
 	/** The draft when one is pending, else the published page. */
 	page: Page,
 	pendingDraft: z.boolean(),
+	/** True where a live campaign's saves wait as a draft until it is published (Platform); false where they go live at once (Standalone). */
+	draftsLiveEdits: z.boolean(),
 	/** The donation form's suggested amounts. */
 	formAmounts: z.array(Money),
 	imageOrigins: ImageOrigins,
@@ -232,11 +234,15 @@ export type PhotoData = z.infer<typeof PhotoData>;
 // The tools the widgets' buttons call. Every app_ tool is app-only
 // (`_meta.ui.visibility: ["app"]`); get_profile is model-visible.
 
-const CampaignId = z.object({ id: z.string() });
+// strict, as every other tool's input is: a key the server doesn't read is refused, not dropped
+const CampaignId = z.strictObject({ id: z.string() });
 
 export const APP_TOOLS = {
 	app_create_campaign: {
-		args: Preset,
+		args: z.strictObject({
+			...Preset.shape,
+			suggestedAmounts: z.array(Money).min(1).max(MAX_SUGGESTED_AMOUNTS),
+		}),
 		result: CreateResult,
 	},
 	app_publish_campaign: {
@@ -267,7 +273,7 @@ export const APP_TOOLS = {
 		result: z.object({ url: Url, expiresAt: z.iso.datetime({ offset: true }) }),
 	},
 	get_profile: {
-		args: z.object({}),
+		args: z.strictObject({}),
 		result: z.object({ id: z.string(), name: z.string() }),
 	},
 } as const;

@@ -105,6 +105,8 @@ export type LocalSpec = Common & {
 	needs: readonly ActionName[];
 	/** Offered on Platform connections alone. */
 	platformOnly?: true;
+	/** The description a Standalone connection lists, where the tool behaves otherwise there. */
+	standaloneDescription?: string;
 	checkWith?: string;
 	run(call: LocalCall): Promise<LocalAnswer>;
 };

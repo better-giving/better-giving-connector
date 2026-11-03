@@ -36,7 +36,7 @@ export const CONTENT_EDIT: EditOf = (input) => ({
 
 /** An edit to a live campaign is kept as its draft; to any other campaign it is sent as usual (null). */
 export const composeLiveEdit =
-	(editOf: EditOf) =>
+	(editOf: EditOf, options?: { rebase?: boolean }) =>
 	async (call: LocalCall): Promise<LocalAnswer | null> => {
 		const { input } = call;
 		const saved = await saveLiveCampaignEdit(
@@ -46,6 +46,7 @@ export const composeLiveEdit =
 			typeof input.expected_version === "string"
 				? input.expected_version
 				: undefined,
+			options,
 		);
 		if (saved === null) return null;
 		return {

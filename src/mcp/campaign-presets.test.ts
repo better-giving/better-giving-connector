@@ -4,6 +4,7 @@ import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
 import { createCampaignWithPreset, type Preset } from "./campaign-presets";
 import type { ToolConnection } from "./run-tool";
+import { ToolRefusal } from "./spec";
 
 const origin = parseOrigin("https://give.example.org");
 if (!origin) throw new Error("bad origin");
@@ -104,8 +105,11 @@ test("a create that replays an earlier one reads the campaign afresh, so the set
 		"campaigns.create": () => CAMPAIGN,
 		"campaigns.get": () => ({ ...CAMPAIGN, version: "8" }),
 		"campaigns.update_settings": () => ({ ...CAMPAIGN, version: "9" }),
-		"forms.list": () => ({ data: [], next_cursor: null }),
-		"forms.create": () => ({}),
+		"forms.list": () => ({
+			data: [{ id: "frm_b", campaign_id: "cmp_9", suggested_amounts: [] }],
+			next_cursor: null,
+		}),
+		"forms.update": () => ({}),
 		"campaigns.update_blocks": () => ({ ...CAMPAIGN, version: "10" }),
 	});
 
@@ -119,4 +123,31 @@ test("a create that replays an earlier one reads the campaign afresh, so the set
 		sent.find((s) => s.action === "campaigns.update_settings")?.input,
 	).toMatchObject({ expected_version: "8" });
 	expect(created.campaign.version).toBe("10");
+	// the form belongs to a campaign an earlier call made, so a live form's
+	// confirm is left to the site
+	expect(
+		sent.find((s) => s.action === "forms.update")?.input,
+	).not.toHaveProperty("confirm");
+});
+
+test("a replayed create on a campaign that is no longer a draft leaves it untouched and says it exists", async () => {
+	const { sent, client } = scripted({
+		"campaigns.create": () => CAMPAIGN,
+		"campaigns.get": () => ({ ...CAMPAIGN, status: "published", version: "8" }),
+	});
+
+	const refused = createCampaignWithPreset(
+		{ connection, client },
+		"Giving day",
+		PRESET,
+	);
+
+	await expect(refused).rejects.toBeInstanceOf(ToolRefusal);
+	await expect(refused).rejects.toMatchObject({
+		text: expect.stringContaining('"Giving day" already exists'),
+	});
+	expect(sent.map((s) => s.action)).toEqual([
+		"campaigns.create",
+		"campaigns.get",
+	]);
 });

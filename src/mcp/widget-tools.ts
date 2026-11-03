@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { formatDate, formatMoney } from "../format";
 import { THEME_NAMES } from "../presets/themes";
+import { WIDGETS } from "../widgets/html";
 import {
 	APP_TOOLS,
 	CampaignCreateData,
@@ -14,18 +15,15 @@ import {
 } from "../widgets/model";
 import { ADD, DESTRUCTIVE, OVERWRITES, READ } from "./actions";
 import {
+	type DraftPublished,
 	discardCampaignDraft,
 	isLive,
 	pendingDraft,
+	publishLiveCampaignDraft,
 	readCampaign,
 } from "./campaign-drafts";
 import { createCampaignWithPreset } from "./campaign-presets";
-import {
-	BLOCKS_EDIT,
-	CONTENT_EDIT,
-	composeLiveEdit,
-	composePublish,
-} from "./draft-tools";
+import { BLOCKS_EDIT, CONTENT_EDIT, composeLiveEdit } from "./draft-tools";
 import { setCampaignPhoto, uploadLink } from "./photo-upload";
 import type { LocalCall, LocalSpec, ToolMeta } from "./spec";
 import { statusLines, ToolRefusal } from "./spec";
@@ -40,10 +38,10 @@ import {
 // The render tools that show each widget, and the app-only tools its buttons
 // call. A widget is an MCP Apps resource the render tool links to; a button
 // press is a tool call the model never sees (`visibility: ["app"]`), so no
-// elicitation is involved: the widget's own confirm stands in for it.
+// elicitation is involved. Of the buttons that change what donors see, only
+// End asks the operator to confirm in the card; Publish runs on its press.
 
-export const widgetUri = (name: WidgetName) =>
-	`ui://better-giving/${name}.html` as const;
+const widgetUri = (name: WidgetName) => WIDGETS[name].uri;
 
 const renderMeta = (
 	name: WidgetName,
@@ -178,7 +176,7 @@ const SHOW_CAMPAIGN_RESULTS: LocalSpec = {
 	tool: RENDER_TOOLS["campaign-results"].tool,
 	title: "Show a campaign's results",
 	description:
-		"Shows the operator one campaign's results card: raised against its goal, donors, average and median gift and the last week; a draft shows what is left before it can be published. The card has the Publish and End buttons, which ask the operator to confirm.",
+		"Shows the operator one campaign's results card: raised against its goal, donors, average and median gift, and the last seven days against the seven before; a draft shows what is left before it can be published. The card has the Publish and End buttons; End asks the operator to confirm in the card, Publish doesn't.",
 	input: z.strictObject({ id }),
 	output: {
 		schema: CampaignResultsData,
@@ -206,6 +204,8 @@ const OPEN_CAMPAIGN_EDITOR: LocalSpec = {
 	title: "Open a campaign's editor",
 	description:
 		"Opens the fullscreen editor for a campaign's page, with a live preview of the donation page. Edits to a live campaign are saved as a draft until it is published again.",
+	standaloneDescription:
+		"Opens the fullscreen editor for a campaign's page, with a live preview of the donation page. Its saves go to the site at once: donors see a live campaign's edits as soon as they're saved.",
 	input: z.strictObject({ id }),
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: READ,
@@ -362,6 +362,15 @@ const APP_CREATE_CAMPAIGN: LocalSpec = {
 	},
 };
 
+const partlyPublished = ({ applied, pending, failure }: DraftPublished) => {
+	const still = `${pending.join(" and ")} edits are still a draft: ${failure ?? ""}`;
+	const lead =
+		applied.length > 0
+			? `The ${applied.join(" and ")} edits are live now, but the ${still}`
+			: `The ${still}`;
+	return `${lead} Fix them in the editor and publish again, or discard the draft edits.`;
+};
+
 const APP_PUBLISH_CAMPAIGN: LocalSpec = {
 	tool: "app_publish_campaign",
 	title: "Publish a campaign from its card",
@@ -380,7 +389,10 @@ const APP_PUBLISH_CAMPAIGN: LocalSpec = {
 		);
 		const campaign = await readCampaign(call, campaignId);
 		if (isLive(campaign)) {
-			await composePublish({ ...call, input: { id: campaignId } });
+			const published = await publishLiveCampaignDraft(call, campaign);
+			if (published.pending.length > 0) {
+				throw new ToolRefusal("rejected", partlyPublished(published));
+			}
 		} else {
 			await call.client.call(call.connection, "campaigns.publish", {
 				id: campaignId,
@@ -430,10 +442,14 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 	tool: "app_save_campaign_edit",
 	title: "Save an editor change",
 	description: `The editor's save: a live campaign keeps the change as a draft until it is published; a draft campaign is written through. ${CARD_ONLY}`,
+	standaloneDescription: `The editor's save: writes the change to the site at once, a live campaign's included. ${CARD_ONLY}`,
 	input: APP_TOOLS.app_save_campaign_edit.args,
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: OVERWRITES,
 	_meta: appMeta("Saving the page…", "Page saved"),
+	// The write is update_blocks or update_content, as the campaign's page
+	// takes; a site serves the one its pages use, so requiring both would
+	// hide the save where it works.
 	needs: ["campaigns.get"],
 	async run(call) {
 		const {
@@ -449,13 +465,12 @@ const APP_SAVE_CAMPAIGN_EDIT: LocalSpec = {
 		const isBlocks = page.pageKind === "blocks";
 		const input = isBlocks
 			? { id: campaignId, blocks: page.blocks, ...version }
-			: { id: campaignId, ...page.content, ...version };
+			: { ...page.content, id: campaignId, ...version };
 		// Standalone shows a live campaign's edit at once, as its own tools do.
 		const kept = call.connection.platform
-			? await composeLiveEdit(isBlocks ? BLOCKS_EDIT : CONTENT_EDIT)({
-					...call,
-					input,
-				})
+			? await composeLiveEdit(isBlocks ? BLOCKS_EDIT : CONTENT_EDIT, {
+					rebase: false,
+				})({ ...call, input })
 			: null;
 		if (kept === null) {
 			await call.client.call(
@@ -476,7 +491,7 @@ const APP_DISCARD_CAMPAIGN_DRAFT: LocalSpec = {
 	output: { schema: CampaignEditorData, summary: editorSummary },
 	annotations: DESTRUCTIVE,
 	_meta: appMeta("Discarding draft edits…", "Draft edits discarded"),
-	needs: [],
+	needs: ["campaigns.get"],
 	platformOnly: true,
 	async run(call) {
 		const campaignId = String(call.input.id);

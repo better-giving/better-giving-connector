@@ -536,7 +536,7 @@ test("the card's Publish on a draft the site moved past says what to do in the c
 
 	expect(result.isError).toBe(true);
 	expect(result.content[0]?.text).toBe(
-		"Nothing was published: this campaign was changed on the site after these draft edits were saved, and publishing them would overwrite that change. To keep them, make your edit again in the editor and save it, then publish; or discard the draft edits.",
+		"Nothing was published: this campaign was changed on the site after these draft edits were saved, and publishing them would overwrite that change. Discard the draft edits, then make them again on the campaign as it is now.",
 	);
 });
 
@@ -702,4 +702,78 @@ test("the editor card's save of a draft campaign sends its version to the site a
 	]);
 	expect(writes()[0]?.body).toMatchObject({ expected_version: k.version });
 	expect(writes()[1]?.body).not.toHaveProperty("expected_version");
+});
+
+test("the card's Publish that sends only part of a draft says which part is still a draft, and why", async () => {
+	const k = await liveWithDraft();
+	refuseOnce("blocks", 422, "invalid", "The story is too long.");
+
+	const result = await tool("app_publish_campaign", {
+		id: k.id,
+		giftsGoTo: null,
+	});
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toBe(
+		"The settings edits are live now, but the page edits are still a draft: The story is too long. Fix them in the editor and publish again, or discard the draft edits.",
+	);
+	expect((await get(k.id)).pendingDraft).toMatchObject({ page_kind: "blocks" });
+});
+
+test("the editor card's save onto a draft the site has moved past is refused, so the site's change isn't overwritten at publish", async () => {
+	const k = await liveWithDraft();
+	await onSite(k.id, { end_date: "2031-01-31" });
+	const opened = (await tool("app_get_campaign_editor", { id: k.id }))
+		.structuredContent as { campaign: { version: string } };
+	const before = (await get(k.id)).pendingDraft;
+	deployment.calls.length = 0;
+
+	const result = await widgetSave(
+		k.id,
+		opened.campaign.version,
+		withStory(k, "One word changed."),
+	);
+
+	expect(result.isError).toBe(true);
+	expect(result.content[0]?.text).toBe(
+		"Nothing was saved: this campaign was changed on the site after its draft edits were started, and saving onto them would overwrite that change when they're published. Discard the draft edits to start again from the campaign as it is now.",
+	);
+	expect((await get(k.id)).pendingDraft).toEqual(before);
+	expect(writes()).toEqual([]);
+});
+
+test("the editor shows the campaign's page, not a leftover draft, once the campaign has ended", async () => {
+	const k = await liveWithDraft();
+	await tool("end_campaign", { id: k.id });
+
+	const opened = (await tool("app_get_campaign_editor", { id: k.id }))
+		.structuredContent as { page: { blocks: unknown }; pendingDraft: boolean };
+
+	expect(opened.pendingDraft).toBe(false);
+	expect(opened.page.blocks).toEqual(k.blocks);
+});
+
+test("the editor says a Platform campaign's live edits wait as a draft, and a Standalone one's don't", async () => {
+	const k = await live();
+	const standalone = await standaloneSession();
+	const s = await standalone.live();
+
+	const platform = await tool("open_campaign_editor", { id: k.id });
+	const direct = await standalone.tool("open_campaign_editor", { id: s.id });
+
+	expect(platform.structuredContent).toMatchObject({ draftsLiveEdits: true });
+	expect(direct.structuredContent).toMatchObject({ draftsLiveEdits: false });
+	const description = async (
+		list: () => Promise<{ tools: { name: string; description: string }[] }>,
+	) =>
+		(await list()).tools.find((t) => t.name === "open_campaign_editor")
+			?.description;
+	expect(
+		await description(
+			async () => (await rpc(await send("tools/list", {}))).result,
+		),
+	).toMatch(/saved as a draft until it is published again/);
+	expect(await description(() => standalone.send("tools/list", {}))).toMatch(
+		/donors see a live campaign's edits as soon as they're saved/,
+	);
 });

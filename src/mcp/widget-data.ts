@@ -1,15 +1,16 @@
 import { z } from "zod";
 import { THEME_NAMES, THEMES, type ThemeName } from "../presets/themes";
-import type {
-	CampaignCreateData,
-	CampaignEditorData,
-	CampaignResultsData,
-	CampaignsData,
-	PhotoData,
+import {
+	type CampaignCreateData,
+	type CampaignEditorData,
+	type CampaignResultsData,
+	type CampaignsData,
+	MAX_CAMPAIGNS,
+	type PhotoData,
 } from "../widgets/model";
 import { isLive, pendingDraft, readCampaign } from "./campaign-drafts";
 import { findCampaignForm, versionOf } from "./campaign-presets";
-import { type Body, isBody, readPages } from "./read-pages";
+import { type Body, isBody, readPages, readPagesCapped } from "./read-pages";
 import { readHistory } from "./recommend-tool";
 import { recommend } from "./recommendations";
 import type { LocalCall } from "./spec";
@@ -80,19 +81,17 @@ const fromCents = (c: number, currency: string) => ({
 
 // --- show_campaigns ---------------------------------------------------------
 
-export const MAX_CAROUSEL = 8;
-
 export async function campaignsData(
 	c: LocalCall,
 	filter?: "draft" | "published" | "ended",
 ): Promise<CampaignsData> {
 	const list = await call(c, "campaigns.list", {
-		limit: MAX_CAROUSEL,
+		limit: MAX_CAMPAIGNS,
 		...(filter === undefined ? {} : { status: filter }),
 	});
 	const items = (Array.isArray(list.data) ? list.data : [])
 		.filter(isBody)
-		.slice(0, MAX_CAROUSEL);
+		.slice(0, MAX_CAMPAIGNS);
 	const campaigns = await Promise.all(
 		items.map(async (item) => {
 			const id = String(item.id);
@@ -144,14 +143,24 @@ export async function resultsData(
 	const currency =
 		money(results.total)?.currency ?? goal?.currency ?? DEFAULT_CURRENCY;
 	const raised = money(results.total) ?? zero(currency);
-	const gifts = await readPages(
-		c,
-		"donations.list",
-		{ campaign_id: id },
-		giftItem,
+	const today = Date.now() - (Date.now() % DAY_MS);
+	const days = Array.from({ length: 14 }, (_, i) =>
+		new Date(today - (13 - i) * DAY_MS).toISOString().slice(0, 10),
 	);
+	const [all, recent] = await Promise.all([
+		readPagesCapped(c, "donations.list", { campaign_id: id }, giftItem),
+		readPages(
+			c,
+			"donations.list",
+			{ campaign_id: id, from: days[0] },
+			giftItem,
+		),
+	]);
 
-	const amounts = gifts.map((g) => cents(g.amount)).sort((a, b) => a - b);
+	// a median of the gifts read is no median of the campaign when more remain
+	const amounts = all.complete
+		? all.items.map((g) => cents(g.amount)).sort((a, b) => a - b)
+		: [];
 	const mid = Math.floor(amounts.length / 2);
 	const median =
 		amounts.length === 0
@@ -160,14 +169,14 @@ export async function resultsData(
 				? (amounts[mid] ?? 0)
 				: Math.round(((amounts[mid - 1] ?? 0) + (amounts[mid] ?? 0)) / 2);
 	const giftCount =
-		typeof results.gift_count === "number" ? results.gift_count : gifts.length;
+		typeof results.gift_count === "number"
+			? results.gift_count
+			: all.items.length;
 	const average =
 		giftCount === 0 ? null : Math.round(cents(raised) / giftCount);
 
-	const today = Date.now() - (Date.now() % DAY_MS);
-	const daily = Array.from({ length: 14 }, (_, i) => {
-		const date = new Date(today - (13 - i) * DAY_MS).toISOString().slice(0, 10);
-		const total = gifts
+	const daily = days.map((date) => {
+		const total = recent
 			.filter((g) => g.date.slice(0, 10) === date)
 			.reduce((sum, g) => sum + cents(g.amount), 0);
 		return { date, total: fromCents(total, currency) };
@@ -262,7 +271,8 @@ export async function editorData(
 	id: string,
 ): Promise<CampaignEditorData> {
 	const campaign = await readCampaign(c, id);
-	const draft = await pendingDraft(c, id);
+	// a draft left behind by a campaign that has since ended never goes live
+	const draft = isLive(campaign) ? await pendingDraft(c, id) : null;
 	const asBlocks = Array.isArray(campaign.blocks);
 	const page: CampaignEditorData["page"] =
 		draft?.page != null && draft.page_kind === "blocks"
@@ -297,7 +307,8 @@ export async function editorData(
 			url: status(campaign) === "draft" ? null : url(campaign.public_url),
 		},
 		page,
-		pendingDraft: draft !== null && isLive(campaign),
+		pendingDraft: draft !== null,
+		draftsLiveEdits: c.connection.platform,
 		formAmounts: amounts,
 		imageOrigins: imageOrigins(c),
 		images,

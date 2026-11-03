@@ -29,10 +29,12 @@ const initials = (name: string) =>
 function Account() {
 	const { host } = useSession();
 	const [name, setName] = useState<string | null>(null);
+	const [settled, setSettled] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	useEffect(() => {
 		void callTool(host, "get_profile", {}).then((res) => {
-			if (res.ok) setName(res.data.name);
+			if (res.ok) setName(res.data.name.trim() ? res.data.name : null);
+			setSettled(true);
 		});
 	}, [host]);
 	const ask = (prompt: string) => {
@@ -50,7 +52,9 @@ function Account() {
 					{name ? initials(name) : ""}
 				</span>
 				<div class="account-who">
-					<p class="account-name">{name ?? "…"}</p>
+					<p class="account-name">
+						{name ?? (settled ? "Your nonprofit" : "…")}
+					</p>
 					<p class="account-label">Nonprofit</p>
 				</div>
 				<span class="connected-pill">Connected</span>
@@ -86,7 +90,7 @@ function Account() {
 						)
 					}
 				>
-					Disconnect
+					How to disconnect
 				</button>
 			</div>
 			{error && (

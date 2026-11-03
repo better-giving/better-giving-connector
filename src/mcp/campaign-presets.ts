@@ -14,6 +14,7 @@ import {
 	type ThemeName,
 } from "../presets/themes";
 import type { ToolConnection } from "./run-tool";
+import { ToolRefusal } from "./spec";
 
 export type Preset = {
 	theme: ThemeName;
@@ -87,6 +88,8 @@ class StepSkipped extends Error {
  * carries the version the one before it returned. A failure on the create
  * throws as a plain create's would; one after it ends the run there and is
  * reported in the result, the draft left as it stands (donors can't see it).
+ * A create the site replays onto a campaign that is no longer a draft throws
+ * a ToolRefusal and writes nothing.
  */
 export async function createCampaignWithPreset(
 	deps: DeploymentDeps,
@@ -100,11 +103,21 @@ export async function createCampaignWithPreset(
 	const created = await client.call(connection, "campaigns.create", { title });
 	let campaign = bodyOf(created.body);
 	const id = String(campaign.id);
-	// A replayed create answers with the campaign as it was first made.
-	if (created.status === 200) {
+	// A replayed create answers with the campaign as it was first made, by an
+	// earlier call under the same title; dressing it again would overwrite
+	// whatever the operator has done to it since, so only a draft is dressed.
+	const madeHere = created.status !== 200;
+	if (!madeHere) {
 		campaign = bodyOf(
 			(await client.call(connection, "campaigns.get", { id })).body,
 		);
+		if (campaign.status !== "draft") {
+			throw new ToolRefusal(
+				"rejected",
+				`A campaign titled "${title}" already exists and is no longer a draft, so nothing was changed. Create the new one under another title, or edit that campaign.`,
+				"A campaign with this title already exists and is no longer a draft, so nothing was changed. Open it from your campaigns.",
+			);
+		}
 	}
 
 	const run: Record<Exclude<PresetStep, "create">, () => Promise<void>> = {
@@ -126,7 +139,14 @@ export async function createCampaignWithPreset(
 			campaign = bodyOf(answer.body);
 		},
 		form: () =>
-			setFormAmounts(deps, serves, id, title, preset.suggested_amounts),
+			setFormAmounts(
+				deps,
+				serves,
+				id,
+				title,
+				preset.suggested_amounts,
+				madeHere,
+			),
 		page: async () => {
 			campaign = await starterPage(deps, serves, campaign, id, preset.theme);
 		},
@@ -177,6 +197,7 @@ async function setFormAmounts(
 	campaignId: string,
 	title: string,
 	amounts: Money[],
+	campaignMadeHere: boolean,
 ): Promise<void> {
 	if (!serves("forms.list"))
 		throw new StepSkipped(
@@ -201,9 +222,10 @@ async function setFormAmounts(
 			...(typeof form.updated_at === "string"
 				? { updated_at: form.updated_at }
 				: {}),
-			// Platform holds a change to a live form for a confirm; this form
-			// belongs to a draft no donor can reach, made in this same call.
-			...(connection.platform ? { confirm: true } : {}),
+			// Platform holds a change to a live form for a confirm. Only a form
+			// whose campaign this call made skips it; a replayed campaign's form
+			// may already take gifts, so its hold stands and fails the step.
+			...(connection.platform && campaignMadeHere ? { confirm: true } : {}),
 		});
 		return;
 	}

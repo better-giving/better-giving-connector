@@ -167,7 +167,10 @@ function connectionServer(
 	for (const spec of specs) {
 		// No outputSchema here: the SDK fails a call whose result has none, and
 		// a body its schema refuses is answered as text. runTool checks it;
-		// tools/list below lists it.
+		// tools/list below lists it. @modelcontextprotocol/client applies the
+		// same rule on its side: it throws on a result that isn't an error and
+		// has no structuredContent when tools/list gave the tool a schema, so a
+		// client built on it fails that text answer.
 		server.registerTool(
 			spec.tool,
 			{ title: spec.title, inputSchema: loggedInput(spec) },
@@ -221,6 +224,10 @@ function servedSpecs(connection: ToolConnection): ToolSpec[] {
 			(spec) =>
 				spec.needs.every(serves) &&
 				(spec.platformOnly !== true || connection.platform),
+		).map((spec) =>
+			spec.standaloneDescription === undefined || connection.platform
+				? spec
+				: { ...spec, description: spec.standaloneDescription },
 		),
 	];
 }

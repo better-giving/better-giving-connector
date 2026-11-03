@@ -2058,7 +2058,7 @@
 		{
 			"name": "show_campaign_results",
 			"title": "Show a campaign's results",
-			"description": "Shows the operator one campaign's results card: raised against its goal, donors, average and median gift and the last week; a draft shows what is left before it can be published. The card has the Publish and End buttons, which ask the operator to confirm.",
+			"description": "Shows the operator one campaign's results card: raised against its goal, donors, average and median gift, and the last seven days against the seven before; a draft shows what is left before it can be published. The card has the Publish and End buttons; End asks the operator to confirm in the card, Publish doesn't.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2331,7 +2331,7 @@
 		{
 			"name": "open_campaign_editor",
 			"title": "Open a campaign's editor",
-			"description": "Opens the fullscreen editor for a campaign's page, with a live preview of the donation page. Edits to a live campaign are saved as a draft until it is published again.",
+			"description": "Opens the fullscreen editor for a campaign's page, with a live preview of the donation page. Its saves go to the site at once: donors see a live campaign's edits as soon as they're saved.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2494,6 +2494,9 @@
 					"pendingDraft": {
 						"type": "boolean"
 					},
+					"draftsLiveEdits": {
+						"type": "boolean"
+					},
 					"formAmounts": {
 						"type": "array",
 						"items": {
@@ -2535,6 +2538,7 @@
 					"campaign",
 					"page",
 					"pendingDraft",
+					"draftsLiveEdits",
 					"formAmounts",
 					"imageOrigins",
 					"images"
@@ -2848,6 +2852,7 @@
 					},
 					"suggestedAmounts": {
 						"minItems": 1,
+						"maxItems": 6,
 						"type": "array",
 						"items": {
 							"type": "object",
@@ -2866,7 +2871,8 @@
 						}
 					}
 				},
-				"required": ["theme", "title", "goal", "endDate", "suggestedAmounts"]
+				"required": ["theme", "title", "goal", "endDate", "suggestedAmounts"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",
@@ -2959,7 +2965,8 @@
 						"type": ["string", "null"]
 					}
 				},
-				"required": ["id", "giftsGoTo"]
+				"required": ["id", "giftsGoTo"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",
@@ -3229,7 +3236,8 @@
 						"type": "string"
 					}
 				},
-				"required": ["id"]
+				"required": ["id"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",
@@ -3499,7 +3507,8 @@
 						"type": "string"
 					}
 				},
-				"required": ["id"]
+				"required": ["id"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",
@@ -3651,6 +3660,9 @@
 					"pendingDraft": {
 						"type": "boolean"
 					},
+					"draftsLiveEdits": {
+						"type": "boolean"
+					},
 					"formAmounts": {
 						"type": "array",
 						"items": {
@@ -3692,6 +3704,7 @@
 					"campaign",
 					"page",
 					"pendingDraft",
+					"draftsLiveEdits",
 					"formAmounts",
 					"imageOrigins",
 					"images"
@@ -3717,7 +3730,7 @@
 		{
 			"name": "app_save_campaign_edit",
 			"title": "Save an editor change",
-			"description": "The editor's save: a live campaign keeps the change as a draft until it is published; a draft campaign is written through. Only the card calls this tool, when the operator presses its button; never call it from the chat.",
+			"description": "The editor's save: writes the change to the site at once, a live campaign's included. Only the card calls this tool, when the operator presses its button; never call it from the chat.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3833,7 +3846,8 @@
 						]
 					}
 				},
-				"required": ["id", "expectedVersion", "page"]
+				"required": ["id", "expectedVersion", "page"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",
@@ -3985,6 +3999,9 @@
 					"pendingDraft": {
 						"type": "boolean"
 					},
+					"draftsLiveEdits": {
+						"type": "boolean"
+					},
 					"formAmounts": {
 						"type": "array",
 						"items": {
@@ -4026,6 +4043,7 @@
 					"campaign",
 					"page",
 					"pendingDraft",
+					"draftsLiveEdits",
 					"formAmounts",
 					"imageOrigins",
 					"images"
@@ -4067,7 +4085,8 @@
 						"type": "string"
 					}
 				},
-				"required": ["id", "downloadUrl", "alt"]
+				"required": ["id", "downloadUrl", "alt"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",
@@ -4111,7 +4130,8 @@
 						"type": "string"
 					}
 				},
-				"required": ["id"]
+				"required": ["id"],
+				"additionalProperties": false
 			},
 			"outputSchema": {
 				"type": "object",

@@ -137,6 +137,7 @@ describe("open_campaign_editor data", () => {
 			url: null,
 		},
 		pendingDraft: false,
+		draftsLiveEdits: true,
 		formAmounts: [usd("25.00")],
 		imageOrigins: [],
 		images: {},
@@ -188,6 +189,41 @@ describe("app-only tools", () => {
 			"app_set_campaign_photo",
 			"get_profile",
 		]);
+	});
+
+	it("refuse an argument they don't declare, as every other tool's input does", () => {
+		for (const [name, { args }] of Object.entries(APP_TOOLS)) {
+			const shape = args.shape as Record<string, unknown>;
+			const declared = Object.fromEntries(
+				Object.keys(shape).map((key) => [key, undefined]),
+			);
+			const parsed = args.safeParse({ ...declared, stray: true });
+			expect(
+				parsed.success ? [] : parsed.error.issues.map((i) => i.code),
+				name,
+			).toContain("unrecognized_keys");
+		}
+	});
+
+	it("caps a created draft's suggested amounts at six, as the chat's preset is", () => {
+		const usd = (amount: string) => ({ amount, currency: "USD" });
+		const preset = {
+			theme: "year_end",
+			title: "Year-End 2026",
+			goal: usd("5000.00"),
+			endDate: "2026-12-31",
+			suggestedAmounts: Array.from({ length: 6 }, (_, i) =>
+				usd(`${i + 1}0.00`),
+			),
+		};
+		const { args } = APP_TOOLS.app_create_campaign;
+		expect(args.safeParse(preset).success).toBe(true);
+		expect(
+			args.safeParse({
+				...preset,
+				suggestedAmounts: [...preset.suggestedAmounts, usd("70.00")],
+			}).success,
+		).toBe(false);
 	});
 
 	it("reads the create result's steps and the step that failed", () => {

@@ -1,4 +1,5 @@
 import { readCampaign } from "./campaign-drafts";
+import { isStepFailure } from "./campaign-presets";
 import { type Body, isBody } from "./read-pages";
 import type { LocalCall } from "./spec";
 
@@ -66,7 +67,9 @@ async function download(
 	const chunks: Uint8Array[] = [];
 	let size = 0;
 	while (reader) {
-		const { done, value } = await reader.read();
+		const { done, value } = await reader.read().catch(() => {
+			throw new Refused("The photo couldn't be downloaded from the chat.");
+		});
 		if (done) break;
 		size += value.byteLength;
 		if (size > MAX_PHOTO_BYTES) {
@@ -112,8 +115,9 @@ export async function uploadLink(
 
 /**
  * Puts the photo at `downloadUrl` on the campaign as its cover. Any failure
- * answers `uploaded: false` with why, and the link for the operator to open
- * themselves, except a link to another origin, which is never handed out.
+ * before the site takes the photo answers `uploaded: false` with why, and the
+ * link for the operator to open themselves, except a link to another origin,
+ * which is never handed out.
  */
 export async function setCampaignPhoto(
 	call: LocalCall,
@@ -138,6 +142,7 @@ export async function setCampaignPhoto(
 		new Blob([file.bytes as unknown as ArrayBuffer], { type: file.type }),
 		"photo",
 	);
+	let answered: unknown;
 	try {
 		const res = await call.fetch(new URL(link.url), {
 			method: "POST",
@@ -151,17 +156,7 @@ export async function setCampaignPhoto(
 				reason: "The site didn't accept the photo.",
 				link,
 			};
-		const answered: unknown = await res.json().catch(() => null);
-		const given = isBody(answered) ? answered.url : undefined;
-		const hero = (await readCampaign(call, campaignId)).hero;
-		const fromCampaign = isBody(hero) ? hero.url : hero;
-		const imageUrl =
-			typeof given === "string"
-				? given
-				: typeof fromCampaign === "string"
-					? fromCampaign
-					: null;
-		return { uploaded: true, imageUrl };
+		answered = await res.json().catch(() => null);
 	} catch {
 		return {
 			uploaded: false,
@@ -169,4 +164,24 @@ export async function setCampaignPhoto(
 			link,
 		};
 	}
+	const given = isBody(answered) ? answered.url : undefined;
+	if (typeof given === "string") return { uploaded: true, imageUrl: given };
+	return { uploaded: true, imageUrl: await coverUrl(call, campaignId) };
+}
+
+// The upload has landed by now: a read that fails leaves the cover set, its
+// address unknown.
+async function coverUrl(
+	call: LocalCall,
+	campaignId: string,
+): Promise<string | null> {
+	let hero: unknown;
+	try {
+		hero = (await readCampaign(call, campaignId)).hero;
+	} catch (error) {
+		if (isStepFailure(error)) return null;
+		throw error;
+	}
+	const url = isBody(hero) ? hero.url : hero;
+	return typeof url === "string" ? url : null;
 }

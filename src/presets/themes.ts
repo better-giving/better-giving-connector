@@ -12,6 +12,9 @@ export type ThemeName = (typeof THEME_NAMES)[number];
 
 export type Money = { amount: string; currency: "USD" };
 
+/** The most suggested amounts a preset sets on a campaign's form. */
+export const MAX_SUGGESTED_AMOUNTS = 6;
+
 export type Theme = {
 	label: string;
 	/** What a title for this kind of appeal starts with, for a form to offer. */

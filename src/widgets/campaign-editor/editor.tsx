@@ -95,6 +95,8 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 	const { campaign } = data;
 	const live = campaign.status === "published";
 	const ended = campaign.status === "ended";
+	// Standalone writes a live campaign's save through, so there is no draft to publish
+	const savesAsDraft = live && data.draftsLiveEdits;
 
 	const edit = (next: Page) => {
 		setPage(next);
@@ -121,7 +123,14 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 			setError(res.error);
 			return false;
 		}
-		apply(res.data, live ? "Saved as a draft." : "Saved.");
+		apply(
+			res.data,
+			savesAsDraft
+				? "Saved as a draft."
+				: live
+					? "Saved. Donors see it now."
+					: "Saved.",
+		);
 		return true;
 	};
 
@@ -211,14 +220,16 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 					>
 						Save
 					</Button>
-					<Button
-						variant="primary"
-						busy={busy === "publish"}
-						disabled={ended || (live && !dirty && !data.pendingDraft)}
-						onClick={() => void publish()}
-					>
-						{live ? "Publish changes" : "Publish"}
-					</Button>
+					{(!live || savesAsDraft) && (
+						<Button
+							variant="primary"
+							busy={busy === "publish"}
+							disabled={ended || (live && !dirty && !data.pendingDraft)}
+							onClick={() => void publish()}
+						>
+							{live ? "Publish changes" : "Publish"}
+						</Button>
+					)}
 				</span>
 			</header>
 			{error && (

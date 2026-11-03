@@ -82,7 +82,9 @@ const DRAFT_MOVED_CARD =
 export const STALE_DRAFT =
 	"Nothing was published: this campaign changed on the site after its draft edits were started, and publishing them would overwrite that change. Read it with get_campaign, which shows the campaign as it is now and the draft under pendingDraft, and tell the operator what changed. To keep the draft, re-make its edit with the version get_campaign returns as expected_version, which moves the draft onto that version, then publish again; or drop it with discard_campaign_draft.";
 const STALE_DRAFT_CARD =
-	"Nothing was published: this campaign was changed on the site after these draft edits were saved, and publishing them would overwrite that change. To keep them, make your edit again in the editor and save it, then publish; or discard the draft edits.";
+	"Nothing was published: this campaign was changed on the site after these draft edits were saved, and publishing them would overwrite that change. Discard the draft edits, then make them again on the campaign as it is now.";
+const STALE_BASE =
+	"Nothing was saved: this campaign was changed on the site after its draft edits were started, and saving onto them would overwrite that change when they're published. Discard the draft edits to start again from the campaign as it is now.";
 const STALE_READ =
 	"Nothing was saved: this campaign changed after it was read. Read it again with get_campaign, make the change against what it shows now, and send the version it returns as expected_version.";
 const STALE_READ_CARD =
@@ -119,13 +121,16 @@ export function mergeDraft(
  * The first edit records the version it was read at; a later one keeps it,
  * unless it names the campaign's own version as `expectedVersion`: made
  * against the campaign as it is now, it moves the whole draft onto that
- * version. Any other `expectedVersion` is refused as stale.
+ * version. Any other `expectedVersion` is refused as stale. With `rebase`
+ * false, a draft the campaign has moved past is refused instead of moved: the
+ * editor card shows the draft, never the site's change it would overwrite.
  */
 export async function saveLiveCampaignEdit(
 	deps: DraftDeps,
 	campaignId: string,
 	edit: DraftEdit,
 	expectedVersion?: string,
+	{ rebase = true }: { rebase?: boolean } = {},
 ): Promise<SavedDraft | null> {
 	const campaign = await readCampaign(deps, campaignId);
 	if (!isLive(campaign)) return null;
@@ -135,6 +140,9 @@ export async function saveLiveCampaignEdit(
 	}
 	const key = keyOf(deps, campaignId);
 	const stored = await deps.drafts.get(key);
+	if (!rebase && stored && stored.baseVersion !== current) {
+		throw new ToolRefusal("rejected", STALE_BASE);
+	}
 	const baseVersion =
 		stored && expectedVersion === undefined ? stored.baseVersion : current;
 	const kept = await deps.drafts.put(

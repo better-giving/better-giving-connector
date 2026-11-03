@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { THEME_NAMES } from "../presets/themes";
+import { MAX_SUGGESTED_AMOUNTS, THEME_NAMES } from "../presets/themes";
 import {
 	createCampaignWithPreset,
 	type Preset,
@@ -69,8 +69,6 @@ const money = z
 	.describe(
 		'An object with a decimal-string amount and a currency, such as {"amount": "100.00", "currency": "USD"}. A plain number is refused.',
 	);
-/** The most suggested amounts a preset sets on a campaign's form. */
-export const MAX_SUGGESTED_AMOUNTS = 6;
 const preset = z
 	.strictObject({
 		theme: z.enum(THEME_NAMES),
