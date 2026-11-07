@@ -5,16 +5,16 @@ import { mount } from "../test-dom";
 import { StatusBadge } from "./badge";
 
 it.each([
-	["draft", "Draft", "badge-warning"],
-	["published", "Live", "badge-success"],
-	["ended", "Ended", "badge-neutral"],
+	["draft", "Draft", "ds-badge-warning"],
+	["published", "Live", "ds-badge-success"],
+	["ended", "Ended", "ds-badge-neutral"],
 ] as const)(
 	"labels a %s campaign %s, in words beside its %s color",
 	(status, label, variant) => {
 		const badge = mount(<StatusBadge status={status} />).querySelector(
-			".badge",
+			".ds-badge",
 		);
 		expect(badge?.textContent).toBe(label);
-		expect(badge?.className.split(" ").sort()).toEqual(["badge", variant]);
+		expect(badge?.className.split(" ").sort()).toEqual(["ds-badge", variant]);
 	},
 );

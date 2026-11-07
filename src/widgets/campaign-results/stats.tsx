@@ -82,7 +82,9 @@ export function Facts(props: { data: CampaignResultsData }) {
 						{change !== null && change !== 0 && (
 							<span
 								class={
-									change > 0 ? "badge badge-success" : "badge badge-warning"
+									change > 0
+										? "ds-badge ds-badge-success"
+										: "ds-badge ds-badge-warning"
 								}
 							>
 								<span aria-hidden="true">{change > 0 ? "↗" : "↘"}</span>{" "}

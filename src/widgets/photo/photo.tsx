@@ -57,7 +57,7 @@ function Account() {
 					</p>
 					<p class="account-label">Nonprofit</p>
 				</div>
-				<span class="badge badge-success">Connected</span>
+				<span class="ds-badge ds-badge-success">Connected</span>
 			</div>
 			<div class="account-row">
 				<div class="account-who">
@@ -173,12 +173,12 @@ export function PhotoCard(props: { data: PhotoData }) {
 						16:9 on the donor page.
 					</p>
 					<div class="field">
-						<label class="label" for={altId}>
+						<label class="ds-label" for={altId}>
 							Photo description (alt text)
 						</label>
 						<input
 							id={altId}
-							class="field-input"
+							class="ds-field-input"
 							type="text"
 							value={alt}
 							onInput={(e: Event) =>

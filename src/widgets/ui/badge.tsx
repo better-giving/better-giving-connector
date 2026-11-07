@@ -16,7 +16,7 @@ const VARIANT: Record<CampaignStatus, "warning" | "success" | "neutral"> = {
 
 export function StatusBadge(props: { status: CampaignStatus }) {
 	return (
-		<span class={`badge badge-${VARIANT[props.status]}`}>
+		<span class={`ds-badge ds-badge-${VARIANT[props.status]}`}>
 			{LABEL[props.status]}
 		</span>
 	);

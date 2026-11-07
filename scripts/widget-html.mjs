@@ -17,24 +17,22 @@ const escapeForScript = (js) =>
 const escapeForStyle = (css) => css.replace(/<(\/style)/gi, "\\3C $1");
 
 // The registry's fonts.css names every face it ships (about 2 MB once inlined);
-// widgets get src/widgets/fonts.css, the faces they set, in its place.
-const WIDGET_FONTS = fileURLToPath(
-	new URL("../src/widgets/fonts.css", import.meta.url),
+// its `fonts-core` item is the subset a widget or page sets: Red Hat Round Text
+// 400 to 700 and Display 600 and 700. The `variables` item imports fonts.css,
+// so this swaps in fonts-core.css for that import.
+const FONTS_CORE = fileURLToPath(
+	new URL("../src/widgets/registry/styles/fonts-core.css", import.meta.url),
 );
-// The pages' cut: the widgets' faces and Red Hat Round Mono for code.
-const PAGE_FONTS = fileURLToPath(
-	new URL("../src/pages/fonts.css", import.meta.url),
-);
-const registryFontsPlugin = (subset) => ({
-	name: "registry-fonts-subset",
+const registryFontsPlugin = {
+	name: "registry-fonts-core",
 	setup(b) {
 		b.onResolve({ filter: /(^|\/)fonts\.css$/ }, (args) =>
 			args.resolveDir.endsWith("registry/styles")
-				? { path: subset }
+				? { path: FONTS_CORE }
 				: undefined,
 		);
 	},
-});
+};
 
 /** Bundle a widget entry. `html` is the document; `inputs` are the files it was built from. */
 export async function buildWidget(entry) {
@@ -55,7 +53,7 @@ export async function buildWidget(entry) {
 		jsx: "automatic",
 		jsxImportSource,
 		loader: { ".woff2": "dataurl", ".png": "dataurl" },
-		plugins: [registryFontsPlugin(WIDGET_FONTS)],
+		plugins: [registryFontsPlugin],
 		logLevel: "silent",
 	});
 	let js = "";
@@ -128,7 +126,7 @@ export async function buildCss(entry) {
 		metafile: true,
 		minify: true,
 		legalComments: "none",
-		plugins: [registryFontsPlugin(PAGE_FONTS), servedFontsPlugin],
+		plugins: [registryFontsPlugin, servedFontsPlugin],
 		logLevel: "silent",
 	});
 	const css = result.outputFiles.find((out) => out.path.endsWith(".css"));

@@ -22,9 +22,7 @@ const files = readdirSync(root, { recursive: true }).filter(
 );
 const read = (name: string) => readFileSync(new URL(name, root), "utf8");
 const registry = files.filter((name) => name.startsWith("registry/"));
-const widgets = files.filter(
-	(name) => !name.startsWith("registry/") && name !== "fonts.css",
-);
+const widgets = files.filter((name) => !name.startsWith("registry/"));
 
 const declared = (name: string) =>
 	[...read(name).matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1] ?? "");
@@ -60,12 +58,12 @@ describe("widget tokens are the registry's", () => {
 	});
 
 	// every widget mounts through ui/widget.tsx, which imports ui/styles.css and, through it,
-	// components.css, so their declarations reach all of them; any other file's reach only itself
+	// registry-ui.css, so their declarations reach all of them; any other file's reach only itself
 	it("reads only tokens the registry, the shared ui/styles.css or the same file declares", () => {
 		expect(read("ui/widget.tsx")).toContain('import "./styles.css";');
-		expect(read("ui/styles.css")).toContain('@import "../components.css";');
+		expect(read("ui/styles.css")).toContain('@import "../registry-ui.css";');
 		const shared = [
-			...declared("components.css"),
+			...declared("registry-ui.css"),
 			...declared("ui/styles.css"),
 		];
 		const unknown: string[] = [];
@@ -93,15 +91,17 @@ describe("widget tokens are the registry's", () => {
 });
 
 describe("fonts", () => {
-	it("cuts the registry's faces to files the registry ships", () => {
-		const cut = read("fonts.css");
-		const urls = [...cut.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1] ?? "");
+	it("serves every face the registry's fonts-core names, and no other", () => {
+		const urls = [
+			...read("registry/styles/fonts-core.css").matchAll(
+				/url\(\.\/fonts\/([^)]+)\)/g,
+			),
+		].map((m) => m[1] ?? "");
 		expect(urls.length).toBeGreaterThan(0);
-		const registryFonts = read("registry/styles/fonts.css");
-		for (const url of urls)
-			expect(registryFonts).toContain(
-				`url(./${url.replace("./registry/styles/", "")})`,
-			);
+		const served = [
+			...read("../pages/fonts.ts").matchAll(/"(RedHatRound[^"]+\.woff2)":/g),
+		].map((m) => m[1] ?? "");
+		expect(served.sort()).toEqual(urls.sort());
 	});
 });
 
@@ -109,16 +109,14 @@ describe("fonts", () => {
 const pageSheets = [
 	"../site/site.css",
 	"../connect/connect.css",
-	"../pages/fonts.css",
-	"components.css",
+	"registry-ui.css",
 ];
 
-// Registry gap, awaiting the design-system PM: these six are local to
-// components.css because the registry has no token for them yet. When it ships
+// Registry gap, awaiting the design-system PM: these five are local to
+// registry-ui.css because the registry has no token for them yet. When it ships
 // one, the "not in the registry" check below goes red; delete that entry then.
-const LOCAL_TO_COMPONENTS = [
+const LOCAL_TO_REGISTRY_UI = [
 	"--control-height",
-	"--field-size",
 	"--text-xs",
 	"--text-sm",
 	"--text-base",
@@ -126,11 +124,11 @@ const LOCAL_TO_COMPONENTS = [
 ];
 
 describe("page stylesheets use the registry's tokens", () => {
-	it("keeps the local allowlist to exactly what components.css declares and the registry lacks", () => {
-		expect([...new Set(declared("components.css"))].sort()).toEqual(
-			[...LOCAL_TO_COMPONENTS].sort(),
+	it("keeps the local allowlist to exactly what registry-ui.css declares and the registry lacks", () => {
+		expect([...new Set(declared("registry-ui.css"))].sort()).toEqual(
+			[...LOCAL_TO_REGISTRY_UI].sort(),
 		);
-		for (const token of LOCAL_TO_COMPONENTS)
+		for (const token of LOCAL_TO_REGISTRY_UI)
 			expect(registryTokens.has(token), `${token} is now in the registry`).toBe(
 				false,
 			);
@@ -148,7 +146,7 @@ describe("page stylesheets use the registry's tokens", () => {
 	it("reads only tokens the registry, the local allowlist or the same file declares", () => {
 		const unknown: string[] = [];
 		for (const name of pageSheets) {
-			const own = new Set([...LOCAL_TO_COMPONENTS, ...declared(name)]);
+			const own = new Set([...LOCAL_TO_REGISTRY_UI, ...declared(name)]);
 			for (const m of read(name).matchAll(/var\((--[a-z0-9-]+)/g)) {
 				const token = m[1] ?? "";
 				if (!registryTokens.has(token) && !own.has(token))

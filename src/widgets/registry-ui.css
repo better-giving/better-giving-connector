@@ -1,0 +1,32 @@
+/*
+ * The registry's plain-css components the widgets and the served pages share,
+ * over its variables (tokens.css): button, badge, card, field, checkbox and
+ * radio, all `ds-` classes, copied by `bg-design` and never edited here.
+ * What stays local is below: the type sizes the surfaces' own rules read and
+ * the touch height. The card's flush footer is `.card-foot` in ui/styles.css.
+ */
+@import "./tokens.css";
+@import "./registry/styles/button-css.css";
+@import "./registry/styles/badge-css.css";
+@import "./registry/styles/card-css.css";
+@import "./registry/styles/field-css.css";
+@import "./registry/styles/checkbox-css.css";
+@import "./registry/styles/radio-css.css";
+
+:root {
+	/* the registry's items keep their type ladder on their own classes (--ds-*), so the surfaces' rules read these */
+	--control-height: 36px;
+	--text-xs: 12px;
+	--text-sm: 14px;
+	--text-base: 16px;
+	--text-lg: 18px;
+}
+
+:root[data-touch] {
+	--control-height: 44px;
+}
+
+/* buttons grow to a thumb's target on touch */
+:root[data-touch] .ds-btn {
+	min-block-size: var(--control-height);
+}

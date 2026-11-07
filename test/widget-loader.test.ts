@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildCss } from "../scripts/widget-html.mjs";
+import { buildCss, buildWidget } from "../scripts/widget-html.mjs";
 import html from "./fixtures/widget/entry.tsx?widget";
 
 const count = (haystack: string, needle: RegExp) =>
@@ -93,5 +93,53 @@ describe("?css import", () => {
 		} finally {
 			rmSync(dir, { recursive: true });
 		}
+	});
+});
+
+// The registry's `variables` imports the full fonts.css (every face, about 2 MB
+// inlined); both builders swap in fonts-core.css, the subset a surface sets.
+describe("registry fonts", () => {
+	const root = join(__dirname, "..");
+	const faceFiles = (css: string) =>
+		[...css.matchAll(/RedHatRound[\w-]+\.woff2/g)].map((m) => m[0]).sort();
+	// the family each @font-face declares; a `--font-mono` token naming a family is not a face
+	const faceFamilies = (css: string) =>
+		[
+			...new Set(
+				[...css.matchAll(/@font-face\{font-family:([^;]+);/g)].map((m) => m[1]),
+			),
+		].sort();
+	const coreCss = readFileSync(
+		join(root, "src/widgets/registry/styles/fonts-core.css"),
+		"utf8",
+	);
+	const coreFaces = faceFiles(coreCss);
+	const coreFamilies = ["Red Hat Round Display", "Red Hat Round Text"];
+
+	it("bundles only the fonts-core faces into a widget document", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "widget-fonts-"));
+		const entry = join(dir, "entry.ts");
+		writeFileSync(
+			entry,
+			`import ${JSON.stringify(join(root, "src/widgets/tokens.css"))};`,
+		);
+		try {
+			const { html } = await buildWidget(entry);
+			const style = html.slice(
+				html.indexOf("<style>"),
+				html.indexOf("</style>"),
+			);
+			expect(count(style, /@font-face/g)).toBe(coreFaces.length);
+			expect(faceFamilies(style)).toEqual(coreFamilies);
+		} finally {
+			rmSync(dir, { recursive: true });
+		}
+	});
+
+	it("links only the fonts-core faces from a page stylesheet", async () => {
+		const { css } = await buildCss(join(root, "src/connect/connect.css"));
+		expect(coreFaces).toHaveLength(6);
+		expect(faceFiles(css)).toEqual(coreFaces);
+		expect(faceFamilies(css)).toEqual(coreFamilies);
 	});
 });

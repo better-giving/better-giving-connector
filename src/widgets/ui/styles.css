@@ -2,12 +2,17 @@
  * Widget chrome over the registry's tokens (tokens.css): its faces, corners,
  * colors and shadow. Nothing here is a raw color or a face of its own.
  */
-@import "../components.css";
+@import "../registry-ui.css";
 
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
+}
+
+/* the registry's components size in rem, so the root stays at the browser's 16px; the 14px is the body's */
+html {
+	font-size: 100%;
 }
 
 html,
@@ -16,9 +21,12 @@ body {
 	background: transparent;
 	color: var(--gray-12);
 	font-family: var(--font-body);
-	font-size: var(--text-sm);
 	line-height: 1.43;
 	-webkit-font-smoothing: antialiased;
+}
+
+body {
+	font-size: var(--text-sm);
 }
 
 h1,
@@ -67,53 +75,23 @@ h3 {
 	padding: 20px 24px;
 }
 
-/* the registry's card footer: the actions row on the well fill, a hairline above */
+/* the footer sits inside the body, so it runs flush to the card's edges; its look is the registry's .ds-card-footer */
 .card-foot {
-	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
 	margin: 0 -24px -20px;
-	padding: 16px 24px;
-	background: var(--panel);
-	border-top: 1px solid var(--hairline);
 }
 
-.btn-secondary {
-	background: var(--gray-3);
-	border-color: var(--gray-7);
-	color: var(--gray-12);
-}
-
-.btn-secondary:hover:not(:disabled) {
-	background: var(--gray-4);
-	border-color: var(--gray-8);
-}
-
-.btn-secondary:active:not(:disabled) {
-	background: var(--gray-5);
-}
-
-.btn-destructive {
-	background: var(--destructive);
-	color: var(--destructive-fg);
-}
-
-.btn-destructive:active:not(:disabled) {
-	background: var(--destructive-hover);
-	transform: translateY(1px);
-}
-
-.btn-destructive:hover:not(:disabled) {
-	background: var(--destructive-hover);
-}
-
-/* no registry variant: an outlined button in the destructive color */
+/* no registry variant: an outlined button in the destructive color, on .ds-btn */
 .btn-outline-destructive {
 	background: transparent;
-	border-color: var(--destructive);
+	border: 1px solid var(--destructive);
 	color: var(--destructive-subtle-fg);
+}
+
+.btn-outline-destructive:disabled {
+	background: var(--gray-3);
+	color: var(--gray-11);
 }
 
 .btn-outline-destructive:hover:not(:disabled) {
@@ -293,7 +271,7 @@ h3 {
 	font-weight: 600;
 }
 
-/* form controls: the registry's .label and .field-input */
+/* form controls: the registry's .ds-label and .ds-field-input */
 
 .field {
 	display: flex;

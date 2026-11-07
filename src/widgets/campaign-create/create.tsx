@@ -218,7 +218,7 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 						until you publish.
 					</p>
 				</div>
-				<span class="badge badge-warning">Draft</span>
+				<span class="ds-badge ds-badge-warning">Draft</span>
 			</div>
 			<RadioGroup
 				class="presets"
@@ -235,7 +235,7 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 			<p class="error-line" role="alert">
 				{error}
 			</p>
-			<div class="card-foot">
+			<div class="ds-card-footer card-foot">
 				<span class="summary">{summary}</span>
 				<div class="foot-actions">
 					<Button

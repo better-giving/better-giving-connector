@@ -479,7 +479,7 @@ test("the connect flow is light only", async () => {
 		/\/\*[\s\S]*?\*\//g,
 		"",
 	);
-	expect(own).toContain(".btn");
+	expect(own).toContain(".ds-btn");
 	expect(own).not.toMatch(/\.dark\b/);
 });
 

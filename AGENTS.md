@@ -50,9 +50,9 @@ Biome enforces the import walls:
 - `src/deployment/`: the `/connector/v1` client. It imports nothing from `src/db/`, `src/auth/`, or `src/mcp/`.
 - `src/connect/`: the connect-flow pages, server-rendered with hono/jsx, mounted at `/connect`. `connect.css` is its stylesheet, light only.
 - `src/site/`: the public pages; `site.css` is its stylesheet, and `page.tsx` sets the registry's `dark` class from the browser's scheme.
-- `src/pages/`: what the served pages (site and connect) share: `fonts.ts` serves the registry's faces at `/assets/fonts/*` and names the two preloaded ones; `fonts.css` is the pages' cut of the faces (the widgets' plus Red Hat Round Mono 400).
+- `src/pages/`: what the served pages (site and connect) share: `fonts.ts` serves the registry's `fonts-core` faces at `/assets/fonts/*` and names the preloaded ones.
 - `src/widgets/`: the MCP Apps widgets, browser code (`hono/jsx/dom`, DOM types) and the only place that imports `@modelcontextprotocol/ext-apps`. It imports nothing from `src/db/`, `src/auth/`, `src/mcp/`, `src/deployment/`, `src/connect/`, `src/site/`, `src/env.ts`, `src/log.ts`, or `src/secret.ts`; `src/format.ts` and `src/presets/` are the server files it shares, so they stay free of node and server imports. `src/widgets/html.ts` exposes each widget as one HTML document, which `src/mcp/` serves as a resource.
-- `src/widgets/components.css`: the registry's `.btn`, `.btn-primary`, `.card`, `.badge`, `.label` and `.field-input` in plain css over its variables, imported by `ui/styles.css` and by both page stylesheets. Token-only (`src/widgets/tokens.test.ts` checks it).
+- `src/widgets/registry-ui.css`: imports the registry's `button-css`, `badge-css`, `card-css`, `field-css`, `checkbox-css` and `radio-css` (the `ds-` classes), imported by `ui/styles.css` and by both page stylesheets. It adds only the type sizes the surfaces' rules read and the touch button height. Token-only (`src/widgets/tokens.test.ts` checks it).
 - `?widget`: `import html from "./x/index.tsx?widget"` is the entry bundled into a self-contained HTML string (`scripts/widget-html.mjs`). `import css from "./x.css?css"` is a page stylesheet bundled and minified into a string, its faces linked to `/assets/fonts/*` (`buildCss` in the same file). Three loaders resolve both queries: the esbuild plugin in `scripts/build.ts`, the vitest plugin in `vitest.config.ts`, and the node hook `scripts/widget-hook.mjs`, which `scripts/binary-register.mjs` registers for tsx (`pnpm dev`, `pnpm widget-shots`).
 - `src/presets/`: the campaign theme presets, shared by `src/mcp/` and `src/widgets/`.
 - `src/format.ts`: money and date formatting in the reader's locale, shared by `src/mcp/` and `src/widgets/`.
@@ -70,7 +70,7 @@ A deployment is reached only through its `/connector/v1`. `better-giving-oss` ow
 - No `@ts-ignore`, no focused tests, no floating promises (Biome).
 - No `!!` or `Boolean()` coercion (`lint/no-coerce-boolean.grit`).
 - No branching on stage or test env in `src/` (`lint/no-stage-branching.grit`): do not compare `NODE_ENV`, `VERCEL_ENV`, or `import.meta.env.MODE` to `"test"`, `"production"`, `"preview"`, or `"development"`. Inject the difference through config.
-- `src/widgets/registry/` is the Better Giving design registry's `variables` and `fonts` items, copied by `bg-design` (`bg-design.json` records them). Never hand-edit it; take a new version with the CLI's `update`. `src/widgets/tokens.css` imports it and `src/widgets/fonts.css` is the cut of its faces the widgets inline.
+- `src/widgets/registry/` is the Better Giving design registry's `variables`, `fonts-core` and component items, copied by `bg-design` (`bg-design.json` records them). Never hand-edit it; take a new version with the CLI's `update`. `src/widgets/tokens.css` imports it; the bundles swap its `fonts.css` import for `fonts-core.css` (`scripts/widget-html.mjs`).
 - Do not hand-edit `pnpm-lock.yaml`. `allowBuilds` in `pnpm-workspace.yaml` stays off for esbuild; the install uses the prebuilt binary.
 - A new schema is a new numbered file in `migrations/`. A shipped migration is left as it was.
 

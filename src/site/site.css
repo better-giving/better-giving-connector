@@ -5,7 +5,7 @@
  * registry's `dark` class on <html>, set from the browser's scheme by the
  * script in page.tsx; without it the page stays light.
  */
-@import "../widgets/components.css";
+@import "../widgets/registry-ui.css";
 
 *,
 *::before,
@@ -130,12 +130,7 @@ video {
 	background: var(--panel);
 }
 
-/* --primary is 3:1 against the light page; the registry's --ring takes over in dark, where it is the step that does */
 :focus-visible {
-	outline: 3px solid var(--primary);
+	outline: 3px solid var(--ring);
 	outline-offset: 2px;
-}
-
-:root.dark :focus-visible {
-	outline-color: var(--ring);
 }

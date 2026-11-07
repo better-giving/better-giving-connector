@@ -23,7 +23,7 @@ export function Button(props: {
 		<button
 			type="button"
 			id={props.id}
-			class={`btn btn-${props.variant}${props.class ? ` ${props.class}` : ""}`}
+			class={`ds-btn ${props.variant === "outline-destructive" ? "btn-outline-destructive" : `ds-btn-${props.variant}`}${props.class ? ` ${props.class}` : ""}`}
 			aria-label={props.label}
 			aria-busy={busy ? "true" : undefined}
 			disabled={busy || props.disabled === true}

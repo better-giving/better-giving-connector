@@ -10,7 +10,7 @@ export function Card(props: {
 }) {
 	return (
 		<article
-			class={props.class ? `card ${props.class}` : "card"}
+			class={props.class ? `ds-card card ${props.class}` : "ds-card card"}
 			aria-label={props.label}
 		>
 			{props.media}
