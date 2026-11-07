@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import { connections, type Db } from "../src/db";
+import { CONNECT_PRELOAD } from "../src/pages/fonts";
 import {
 	type FakeDeployment,
 	fakeDeployment,
@@ -32,6 +34,7 @@ import {
 	shown,
 	signedConnectCookie,
 } from "./operator";
+import { preloads, reachesOutside, styleOf } from "./pages";
 import { advance, freshDb, MINUTE } from "./support";
 
 let db: Db;
@@ -425,24 +428,68 @@ test("a read-only connect reaches /mcp with only read-only tools", async () => {
 	expect(readOnly).not.toContain(false);
 });
 
-test("the page's stylesheet reaches the browser unescaped and loads the platform's font", async () => {
+test("the page's stylesheet reaches the browser unescaped and sets the registry's faces", async () => {
 	const html = await (await call(new Request(`${BASE}/connect`))).text();
 
-	const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
-	expect(style).toContain('font-family:"Quicksand Variable"');
-	expect(style).toContain("src:url(/connect/assets/quicksand.woff2)");
+	const style = styleOf(html);
+	expect(style).toContain('"Red Hat Round Text"');
+	expect(style).toContain("url(/assets/fonts/RedHatRoundText-Regular.woff2)");
 	expect(style).toContain("font-display:swap");
 	expect(style).not.toContain("&quot;");
+	expect(style).not.toContain("Quicksand");
 });
 
-test.each([
-	["/connect/assets/logo.png", "image/png"],
-	["/connect/assets/quicksand.woff2", "font/woff2"],
-])("%s is served as %s", async (path, type) => {
-	const res = await call(new Request(new URL(path, BASE)));
+test("the page preloads its above-the-fold faces and loads no other origin", async () => {
+	const html = await (await call(new Request(`${BASE}/connect`))).text();
+
+	expect(preloads(html)).toEqual(
+		CONNECT_PRELOAD.map((href) => ({
+			href,
+			as: "font",
+			type: "font/woff2",
+			crossorigin: true,
+		})),
+	);
+	for (const { href } of preloads(html)) {
+		const res = await call(new Request(`${BASE}${href}`));
+		expect(res.status, href).toBe(200);
+		expect(res.headers.get("content-type"), href).toBe("font/woff2");
+	}
+	expect(html).not.toMatch(/<(link|script|img)\b[^>]*(src|href)="https?:/);
+	expect(html).not.toContain("<script");
+});
+
+test("the page's stylesheet asks nothing of another origin", async () => {
+	const html = await (await call(new Request(`${BASE}/connect`))).text();
+	const style = styleOf(html);
+
+	expect(style).toContain("url(/assets/fonts/");
+	expect(reachesOutside(style)).toBeUndefined();
+});
+
+test("the connect flow is light only", async () => {
+	const html = await (await call(new Request(`${BASE}/connect`))).text();
+
+	expect(html).not.toContain("prefers-color-scheme");
+	expect(html).not.toContain("classList");
+	// no script can add the class, and the page's own rules never answer to it
+	// (the built sheet carries the registry's :root.dark variables, so read the source)
+	expect(html).not.toContain("<script");
+	const own = readFileSync("src/connect/connect.css", "utf8").replace(
+		/\/\*[\s\S]*?\*\//g,
+		"",
+	);
+	expect(own).toContain(".btn");
+	expect(own).not.toMatch(/\.dark\b/);
+});
+
+test("/connect/assets/logo.png is served as image/png", async () => {
+	const res = await call(
+		new Request(new URL("/connect/assets/logo.png", BASE)),
+	);
 
 	expect(res.status).toBe(200);
-	expect(res.headers.get("content-type")).toBe(type);
+	expect(res.headers.get("content-type")).toBe("image/png");
 	expect(res.headers.get("x-content-type-options")).toBe("nosniff");
 	expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
 	expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);

@@ -1,0 +1,73 @@
+/*
+ * The connect flow over the Better Giving design registry (widgets/tokens.css):
+ * Red Hat Round, its light colors, one solo card. Light only: the page never
+ * takes the registry's `dark` class. The focus ring is
+ * --primary, not the registry's --ring (accent-8): that is under WCAG's 3:1 for
+ * non-text against the page.
+ */
+@import "../widgets/components.css";
+
+/* the registry's touch height (components.css): the one button is a thumb's target */
+:root {
+	--control-height: 44px;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font: 400 1rem / 1.5 var(--font-body);
+	color: var(--gray-12);
+	background: var(--background);
+}
+
+main {
+	display: grid;
+	justify-items: center;
+	padding: 2.5rem 1rem;
+}
+
+.card {
+	display: grid;
+	justify-items: center;
+	width: 100%;
+	max-width: 28rem;
+	padding: 1.75rem 1.5rem;
+	text-align: center;
+}
+
+.logo {
+	display: block;
+	width: 4rem;
+	height: 4rem;
+	border-radius: 50%;
+	background: var(--secondary);
+}
+
+h1 {
+	font: 700 1.5rem / 1.333 var(--font-display);
+	margin: 1.25rem 0 0;
+}
+
+p {
+	margin: 0.75rem 0 0;
+	line-height: 1.625;
+}
+
+form {
+	width: 100%;
+	margin-top: 1.5rem;
+}
+
+form .btn {
+	width: 100%;
+}
+
+:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}

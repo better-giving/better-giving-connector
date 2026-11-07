@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import {
@@ -11,9 +12,11 @@ import type { Db } from "../src/db";
 import { PLATFORM_ORIGIN } from "../src/deployment/origin";
 import { ACTIONS } from "../src/mcp/actions";
 import { LOCAL_TOOLS } from "../src/mcp/local";
+import { SITE_PRELOAD } from "../src/pages/fonts";
 import { fakeDeployment } from "./fake-deployment";
 import { BASE, env, warmUp } from "./harness";
 import type { Call } from "./oauth";
+import { preloads, reachesOutside, stripStyle, styleOf } from "./pages";
 import { freshDb } from "./support";
 
 let db: Db;
@@ -54,6 +57,168 @@ test.each(["/privacy", "/terms", "/docs", "/support"])(
 	},
 );
 
+test.each(["/privacy", "/terms", "/docs", "/support"])(
+	"%s is set in the registry's faces and colors, from this origin",
+	async (path) => {
+		const html = await (await get(path)).text();
+		const css = styleOf(html);
+
+		expect(css).toMatch(/font:[^;}]*var\(--font-body\)/);
+		expect(css).toContain('"Red Hat Round Text"');
+		expect(css).toMatch(/var\(--primary\)/);
+		expect(css).not.toContain("system-ui");
+		expect(css).not.toContain("prefers-color-scheme");
+		expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+		// no third-party request: a page loads nothing from another origin
+		expect(html).not.toMatch(
+			/<(link|script|img|video|source|track)\b[^>]*(src|href)="https?:/,
+		);
+		expect(reachesOutside(css)).toBeUndefined();
+		expect(preloads(html)).toEqual(
+			SITE_PRELOAD.map((href) => ({
+				href,
+				as: "font",
+				type: "font/woff2",
+				crossorigin: true,
+			})),
+		);
+	},
+);
+
+// Runs the page's inline script against a stub browser: a media query whose
+// match the test flips, and the <html> class list.
+function runDarkScript(script: string, matches: boolean) {
+	const classes = new Set<string>();
+	const listeners: Array<() => void> = [];
+	const query = {
+		matches,
+		addEventListener: (type: string, fn: () => void) => {
+			if (type === "change") listeners.push(fn);
+		},
+	};
+	let asked = "";
+	const documentElement = {
+		classList: {
+			toggle: (name: string, force: boolean) => {
+				if (force) classes.add(name);
+				else classes.delete(name);
+				return force;
+			},
+		},
+	};
+	new Function("matchMedia", "document", script)(
+		(q: string) => {
+			asked = q;
+			return query;
+		},
+		{ documentElement },
+	);
+	return {
+		classes,
+		asked: () => asked,
+		change(next: boolean) {
+			query.matches = next;
+			for (const fn of listeners) fn();
+		},
+	};
+}
+
+const inlineScript = (html: string) =>
+	html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? "";
+
+test("the site sets the registry's dark class from the browser's scheme and follows changes", async () => {
+	const script = inlineScript(await (await get("/docs")).text());
+
+	const dark = runDarkScript(script, true);
+	expect(dark.asked()).toBe("(prefers-color-scheme: dark)");
+	expect([...dark.classes]).toEqual(["dark"]);
+	dark.change(false);
+	expect([...dark.classes]).toEqual([]);
+	dark.change(true);
+	expect([...dark.classes]).toEqual(["dark"]);
+
+	const light = runDarkScript(script, false);
+	expect([...light.classes]).toEqual([]);
+	light.change(true);
+	expect([...light.classes]).toEqual(["dark"]);
+});
+
+test.each(["/privacy", "/terms", "/docs", "/support"])(
+	"%s runs the dark script before the stylesheet, so first paint has the class",
+	async (path) => {
+		const html = await (await get(path)).text();
+		const tag = html.match(/<script\b[^>]*>/)?.[0];
+
+		// a blocking classic script: defer, async or type=module would run it after paint
+		expect(tag).toBe("<script>");
+		expect(html.indexOf("<script>")).toBeGreaterThan(html.indexOf("<head>"));
+		expect(html.indexOf("<script>")).toBeLessThan(html.indexOf("<style>"));
+		expect(html.indexOf("<script>")).toBeLessThan(html.indexOf("<body>"));
+	},
+);
+
+test("the page is readable without the script, and its own rules answer to .dark", async () => {
+	const css = styleOf(await (await get("/docs")).text());
+
+	// light is the registry's base
+	expect(css).toContain("var(--background)");
+	// the registry's variables carry a :root.dark block of their own, so the
+	// page's rule is read from the source: it is the one that is not a variable set
+	const own = readFileSync("src/site/site.css", "utf8").replace(
+		/\/\*[\s\S]*?\*\//g,
+		"",
+	);
+	expect(own).toMatch(/:root\.dark[^{]*\{/);
+});
+
+test("every face a page's stylesheet names is served as a font", async () => {
+	const html = await (await get("/docs")).text();
+	const urls = [
+		...new Set(
+			[...styleOf(html).matchAll(/url\((\/assets\/fonts\/[^)]+)\)/g)].map(
+				(m) => m[1] ?? "",
+			),
+		),
+	];
+
+	// the stylesheet names every face the route serves, not a subset
+	const served = [...new Set(preloads(html).map((p) => p.href))];
+	expect(urls.length).toBeGreaterThan(served.length);
+	for (const href of served) expect(urls).toContain(href);
+	for (const url of urls) {
+		const res = await get(url);
+		expect(res.status, url).toBe(200);
+		expect(res.headers.get("content-type")).toBe("font/woff2");
+		expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+		expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+		expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);
+	}
+});
+
+test.each(["/privacy", "/terms", "/docs", "/support"])(
+	"%s preloads fonts that the route serves as woff2",
+	async (path) => {
+		for (const { href } of preloads(await (await get(path)).text())) {
+			const res = await get(href);
+			expect(res.status, href).toBe(200);
+			expect(res.headers.get("content-type"), href).toBe("font/woff2");
+			expect((await res.arrayBuffer()).byteLength, href).toBeGreaterThan(0);
+		}
+	},
+);
+
+test.each([
+	"/assets/fonts/constructor",
+	"/assets/fonts/__proto__",
+	"/assets/fonts/toString",
+	"/assets/fonts/Missing.woff2",
+	"/assets/fonts/..%2fRedHatRoundText-Regular.woff2",
+	"/assets/fonts/%2e%2e%2fRedHatRoundText-Regular.woff2",
+	"/assets/fonts/RedHatRoundText-Regular.woff2/",
+])("%s is not a font", async (path) => {
+	expect((await get(path)).status).toBe(404);
+});
+
 test("privacy and terms use the filled wording and the version", async () => {
 	const privacy = await (await get("/privacy")).text();
 	const terms = await (await get("/terms")).text();
@@ -74,6 +239,8 @@ test("privacy and terms use the filled wording and the version", async () => {
 	expect(both).not.toContain("[DATA PROCESSING TERMS");
 	expect(both).not.toContain("Data Privacy Framework");
 	expect(both).not.toContain('class="placeholder"');
+	// privacy says "placeholder email address" on purpose; support has no such wording
+	expect(stripStyle(support)).not.toMatch(/placeholder/i);
 
 	expect(REFRESH_TOKEN_EXPIRES_IN).toBe(60 * 60 * 24 * 90);
 	expect(ACCESS_TOKEN_EXPIRES_IN).toBe(60 * 60);
@@ -260,7 +427,7 @@ test("docs and support describe the connector and name the support address", asy
 	expect(docs).toContain("moves no money");
 	expect(docs).toContain("Better Giving logo");
 	expect(docs).toContain('rel="icon" href="/icon.svg"');
-	expect(docs).not.toMatch(/placeholder/i);
+	expect(stripStyle(docs)).not.toMatch(/placeholder/i);
 	expect(docs).not.toMatch(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
 	expect(support).toContain("support@better.giving");
 	expect(support).toContain("security@better.giving");
