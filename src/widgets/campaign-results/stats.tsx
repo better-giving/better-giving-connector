@@ -59,7 +59,7 @@ export function Facts(props: { data: CampaignResultsData }) {
 		<dl class="facts">
 			<div class="fact">
 				<dt>Donors</dt>
-				<dd>{count.format(data.donors)}</dd>
+				<dd class="fact-figure">{count.format(data.donors)}</dd>
 				<dd class="fact-sub">
 					{count.format(data.giftCount)}{" "}
 					{data.giftCount === 1 ? "gift" : "gifts"}
@@ -67,7 +67,9 @@ export function Facts(props: { data: CampaignResultsData }) {
 			</div>
 			<div class="fact">
 				<dt>Average gift</dt>
-				<dd>{data.averageGift ? money(data.averageGift) : "No gifts yet"}</dd>
+				<dd class="fact-figure">
+					{data.averageGift ? money(data.averageGift) : "No gifts yet"}
+				</dd>
 				{data.medianGift && (
 					<dd class="fact-sub">Median {money(data.medianGift)}</dd>
 				)}
@@ -76,9 +78,13 @@ export function Facts(props: { data: CampaignResultsData }) {
 				<div class="fact fact-trend">
 					<dt>Last 7 days</dt>
 					<dd class="fact-line">
-						<span>{money(week.last)}</span>
+						<span class="fact-figure">{money(week.last)}</span>
 						{change !== null && change !== 0 && (
-							<span class={change > 0 ? "pill pill-up" : "pill pill-down"}>
+							<span
+								class={
+									change > 0 ? "badge badge-success" : "badge badge-warning"
+								}
+							>
 								<span aria-hidden="true">{change > 0 ? "↗" : "↘"}</span>{" "}
 								{change > 0 ? "Up" : "Down"} {Math.abs(change)}%
 							</span>

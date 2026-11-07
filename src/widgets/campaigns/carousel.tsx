@@ -1,9 +1,9 @@
 /** @jsxImportSource hono/jsx/dom */
 import { useState } from "hono/jsx/dom";
 import type { CampaignCard, CampaignsData } from "../model";
+import { StatusBadge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
-import { StatusChip } from "../ui/chip";
 import { ImageWithPlaceholder } from "../ui/image";
 import { ProgressBar, percentOf } from "../ui/progress";
 import { EmptyState } from "../ui/states";
@@ -74,7 +74,7 @@ function CampaignTile(props: {
 							origins={props.imageOrigins}
 						/>
 						<span class="campaign-chip">
-							<StatusChip status={campaign.status} />
+							<StatusBadge status={campaign.status} />
 						</span>
 					</div>
 				}

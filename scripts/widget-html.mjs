@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 // Plain .mjs: the node loader hook (tsx's thread) imports this file directly.
@@ -14,6 +15,22 @@ const DEFAULT_JSX_SOURCE = "hono/jsx/dom";
 const escapeForScript = (js) =>
 	js.replace(/<(\/script|script|!--)/gi, "\\x3C$1");
 const escapeForStyle = (css) => css.replace(/<(\/style)/gi, "\\3C $1");
+
+// The registry's fonts.css names every face it ships (about 2 MB once inlined);
+// widgets get src/widgets/fonts.css, the faces they set, in its place.
+const FONT_SUBSET = fileURLToPath(
+	new URL("../src/widgets/fonts.css", import.meta.url),
+);
+const registryFontsPlugin = {
+	name: "registry-fonts-subset",
+	setup(b) {
+		b.onResolve({ filter: /(^|\/)fonts\.css$/ }, (args) =>
+			args.resolveDir.endsWith("registry/styles")
+				? { path: FONT_SUBSET }
+				: undefined,
+		);
+	},
+};
 
 /** Bundle a widget entry. `html` is the document; `inputs` are the files it was built from. */
 export async function buildWidget(entry) {
@@ -34,6 +51,7 @@ export async function buildWidget(entry) {
 		jsx: "automatic",
 		jsxImportSource,
 		loader: { ".woff2": "dataurl", ".png": "dataurl" },
+		plugins: [registryFontsPlugin],
 		logLevel: "silent",
 	});
 	let js = "";

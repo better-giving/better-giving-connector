@@ -5,13 +5,62 @@ import { startHost as start } from "./test-dom";
 
 afterEach(() => {
 	delete document.documentElement.dataset.theme;
+	document.documentElement.classList.remove("dark");
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
+
+// happy-dom's URL rejects file: URLs, so read by path from the repo root (as test-dom.ts does)
+const { process: nodeProcess } = globalThis as unknown as {
+	process: {
+		cwd(): string;
+		getBuiltinModule(id: "node:fs"): {
+			readFileSync(path: string, encoding: "utf8"): string;
+		};
+	};
+};
+const registryTheme = nodeProcess
+	.getBuiltinModule("node:fs")
+	.readFileSync(
+		`${nodeProcess.cwd()}/src/widgets/registry/styles/themes/default.css`,
+		"utf8",
+	);
+
+/** A browser whose colour scheme the test flips; `change` listeners really fire. */
+function stubBrowser(initiallyDark: boolean) {
+	let dark = initiallyDark;
+	const listeners = new Set<() => void>();
+	const query = {
+		get matches() {
+			return dark;
+		},
+		addEventListener(type: string, listener: () => void) {
+			if (type === "change") listeners.add(listener);
+		},
+	};
+	vi.stubGlobal("matchMedia", () => query);
+	return {
+		setDark(next: boolean) {
+			dark = next;
+			for (const listener of listeners) listener();
+		},
+	};
+}
+
+/** host.ts keeps one browser listener per module load, so each test loads it fresh. */
+async function freshStart(opts: Parameters<typeof start>[0] = {}) {
+	vi.resetModules();
+	const { startHost } = await import("./test-dom");
+	return startHost(opts);
+}
+
+const isDark = () => document.documentElement.classList.contains("dark");
 
 describe("host context", () => {
 	it("applies the bridge's theme to the document", async () => {
 		await start({ context: { theme: "dark" } });
 		expect(document.documentElement.dataset.theme).toBe("dark");
+		expect(document.documentElement.classList.contains("dark")).toBe(true);
 	});
 
 	it("follows a theme change from the host and tells subscribers", async () => {
@@ -21,6 +70,7 @@ describe("host context", () => {
 		await bridge.sendHostContextChange({ theme: "light" });
 		await vi.waitFor(() => expect(seen).toHaveBeenCalled());
 		expect(document.documentElement.dataset.theme).toBe("light");
+		expect(document.documentElement.classList.contains("dark")).toBe(false);
 		expect(host.context().theme).toBe("light");
 	});
 
@@ -69,6 +119,64 @@ describe("host context", () => {
 		expect(
 			document.documentElement.style.getPropertyValue("--border-radius-lg"),
 		).toBe("24px");
+	});
+});
+
+describe("theme and the browser", () => {
+	it("follows the browser's colour scheme at start, light or dark", async () => {
+		stubBrowser(false);
+		await freshStart({ context: {} });
+		expect(isDark()).toBe(false);
+
+		document.documentElement.classList.remove("dark");
+		stubBrowser(true);
+		await freshStart({ context: {} });
+		expect(isDark()).toBe(true);
+	});
+
+	it("follows the browser switching scheme mid-session, both ways", async () => {
+		const browser = stubBrowser(false);
+		await freshStart({ context: {} });
+		browser.setDark(true);
+		expect(isDark()).toBe(true);
+		browser.setDark(false);
+		expect(isDark()).toBe(false);
+	});
+
+	it("keeps a host's light theme when the browser is dark", async () => {
+		const browser = stubBrowser(true);
+		await freshStart({ context: { theme: "light" } });
+		expect(isDark()).toBe(false);
+		browser.setDark(false);
+		browser.setDark(true);
+		expect(isDark()).toBe(false);
+	});
+
+	it("keeps a host's dark theme when the browser is light", async () => {
+		const browser = stubBrowser(false);
+		await freshStart({ context: { theme: "dark" } });
+		expect(isDark()).toBe(true);
+		browser.setDark(true);
+		browser.setDark(false);
+		expect(isDark()).toBe(true);
+	});
+
+	it("returns to following the browser when the host drops its theme", async () => {
+		const browser = stubBrowser(true);
+		const { bridge } = await freshStart({ context: { theme: "light" } });
+		expect(isDark()).toBe(false);
+		await bridge.sendHostContextChange({ theme: undefined });
+		await vi.waitFor(() => expect(isDark()).toBe(true));
+		expect(document.documentElement.dataset.theme).toBeUndefined();
+		browser.setDark(false);
+		expect(isDark()).toBe(false);
+	});
+
+	it("sets the class the registry's theme turns dark on", async () => {
+		await freshStart({ context: { theme: "dark" } });
+		const [hook] = [...document.documentElement.classList];
+		expect(hook).toBeDefined();
+		expect(registryTheme).toContain(`:root.${hook}`);
 	});
 });
 

@@ -95,7 +95,7 @@ describe("photo card", () => {
 		it("shows the connected nonprofit with its initials and a Connected pill", async () => {
 			const { root } = await show(PHOTO);
 			expect(root.querySelector(".avatar")?.textContent).toBe("HF");
-			expect(root.querySelector(".connected-pill")?.textContent).toBe(
+			expect(root.querySelector(".badge-success")?.textContent).toBe(
 				"Connected",
 			);
 		});

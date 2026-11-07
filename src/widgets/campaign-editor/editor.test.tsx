@@ -4,7 +4,7 @@ import type { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR } from "../../../test/widget-host/fixtures";
 import { CampaignEditorData } from "../model";
-import { startHost } from "../test-dom";
+import { applyStyles, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignEditor } from "./editor";
 
@@ -185,5 +185,20 @@ describe("the campaign editor and the draft revision", () => {
 		});
 
 		expect(buttons(root)).not.toContain("Discard draft edits");
+	});
+});
+
+describe("campaign editor preview", () => {
+	it("sets its headings in the donor page's face, not the widget's", async () => {
+		applyStyles("ui/styles.css", "campaign-editor/editor.css");
+		const root = await show(EDITOR);
+		const preview = root.querySelector(".preview");
+		const face = getComputedStyle(preview as Element).fontFamily;
+		const headings = [...(preview?.querySelectorAll("h1, h2, h3") ?? [])].map(
+			(h) => getComputedStyle(h).fontFamily,
+		);
+		expect(face).toMatch(/^Quicksand/);
+		expect(headings.length).toBeGreaterThan(0);
+		expect(new Set(headings)).toEqual(new Set([face]));
 	});
 });

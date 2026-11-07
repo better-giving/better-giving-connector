@@ -49,7 +49,7 @@ describe("campaign carousel", () => {
 	it("caps an over-goal bar at full and still shows the real 123%", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
 		const gala = card(root, "Spring gala 2026");
-		expect(gala.querySelector(".chip")?.textContent).toBe("Ended");
+		expect(gala.querySelector(".badge")?.textContent).toBe("Ended");
 		expect(gala.querySelector(".campaign-amounts")?.textContent).toBe(
 			"$12,300 of $10,000123%",
 		);

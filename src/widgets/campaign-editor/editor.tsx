@@ -1,8 +1,8 @@
 /** @jsxImportSource hono/jsx/dom */
 import { useEffect, useState } from "hono/jsx/dom";
 import type { Block, CampaignEditorData, Page } from "../model";
+import { StatusBadge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { StatusChip } from "../ui/chip";
 import { useWidgetState } from "../ui/state";
 import { callTool } from "../ui/tools";
 import { useSession } from "../ui/widget";
@@ -201,8 +201,10 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 					Close
 				</Button>
 				<h2 class="editor-title">{campaign.title}</h2>
-				<StatusChip status={campaign.status} />
-				{data.pendingDraft && <span class="chip-draft">Draft edits</span>}
+				<StatusBadge status={campaign.status} />
+				{data.pendingDraft && (
+					<span class="badge badge-warning">Draft edits</span>
+				)}
 				<span class="editor-saved">{savedLine}</span>
 				<span class="editor-actions">
 					{data.pendingDraft && !ended && (
