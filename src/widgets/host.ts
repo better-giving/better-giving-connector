@@ -97,6 +97,30 @@ function canonicalLocale(tag: unknown): string | undefined {
 	}
 }
 
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+let followingBrowser = false;
+
+/**
+ * The registry's dark is the `dark` class on <html>. The host's theme sets it
+ * (and `data-theme`, which says which the host chose); with no host theme the
+ * class follows the browser, now and when the browser changes.
+ */
+function applyTheme(theme: Theme | undefined) {
+	const root = document.documentElement;
+	const browser = globalThis.matchMedia?.(DARK_QUERY);
+	if (theme) root.dataset.theme = theme;
+	else delete root.dataset.theme;
+	root.classList.toggle(
+		"dark",
+		theme ? theme === "dark" : browser?.matches === true,
+	);
+	if (followingBrowser || !browser) return;
+	followingBrowser = true;
+	browser.addEventListener("change", () => {
+		if (!root.dataset.theme) root.classList.toggle("dark", browser.matches);
+	});
+}
+
 function currentOpenAi(): OpenAiGlobals | undefined {
 	const openai = (globalThis as { openai?: OpenAiGlobals }).openai;
 	return typeof openai === "object" && openai !== null ? openai : undefined;
@@ -141,8 +165,7 @@ export async function connectHost(
 		};
 	};
 	const applyContext = () => {
-		const { theme } = context();
-		if (theme) document.documentElement.dataset.theme = theme;
+		applyTheme(context().theme);
 		const variables = bridgeContext().styles?.variables;
 		if (variables) applyHostStyleVariables(variables);
 	};
@@ -169,6 +192,8 @@ export async function connectHost(
 		});
 	}
 
+	// until the host answers, the document follows the browser
+	applyTheme(undefined);
 	await app.connect(options.transport);
 	applyContext();
 

@@ -18,7 +18,7 @@
 	scroll-snap-type: x mandatory;
 	scroll-padding-inline: 2px;
 	scrollbar-width: thin;
-	border-radius: var(--widget-radius);
+	border-radius: var(--radius-card);
 }
 
 .campaign-slot {
@@ -81,7 +81,7 @@
 	left: 8px;
 }
 
-.campaign-chip .chip {
+.campaign-chip .badge {
 	background: var(--surface);
 	box-shadow: 0 0 0 1px var(--border);
 }

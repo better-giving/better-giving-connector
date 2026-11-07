@@ -4,7 +4,7 @@ import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge
 import { describe, expect, it, vi } from "vitest";
 import { RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
-import { startHost } from "../test-dom";
+import { applyStyles, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignResults } from "./results";
 
@@ -114,5 +114,60 @@ describe("campaign results", () => {
 		await vi.waitFor(() =>
 			expect(document.activeElement).toBe(button(root, "End campaign")),
 		);
+	});
+});
+
+describe("campaign results type", () => {
+	const styled = async (data: CampaignResultsData) => {
+		applyStyles("ui/styles.css", "campaign-results/results.css");
+		return (await show(data)).root;
+	};
+	const weight = (el: Element) =>
+		({ normal: "400", bold: "700" })[getComputedStyle(el).fontWeight] ??
+		getComputedStyle(el).fontWeight;
+	const ownText = (el: Element) =>
+		[...el.childNodes].some(
+			(n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
+		);
+
+	it("sets display-face text only at the weights fonts.css cuts it to", async () => {
+		const root = await styled(RESULTS_LIVE);
+		const display = getComputedStyle(document.documentElement)
+			.getPropertyValue("--font-display")
+			.trim();
+		const offCut = [...root.querySelectorAll("*")]
+			.filter(
+				(el) =>
+					ownText(el) &&
+					getComputedStyle(el).fontFamily === display &&
+					!["600", "700"].includes(weight(el)),
+			)
+			.map((el) => `${el.className}: ${el.textContent?.trim()}`);
+		expect(display).toContain("Red Hat Round Display");
+		expect(offCut).toEqual([]);
+	});
+
+	it("sets the week-over-week badge in the face the status badge uses", async () => {
+		const root = await styled(RESULTS_LIVE);
+		const [status, trend] = [...root.querySelectorAll(".badge")];
+		expect(trend?.textContent).toMatch(/(Up|Down) \d+%/);
+		expect(getComputedStyle(trend as Element).fontFamily).toBe(
+			getComputedStyle(status as Element).fontFamily,
+		);
+	});
+
+	it("sizes the draft footer's gift select to the buttons beside it, labelled like a field", async () => {
+		const root = await styled({
+			...RESULTS_LIVE,
+			campaign: { ...RESULTS_LIVE.campaign, status: "draft", url: null },
+			programs: [{ id: "p-coats", name: "Coat fund" }],
+		});
+		const select = root.querySelector(".card-foot select");
+		const label = root.querySelector(`label[for="${select?.id}"]`);
+		const height = (el: Element | null) =>
+			getComputedStyle(el as Element).minHeight;
+		expect(height(select)).toBe(height(button(root, "Publish")));
+		expect(height(select)).not.toBe("");
+		expect(getComputedStyle(label as Element).fontWeight).toBe("500");
 	});
 });

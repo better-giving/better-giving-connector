@@ -1,0 +1,2 @@
+# byte-exact: bg-design.json hashes the bytes, so no EOL conversion on checkout
+src/widgets/registry/** -text

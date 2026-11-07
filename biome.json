@@ -12,7 +12,9 @@
 			"!lint/*.grit",
 			"!**/*.mp4",
 			"!.claude",
-			"!.mcp.json"
+			"!.mcp.json",
+			"!src/widgets/registry",
+			"!bg-design.json"
 		]
 	},
 	"formatter": {

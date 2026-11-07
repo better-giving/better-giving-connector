@@ -73,3 +73,29 @@ export async function startHost(
 	});
 	return { bridge, host };
 }
+
+// tsconfig.widgets.json gives src/widgets no node types; the suite runs on node,
+// from the repo root.
+const { process } = globalThis as unknown as {
+	process: {
+		cwd(): string;
+		getBuiltinModule(id: "node:fs"): {
+			readFileSync(path: string, encoding: "utf8"): string;
+		};
+	};
+};
+const { readFileSync } = process.getBuiltinModule("node:fs");
+
+const inlined = (path: string): string =>
+	readFileSync(path, "utf8").replace(/@import "([^"]+)";/g, (_, rel: string) =>
+		inlined(`${path.slice(0, path.lastIndexOf("/"))}/${rel}`),
+	);
+
+/** Puts sheets (paths under src/widgets) on the page in order, imports inlined as the ?widget bundle does. */
+export function applyStyles(...sheets: string[]) {
+	const style = document.createElement("style");
+	style.textContent = sheets
+		.map((sheet) => inlined(`${process.cwd()}/src/widgets/${sheet}`))
+		.join("\n");
+	document.head.replaceChildren(style);
+}

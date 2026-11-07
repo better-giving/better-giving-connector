@@ -2,10 +2,10 @@
 import type { Child } from "hono/jsx";
 import { useEffect, useId, useState } from "hono/jsx/dom";
 import type { CampaignResultsData } from "../model";
+import { StatusBadge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Check } from "../ui/check";
-import { StatusChip } from "../ui/chip";
 import { useWidgetState } from "../ui/state";
 import { DateText, useMoney } from "../ui/text";
 import { callTool } from "../ui/tools";
@@ -72,7 +72,7 @@ function Header(props: { data: CampaignResultsData; id: string }) {
 				</h2>
 				<p class="subtitle">{sub}</p>
 			</div>
-			<StatusChip status={campaign.status} />
+			<StatusBadge status={campaign.status} />
 		</div>
 	);
 }
@@ -197,12 +197,14 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 				</section>
 				{errorLine}
 				{statusLine}
-				<div class="foot">
+				<div class="card-foot">
 					<div class="gifts-go">
-						<label for={`${titleId}-gifts`}>Gifts go to:</label>
+						<label class="label" for={`${titleId}-gifts`}>
+							Gifts go to:
+						</label>
 						<select
 							id={`${titleId}-gifts`}
-							class="input"
+							class="field-input"
 							value={giftsGoTo}
 							onChange={(e: Event) =>
 								setGiftsGoTo((e.target as HTMLSelectElement).value)
@@ -257,7 +259,7 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 			{errorLine}
 			{statusLine}
 			{!ended && (
-				<div class="foot">
+				<div class="card-foot">
 					<Updated />
 					<div class="foot-actions">
 						{data.pendingDraft && (

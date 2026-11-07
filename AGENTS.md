@@ -19,6 +19,7 @@ Run from the repo root. These match `.github/workflows/ci.yml`:
 - Typecheck: `pnpm typecheck` (two `tsc --noEmit` projects: `tsconfig.json` for node code, `tsconfig.widgets.json` for `src/widgets/` and `test/fixtures/widget` with DOM types)
 - Test: `pnpm test` (`vitest run`). Hermetic: in-memory libSQL and a fake deployment. No env and no network.
 - Build: `pnpm build` (esbuild → `dist/index.js`)
+- Design registry sync: `pnpm design:check` (`scripts/design-check.sh`; CI runs the same script). It fetches `https://design.better.giving/registry/cli.mjs` into a temp directory and runs `node cli.mjs diff --check` from the repo root; it fails when a file under `src/widgets/registry/` differs from `bg-design.json`, and also when the fetch fails.
 - Bundle-load: with no environment, the bundle must throw the fail-closed env error and nothing else:
 
 ```bash
@@ -35,9 +36,8 @@ Also:
 - Live check: `pnpm test:live` runs `test/live/*.live.ts` against a real deployment (`vitest.live.config.ts`; `LIVE_ORIGIN` and `LIVE_CODE` from the environment or an ignored `.env.live`). Not part of CI.
 - ChatGPT package: `pnpm chatgpt:package` (`scripts/chatgpt-package.ts`; `test/chatgpt-package.test.ts` pins the entries' hashes)
 - Widget screenshots: `pnpm widget-shots` writes `docs/widget-screenshots/`. Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
-- Dark palette: `scripts/derive-dark-palette.ts` derives `src/widgets/tokens.css`'s dark half; its header says how to run it.
 
-Done means the CI checks above are all green: lint, typecheck, test, build, and bundle-load.
+Done means the CI checks above are all green: lint, typecheck, test, design registry sync (`pnpm design:check`), build, and bundle-load.
 
 ## Layout and boundaries
 
@@ -66,6 +66,7 @@ A deployment is reached only through its `/connector/v1`. `better-giving-oss` ow
 - No `@ts-ignore`, no focused tests, no floating promises (Biome).
 - No `!!` or `Boolean()` coercion (`lint/no-coerce-boolean.grit`).
 - No branching on stage or test env in `src/` (`lint/no-stage-branching.grit`): do not compare `NODE_ENV`, `VERCEL_ENV`, or `import.meta.env.MODE` to `"test"`, `"production"`, `"preview"`, or `"development"`. Inject the difference through config.
+- `src/widgets/registry/` is the Better Giving design registry's `variables` and `fonts` items, copied by `bg-design` (`bg-design.json` records them). Never hand-edit it; take a new version with the CLI's `update`. `src/widgets/tokens.css` imports it and `src/widgets/fonts.css` is the cut of its faces the widgets inline.
 - Do not hand-edit `pnpm-lock.yaml`. `allowBuilds` in `pnpm-workspace.yaml` stays off for esbuild; the install uses the prebuilt binary.
 - A new schema is a new numbered file in `migrations/`. A shipped migration is left as it was.
 

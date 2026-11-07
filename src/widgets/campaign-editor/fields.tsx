@@ -20,14 +20,16 @@ function Text(props: {
 	const id = useId();
 	const common = {
 		id,
-		class: "input",
+		class: "field-input",
 		value: props.value,
 		onInput: (e: Event) =>
 			props.onInput((e.target as HTMLInputElement | HTMLTextAreaElement).value),
 	};
 	return (
 		<div class="field">
-			<label for={id}>{props.label}</label>
+			<label class="label" for={id}>
+				{props.label}
+			</label>
 			{props.long ? (
 				<textarea rows={props.rows ?? 4} {...common} />
 			) : (
@@ -46,10 +48,12 @@ function NumberField(props: {
 	const id = useId();
 	return (
 		<div class="field">
-			<label for={id}>{props.label}</label>
+			<label class="label" for={id}>
+				{props.label}
+			</label>
 			<input
 				id={id}
-				class="input"
+				class="field-input"
 				type="number"
 				step={props.step}
 				value={props.value}

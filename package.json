@@ -17,6 +17,7 @@
 		"test:live": "vitest run --config vitest.live.config.ts",
 		"db:migrate": "tsx --env-file-if-exists=.env.local src/db/migrate-cli.ts",
 		"chatgpt:package": "tsx scripts/chatgpt-package.ts",
+		"design:check": "sh scripts/design-check.sh",
 		"widget-shots": "tsx scripts/widget-shots.ts"
 	},
 	"dependencies": {

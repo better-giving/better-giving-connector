@@ -57,7 +57,7 @@ function Account() {
 					</p>
 					<p class="account-label">Nonprofit</p>
 				</div>
-				<span class="connected-pill">Connected</span>
+				<span class="badge badge-success">Connected</span>
 			</div>
 			<div class="account-row">
 				<div class="account-who">
@@ -173,10 +173,12 @@ export function PhotoCard(props: { data: PhotoData }) {
 						16:9 on the donor page.
 					</p>
 					<div class="field">
-						<label for={altId}>Photo description (alt text)</label>
+						<label class="label" for={altId}>
+							Photo description (alt text)
+						</label>
 						<input
 							id={altId}
-							class="input"
+							class="field-input"
 							type="text"
 							value={alt}
 							onInput={(e: Event) =>
