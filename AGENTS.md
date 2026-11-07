@@ -31,10 +31,11 @@ echo "$out" | grep -q "Invalid environment:" || { echo "$out"; echo "dist/index.
 Also:
 
 - Format: `pnpm format <paths>` (paths are required; the script exits if you omit them)
-- Dev: `pnpm dev` (tsx watch; it also watches `src/widgets`, whose sources the `?widget` loader bundles outside node's module graph), with `.env.local` copied from `.env.example` (`TURSO_DATABASE_URL=file:local.db`, `PUBLIC_URL=http://localhost:3000`, and throwaway 32+ character secrets)
+- Dev: `pnpm dev` (tsx watch; it tracks the `?css` entries (`site.css`, `connect.css`) as modules, and `--include` adds `src/widgets` and `src/pages`, whose files the `?widget` and `?css` bundles pull in outside node's module graph), with `.env.local` copied from `.env.example` (`TURSO_DATABASE_URL=file:local.db`, `PUBLIC_URL=http://localhost:3000`, and throwaway 32+ character secrets)
 - Migrate: `pnpm db:migrate` against a local `file:` database
 - Live check: `pnpm test:live` runs `test/live/*.live.ts` against a real deployment (`vitest.live.config.ts`; `LIVE_ORIGIN` and `LIVE_CODE` from the environment or an ignored `.env.live`). Not part of CI.
 - ChatGPT package: `pnpm chatgpt:package` (`scripts/chatgpt-package.ts`; `test/chatgpt-package.test.ts` pins the entries' hashes)
+- Page screenshots: `pnpm surface-shots [outDir]` writes every site and connect page from `createApp` (default `docs/surface-screenshots/after`). Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
 - Widget screenshots: `pnpm widget-shots` writes `docs/widget-screenshots/`. Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
 
 Done means the CI checks above are all green: lint, typecheck, test, design registry sync (`pnpm design:check`), build, and bundle-load.
@@ -47,9 +48,12 @@ Biome enforces the import walls:
 - `src/auth/`: the only place that imports `better-auth` or `@better-auth/*`. OAuth sign-in for Claude and ChatGPT, including dynamic client registration. Routes under `/api/auth/*`.
 - `src/db/`: the only place that imports `@libsql/client`. Connection rows and the key cipher. Schema changes are new numbered files in `migrations/`.
 - `src/deployment/`: the `/connector/v1` client. It imports nothing from `src/db/`, `src/auth/`, or `src/mcp/`.
-- `src/connect/`: the connect-flow pages, server-rendered with hono/jsx, mounted at `/connect`.
+- `src/connect/`: the connect-flow pages, server-rendered with hono/jsx, mounted at `/connect`. `connect.css` is its stylesheet, light only.
+- `src/site/`: the public pages; `site.css` is its stylesheet, and `page.tsx` sets the registry's `dark` class from the browser's scheme.
+- `src/pages/`: what the served pages (site and connect) share: `fonts.ts` serves the registry's faces at `/assets/fonts/*` and names the two preloaded ones; `fonts.css` is the pages' cut of the faces (the widgets' plus Red Hat Round Mono 400).
 - `src/widgets/`: the MCP Apps widgets, browser code (`hono/jsx/dom`, DOM types) and the only place that imports `@modelcontextprotocol/ext-apps`. It imports nothing from `src/db/`, `src/auth/`, `src/mcp/`, `src/deployment/`, `src/connect/`, `src/site/`, `src/env.ts`, `src/log.ts`, or `src/secret.ts`; `src/format.ts` and `src/presets/` are the server files it shares, so they stay free of node and server imports. `src/widgets/html.ts` exposes each widget as one HTML document, which `src/mcp/` serves as a resource.
-- `?widget`: `import html from "./x/index.tsx?widget"` is the entry bundled into a self-contained HTML string (`scripts/widget-html.mjs`). Three loaders resolve it: the esbuild plugin in `scripts/build.ts`, the vitest plugin in `vitest.config.ts`, and the node hook `scripts/widget-hook.mjs`, which `scripts/binary-register.mjs` registers for tsx (`pnpm dev`, `pnpm widget-shots`).
+- `src/widgets/components.css`: the registry's `.btn`, `.btn-primary`, `.card`, `.badge`, `.label` and `.field-input` in plain css over its variables, imported by `ui/styles.css` and by both page stylesheets. Token-only (`src/widgets/tokens.test.ts` checks it).
+- `?widget`: `import html from "./x/index.tsx?widget"` is the entry bundled into a self-contained HTML string (`scripts/widget-html.mjs`). `import css from "./x.css?css"` is a page stylesheet bundled and minified into a string, its faces linked to `/assets/fonts/*` (`buildCss` in the same file). Three loaders resolve both queries: the esbuild plugin in `scripts/build.ts`, the vitest plugin in `vitest.config.ts`, and the node hook `scripts/widget-hook.mjs`, which `scripts/binary-register.mjs` registers for tsx (`pnpm dev`, `pnpm widget-shots`).
 - `src/presets/`: the campaign theme presets, shared by `src/mcp/` and `src/widgets/`.
 - `src/format.ts`: money and date formatting in the reader's locale, shared by `src/mcp/` and `src/widgets/`.
 - `src/log.ts`: the only place `console` is allowed. Each event is a closed set of fields (`kind`, and the fields that kind names). `errorName` is `err.name`, never a message.

@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { defineConfig, type Plugin } from "vitest/config";
 import {
+	buildCss,
 	buildWidget,
+	CSS_QUERY,
+	cssEntry,
 	moduleSource,
 	WIDGET_QUERY,
 	widgetEntry,
@@ -54,8 +57,35 @@ function widgetHtml(): Plugin {
 	};
 }
 
+const CSS_PREFIX = "\0css:";
+const CSS_SUFFIX = ".mjs";
+
+/** `./x.css?css` is the page's stylesheet, matching the esbuild plugin. */
+function pageCss(): Plugin {
+	return {
+		name: "page-css",
+		enforce: "pre",
+		resolveId(source, importer) {
+			if (!source.endsWith(CSS_QUERY)) return null;
+			const from = importer
+				? dirname(importer.split("?")[0] ?? importer)
+				: process.cwd();
+			// a `.css` id would reach vite's own stylesheet handling, which empties it
+			return CSS_PREFIX + cssEntry(source, from) + CSS_SUFFIX;
+		},
+		async load(id) {
+			if (!id.startsWith(CSS_PREFIX)) return null;
+			const { css, inputs } = await buildCss(
+				id.slice(CSS_PREFIX.length, -CSS_SUFFIX.length),
+			);
+			for (const input of inputs) this.addWatchFile(input);
+			return moduleSource(css);
+		},
+	};
+}
+
 export default defineConfig({
-	plugins: [binaryBytes(), widgetHtml()],
+	plugins: [binaryBytes(), widgetHtml(), pageCss()],
 	test: {
 		include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
 	},

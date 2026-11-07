@@ -18,8 +18,7 @@ import {
 import { type Origin, parseOrigin } from "../deployment/origin";
 import { type ConnectOutcome, type ConnectStep, log } from "../log";
 import logoPng from "./assets/logo.png";
-import quicksandWoff2 from "./assets/quicksand-latin-wght-normal.woff2";
-import { FONT_PATH, LOGO_PATH, MessagePage } from "./page";
+import { LOGO_PATH, MessagePage } from "./page";
 
 // Where a request ends short of Allow: the page's heading and its one line.
 const END = {
@@ -160,9 +159,6 @@ export function connectRoutes(deps: ConnectDeps): Hono<ConnectEnv> {
 
 	app.get(assetRoute(LOGO_PATH), (c) =>
 		c.body(logoPng, 200, assetHeaders("image/png")),
-	);
-	app.get(assetRoute(FONT_PATH), (c) =>
-		c.body(quicksandWoff2, 200, assetHeaders("font/woff2")),
 	);
 
 	app.get("/", async (c) => {

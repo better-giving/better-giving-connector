@@ -10,6 +10,7 @@ import type { Origin } from "./deployment/origin";
 import type { Env } from "./env";
 import { log } from "./log";
 import { mcpRoute } from "./mcp";
+import { fontRoutes } from "./pages/fonts";
 import { siteRoutes } from "./site";
 
 export type AppDeps = {
@@ -60,6 +61,7 @@ export function createApp(deps: AppDeps): Hono {
 			secret: deps.env.CRON_SECRET,
 		}),
 	);
+	app.route("/", fontRoutes());
 	app.route("/", siteRoutes({ challenge: deps.env.OPENAI_APPS_CHALLENGE }));
 	app.route(
 		"/mcp",

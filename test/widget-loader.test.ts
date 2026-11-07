@@ -1,6 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildCss } from "../scripts/widget-html.mjs";
 import html from "./fixtures/widget/entry.tsx?widget";
 
 const count = (haystack: string, needle: RegExp) =>
@@ -77,5 +80,18 @@ describe("?widget import through scripts/widget-hook.mjs", () => {
 		expect(run.stderr).toBe("");
 		expect(run.status).toBe(0);
 		expect(run.stdout).toBe(html);
+	});
+});
+
+describe("?css import", () => {
+	it("throws, naming the entry, when it yields no stylesheet", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "buildcss-"));
+		const entry = join(dir, "empty.css");
+		writeFileSync(entry, "");
+		try {
+			await expect(buildCss(entry)).rejects.toThrow(entry);
+		} finally {
+			rmSync(dir, { recursive: true });
+		}
 	});
 });

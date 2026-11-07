@@ -1,5 +1,11 @@
 import { build, type Plugin } from "esbuild";
-import { buildWidget, moduleSource, widgetEntry } from "./widget-html.mjs";
+import {
+	buildCss,
+	buildWidget,
+	cssEntry,
+	moduleSource,
+	widgetEntry,
+} from "./widget-html.mjs";
 
 /** `./x.tsx?widget` is the widget's HTML document, inlined as a string module. */
 const widgetHtmlPlugin: Plugin = {
@@ -20,6 +26,21 @@ const widgetHtmlPlugin: Plugin = {
 	},
 };
 
+/** `./x.css?css` is the page's stylesheet, inlined as a string module. */
+const pageCssPlugin: Plugin = {
+	name: "page-css",
+	setup(b) {
+		b.onResolve({ filter: /\?css$/ }, (args) => ({
+			path: cssEntry(args.path, args.resolveDir),
+			namespace: "page-css",
+		}));
+		b.onLoad({ filter: /.*/, namespace: "page-css" }, async (args) => {
+			const { css, inputs } = await buildCss(args.path);
+			return { contents: moduleSource(css), loader: "js", watchFiles: inputs };
+		});
+	},
+};
+
 await build({
 	entryPoints: ["src/index.ts"],
 	bundle: true,
@@ -29,5 +50,5 @@ await build({
 	packages: "external",
 	outfile: "dist/index.js",
 	loader: { ".mp4": "binary", ".png": "binary", ".woff2": "binary" },
-	plugins: [widgetHtmlPlugin],
+	plugins: [widgetHtmlPlugin, pageCssPlugin],
 });

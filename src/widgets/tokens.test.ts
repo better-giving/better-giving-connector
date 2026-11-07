@@ -59,11 +59,15 @@ describe("widget tokens are the registry's", () => {
 		}
 	});
 
-	// every widget mounts through ui/widget.tsx, which imports ui/styles.css, so its
-	// declarations reach all of them; any other file's declarations reach only itself
+	// every widget mounts through ui/widget.tsx, which imports ui/styles.css and, through it,
+	// components.css, so their declarations reach all of them; any other file's reach only itself
 	it("reads only tokens the registry, the shared ui/styles.css or the same file declares", () => {
 		expect(read("ui/widget.tsx")).toContain('import "./styles.css";');
-		const shared = declared("ui/styles.css");
+		expect(read("ui/styles.css")).toContain('@import "../components.css";');
+		const shared = [
+			...declared("components.css"),
+			...declared("ui/styles.css"),
+		];
 		const unknown: string[] = [];
 		for (const name of widgets) {
 			const own = new Set([...shared, ...declared(name)]);
@@ -98,5 +102,59 @@ describe("fonts", () => {
 			expect(registryFonts).toContain(
 				`url(./${url.replace("./registry/styles/", "")})`,
 			);
+	});
+});
+
+// The served pages' stylesheets and the components they share, outside src/widgets.
+const pageSheets = [
+	"../site/site.css",
+	"../connect/connect.css",
+	"../pages/fonts.css",
+	"components.css",
+];
+
+// Registry gap, awaiting the design-system PM: these six are local to
+// components.css because the registry has no token for them yet. When it ships
+// one, the "not in the registry" check below goes red; delete that entry then.
+const LOCAL_TO_COMPONENTS = [
+	"--control-height",
+	"--field-size",
+	"--text-xs",
+	"--text-sm",
+	"--text-base",
+	"--text-lg",
+];
+
+describe("page stylesheets use the registry's tokens", () => {
+	it("keeps the local allowlist to exactly what components.css declares and the registry lacks", () => {
+		expect([...new Set(declared("components.css"))].sort()).toEqual(
+			[...LOCAL_TO_COMPONENTS].sort(),
+		);
+		for (const token of LOCAL_TO_COMPONENTS)
+			expect(registryTokens.has(token), `${token} is now in the registry`).toBe(
+				false,
+			);
+	});
+
+	it("redeclares no registry token", () => {
+		for (const name of pageSheets)
+			for (const token of declared(name))
+				expect(
+					registryTokens.has(token),
+					`${name}: ${token} redeclares a registry token`,
+				).toBe(false);
+	});
+
+	it("reads only tokens the registry, the local allowlist or the same file declares", () => {
+		const unknown: string[] = [];
+		for (const name of pageSheets) {
+			const own = new Set([...LOCAL_TO_COMPONENTS, ...declared(name)]);
+			for (const m of read(name).matchAll(/var\((--[a-z0-9-]+)/g)) {
+				const token = m[1] ?? "";
+				if (!registryTokens.has(token) && !own.has(token))
+					unknown.push(`${name}: ${token}`);
+			}
+		}
+		expect(unknown).toEqual([]);
 	});
 });

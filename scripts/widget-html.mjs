@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
@@ -18,19 +18,23 @@ const escapeForStyle = (css) => css.replace(/<(\/style)/gi, "\\3C $1");
 
 // The registry's fonts.css names every face it ships (about 2 MB once inlined);
 // widgets get src/widgets/fonts.css, the faces they set, in its place.
-const FONT_SUBSET = fileURLToPath(
+const WIDGET_FONTS = fileURLToPath(
 	new URL("../src/widgets/fonts.css", import.meta.url),
 );
-const registryFontsPlugin = {
+// The pages' cut: the widgets' faces and Red Hat Round Mono for code.
+const PAGE_FONTS = fileURLToPath(
+	new URL("../src/pages/fonts.css", import.meta.url),
+);
+const registryFontsPlugin = (subset) => ({
 	name: "registry-fonts-subset",
 	setup(b) {
 		b.onResolve({ filter: /(^|\/)fonts\.css$/ }, (args) =>
 			args.resolveDir.endsWith("registry/styles")
-				? { path: FONT_SUBSET }
+				? { path: subset }
 				: undefined,
 		);
 	},
-};
+});
 
 /** Bundle a widget entry. `html` is the document; `inputs` are the files it was built from. */
 export async function buildWidget(entry) {
@@ -51,7 +55,7 @@ export async function buildWidget(entry) {
 		jsx: "automatic",
 		jsxImportSource,
 		loader: { ".woff2": "dataurl", ".png": "dataurl" },
-		plugins: [registryFontsPlugin],
+		plugins: [registryFontsPlugin(WIDGET_FONTS)],
 		logLevel: "silent",
 	});
 	let js = "";
@@ -95,4 +99,47 @@ export function widgetEntry(specifier, importerDir) {
 
 export function moduleSource(html) {
 	return `export default ${JSON.stringify(html)};\n`;
+}
+
+export const CSS_QUERY = "?css";
+
+/** Where src/pages/fonts.ts serves the faces a page's stylesheet names. */
+export const PAGE_FONT_DIR = "/assets/fonts";
+
+// A served page links its faces instead of inlining them: each url() becomes a
+// route on this service and the file stays out of the stylesheet.
+const servedFontsPlugin = {
+	name: "served-fonts",
+	setup(b) {
+		b.onResolve({ filter: /\.woff2$/ }, (args) => ({
+			path: `${PAGE_FONT_DIR}/${basename(args.path)}`,
+			external: true,
+		}));
+	},
+};
+
+/** Bundle a page's stylesheet: the registry's tokens, minified, faces by route. */
+export async function buildCss(entry) {
+	const result = await build({
+		entryPoints: [resolve(entry)],
+		bundle: true,
+		write: false,
+		outdir: "css-out",
+		metafile: true,
+		minify: true,
+		legalComments: "none",
+		plugins: [registryFontsPlugin(PAGE_FONTS), servedFontsPlugin],
+		logLevel: "silent",
+	});
+	const css = result.outputFiles.find((out) => out.path.endsWith(".css"));
+	const inputs = Object.keys(result.metafile.inputs)
+		.filter((input) => !input.startsWith("node_modules"))
+		.map((input) => resolve(input));
+	if (!css?.text) throw new Error(`${entry} produced no stylesheet`);
+	return { css: css.text, inputs };
+}
+
+/** `./x.css?css` imported from `importerDir` → the stylesheet's absolute path. */
+export function cssEntry(specifier, importerDir) {
+	return resolve(importerDir, specifier.slice(0, -CSS_QUERY.length));
 }
