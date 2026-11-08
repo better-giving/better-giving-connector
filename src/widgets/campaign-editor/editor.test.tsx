@@ -212,7 +212,13 @@ describe("campaign editor row buttons", () => {
 		applyStyles("ui/styles.css", "campaign-editor/editor.css");
 		const root = await show(EDITOR, () => answer(EDITOR), context);
 		const found = [...root.querySelectorAll(".outline .icon-btn")];
-		expect(found.length).toBeGreaterThan(0);
+		const row = root.querySelector(".outline-item");
+		const name = row?.querySelector(".outline-label")?.textContent;
+		expect(
+			[...(row?.querySelectorAll(".icon-btn") ?? [])].map((b) =>
+				b.getAttribute("aria-label"),
+			),
+		).toEqual([`Move ${name} up`, `Move ${name} down`, `Remove ${name}`]);
 		await vi.waitFor(() =>
 			expect(document.documentElement.hasAttribute("data-touch")).toBe(
 				context.deviceCapabilities?.touch === true,
