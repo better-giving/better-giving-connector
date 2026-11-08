@@ -224,9 +224,9 @@ describe("campaign photo status chip", () => {
 		const chip = all.filter((r) => r.path.includes(".campaign-chip"));
 
 		// liveness: the edge rule is read, and the walk reaches nested at-rules
-		expect(chip.find((r) => r.path === ".campaign-chip .ds-badge")?.body).toMatch(
-			/box-shadow:/,
-		);
+		expect(
+			chip.find((r) => r.path === ".campaign-chip .ds-badge")?.body,
+		).toMatch(/box-shadow:/);
 		expect(all.some((r) => r.path.startsWith("@"))).toBe(true);
 
 		expect(
