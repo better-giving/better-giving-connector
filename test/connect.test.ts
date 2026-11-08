@@ -490,8 +490,7 @@ const connectSource = () =>
 	);
 
 test("the connect flow draws its focus ring with the registry's --ring, not --primary", () => {
-	const rule =
-		connectSource().match(/:focus-visible\s*\{([^}]*)\}/)?.[1] ?? "";
+	const rule = connectSource().match(/:focus-visible\s*\{([^}]*)\}/)?.[1] ?? "";
 
 	expect(rule).toMatch(/outline:[^;]*var\(--ring\)/);
 	expect(rule).not.toContain("var(--primary)");
