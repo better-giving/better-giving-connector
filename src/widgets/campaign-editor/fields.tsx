@@ -259,7 +259,7 @@ export function ContentFields(props: {
 						<div key={`${tier.amountMinor}-${i}`} class="tier">
 							<NumberField
 								label={`Amount ${i + 1} (${props.currency})`}
-								step="any"
+								step={factor === 1 ? "1" : "any"}
 								value={tier.amountMinor / factor}
 								onInput={(n) => {
 									const minor = Math.round(n * factor);
