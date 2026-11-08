@@ -17,9 +17,8 @@ const escapeForScript = (js) =>
 const escapeForStyle = (css) => css.replace(/<(\/style)/gi, "\\3C $1");
 
 // The registry's fonts.css names every face it ships (about 2 MB once inlined);
-// its `fonts-core` item is the subset a widget or page sets: Red Hat Round Text
-// 400 to 700 and Display 600 and 700. The `variables` item imports fonts.css,
-// so this swaps in fonts-core.css for that import.
+// its `fonts-core` item is the subset a widget or page sets. The `variables`
+// item imports fonts.css, so this swaps in fonts-core.css for that import.
 const FONTS_CORE = fileURLToPath(
 	new URL("../src/widgets/registry/styles/fonts-core.css", import.meta.url),
 );

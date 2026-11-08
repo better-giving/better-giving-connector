@@ -75,7 +75,7 @@ h3 {
 	padding: 20px 24px;
 }
 
-/* the footer sits inside the body, so it runs flush to the card's edges; its look is the registry's .ds-card-footer */
+/* the footer sits inside .card-body, so its negative margins run it flush to the card's edges; its look is the registry's .ds-card-footer */
 .card-foot {
 	flex-wrap: wrap;
 	justify-content: space-between;

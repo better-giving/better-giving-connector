@@ -70,7 +70,7 @@ A deployment is reached only through its `/connector/v1`. `better-giving-oss` ow
 - No `@ts-ignore`, no focused tests, no floating promises (Biome).
 - No `!!` or `Boolean()` coercion (`lint/no-coerce-boolean.grit`).
 - No branching on stage or test env in `src/` (`lint/no-stage-branching.grit`): do not compare `NODE_ENV`, `VERCEL_ENV`, or `import.meta.env.MODE` to `"test"`, `"production"`, `"preview"`, or `"development"`. Inject the difference through config.
-- `src/widgets/registry/` is the Better Giving design registry's `variables`, `fonts-core` and component items, copied by `bg-design` (`bg-design.json` records them). Never hand-edit it; take a new version with the CLI's `update`. `src/widgets/tokens.css` imports it; the bundles swap its `fonts.css` import for `fonts-core.css` (`scripts/widget-html.mjs`).
+- `src/widgets/registry/` is the Better Giving design registry's `variables`, `fonts`, `fonts-core` and component items, copied by `bg-design` (`bg-design.json` records them). Never hand-edit it; take a new version with the CLI's `update`. `src/widgets/tokens.css` imports `variables`, whose `variables.css` imports the `fonts` item's `fonts.css`; the bundles swap that import for `fonts-core.css` (`scripts/widget-html.mjs`).
 - Do not hand-edit `pnpm-lock.yaml`. `allowBuilds` in `pnpm-workspace.yaml` stays off for esbuild; the install uses the prebuilt binary.
 - A new schema is a new numbered file in `migrations/`. A shipped migration is left as it was.
 

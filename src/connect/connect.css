@@ -1,7 +1,7 @@
 /*
  * The connect flow over the Better Giving design registry (widgets/tokens.css):
  * Red Hat Round, its light colors, one solo card. Light only: the page never
- * takes the registry's `dark` class. The focus ring is the registry's --ring.
+ * takes the registry's `dark` class.
  */
 @import "../widgets/registry-ui.css";
 

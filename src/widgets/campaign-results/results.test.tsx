@@ -190,7 +190,7 @@ describe("campaign results type", () => {
 		const label = root.querySelector(`label[for="${select?.id}"]`);
 		const publish = button(root, "Publish");
 		expect(publish.className).toContain("ds-btn");
-		// the select's min-height must be the Publish button's own height, not a copy of it
+		// expected from the Publish button's own computed height, not a hardcoded 36px
 		expect(getComputedStyle(select as Element).minHeight).toBe(
 			`${remToPx(getComputedStyle(publish).minBlockSize)}px`,
 		);
