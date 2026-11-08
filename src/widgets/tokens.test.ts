@@ -90,6 +90,21 @@ describe("widget tokens are the registry's", () => {
 	});
 });
 
+describe("campaign editor multi-line fields", () => {
+	// the registry's field-css sets no resize; without this rule a textarea can be dragged wider than its column
+	it("resize vertically only, so they cannot be dragged wider than their column", () => {
+		const css = read("ui/styles.css").replace(/\/\*[\s\S]*?\*\//g, "");
+		const block = /(?:^|[}\s,])textarea\.ds-field-input\s*\{([^}]*)\}/.exec(
+			css,
+		);
+		expect(
+			block,
+			"ui/styles.css has no textarea.ds-field-input rule",
+		).not.toBeNull();
+		expect(block?.[1]).toMatch(/(?:^|[;\s])resize:\s*vertical\s*(?:;|$)/);
+	});
+});
+
 describe("fonts", () => {
 	it("serves every face the registry's fonts-core names, and no other", () => {
 		const urls = [
