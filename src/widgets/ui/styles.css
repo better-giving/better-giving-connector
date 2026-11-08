@@ -280,6 +280,10 @@ h3 {
 	min-width: 0;
 }
 
+textarea.ds-field-input {
+	resize: vertical;
+}
+
 .hint {
 	color: var(--gray-11);
 	font-size: var(--text-xs);
