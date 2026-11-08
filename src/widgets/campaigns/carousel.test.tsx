@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CAMPAIGNS } from "../../../test/widget-host/fixtures";
 import { formatMoney } from "../../format";
 import { CampaignsData } from "../model";
-import { startHost } from "../test-dom";
+import { applyStyles, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { Campaigns } from "./carousel";
 
@@ -167,5 +167,37 @@ describe("campaign carousel", () => {
 		expect(root.querySelector('[role="alert"]')?.textContent).toContain(
 			"Reconnect Better Giving.",
 		);
+	});
+});
+
+describe("campaign photo status chip", () => {
+	const rule = (variant: string) =>
+		[...(document.styleSheets[0]?.cssRules ?? [])]
+			.filter((r) =>
+				r.cssText.startsWith(`.campaign-chip .ds-badge-${variant}`),
+			)
+			.map((r) => r.cssText)
+			.join(" ");
+
+	it("gives live, draft and ended campaigns each their own class", async () => {
+		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
+		const classes = new Map<string, string>();
+		for (const chip of root.querySelectorAll(".campaign-chip .ds-badge")) {
+			classes.set(chip.textContent ?? "", chip.className);
+		}
+		expect([...classes.keys()].sort()).toEqual(["Draft", "Ended", "Live"]);
+		expect(new Set(classes.values()).size).toBe(3);
+	});
+
+	it("paints each class a solid registry fill with its own ink, not a translucent tint", () => {
+		applyStyles("ui/styles.css", "campaigns/carousel.css");
+		const decl = (variant: string) =>
+			[
+				rule(variant).match(/background-color:\s*var\((--[\w-]+)\)/)?.[1],
+				rule(variant).match(/[^-]color:\s*var\((--[\w-]+)\)/)?.[1],
+			].join(" on ");
+		expect(decl("success")).toBe("--success on --success-fg");
+		expect(decl("warning")).toBe("--warning on --warning-fg");
+		expect(decl("neutral")).toBe("--gray-12 on --gray-1");
 	});
 });

@@ -81,9 +81,25 @@
 	left: 8px;
 }
 
+/* the registry's badge variants are all subtle tints, which wash out on a photo;
+   the chip takes the status role's solid fill and its own ink instead */
 .campaign-chip .ds-badge {
-	background: var(--surface);
-	box-shadow: 0 0 0 1px var(--border);
+	box-shadow: 0 0 0 1px var(--surface);
+}
+
+.campaign-chip .ds-badge-success {
+	background-color: var(--success);
+	color: var(--success-fg);
+}
+
+.campaign-chip .ds-badge-warning {
+	background-color: var(--warning);
+	color: var(--warning-fg);
+}
+
+.campaign-chip .ds-badge-neutral {
+	background-color: var(--gray-12);
+	color: var(--gray-1);
 }
 
 .campaign-title {
