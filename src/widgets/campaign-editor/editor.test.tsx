@@ -1,6 +1,9 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
-import type { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type {
+	AppBridge,
+	McpUiHostContext,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR } from "../../../test/widget-host/fixtures";
 import { CampaignEditorData } from "../model";
@@ -29,8 +32,9 @@ const answer = (data: CampaignEditorData): Answer => ({
 async function show(
 	data: CampaignEditorData,
 	respond: (call: Call) => Answer = () => answer(data),
+	context: McpUiHostContext = {},
 ) {
-	const { bridge, host } = await startHost({ context: {} });
+	const { bridge, host } = await startHost({ context });
 	bridge.oncalltool = async ({ name, arguments: args = {} }) => {
 		const call = { name, args };
 		calls.push(call);
@@ -200,5 +204,107 @@ describe("campaign editor preview", () => {
 		expect(face).toMatch(/^Quicksand/);
 		expect(headings.length).toBeGreaterThan(0);
 		expect(new Set(headings)).toEqual(new Set([face]));
+	});
+});
+
+describe("campaign editor row buttons", () => {
+	const sizes = async (context: McpUiHostContext) => {
+		applyStyles("ui/styles.css", "campaign-editor/editor.css");
+		const root = await show(EDITOR, () => answer(EDITOR), context);
+		const found = [...root.querySelectorAll(".outline .icon-btn")];
+		const row = root.querySelector(".outline-item");
+		const name = row?.querySelector(".outline-label")?.textContent;
+		expect(
+			[...(row?.querySelectorAll(".icon-btn") ?? [])].map((b) =>
+				b.getAttribute("aria-label"),
+			),
+		).toEqual([`Move ${name} up`, `Move ${name} down`, `Remove ${name}`]);
+		await vi.waitFor(() =>
+			expect(document.documentElement.hasAttribute("data-touch")).toBe(
+				context.deviceCapabilities?.touch === true,
+			),
+		);
+		return new Set(
+			found.flatMap((b) => {
+				const style = getComputedStyle(b);
+				return [style.minWidth, style.minHeight];
+			}),
+		);
+	};
+
+	it("squares the up, down and remove buttons at 44px on a touch host", async () => {
+		expect(await sizes({ deviceCapabilities: { touch: true } })).toEqual(
+			new Set(["44px"]),
+		);
+	});
+
+	it("keeps them 32px square where the host is not touch", async () => {
+		expect(await sizes({})).toEqual(new Set(["32px"]));
+	});
+});
+
+describe("campaign editor tier amounts", () => {
+	async function openAmounts(root: HTMLElement) {
+		const donationForm = [...root.querySelectorAll("button")].find((b) =>
+			b.textContent?.includes("Donation form"),
+		);
+		donationForm?.click();
+		return vi.waitFor(() => {
+			const fields = [
+				...root.querySelectorAll<HTMLInputElement>('input[type="number"]'),
+			];
+			expect(fields.length).toBeGreaterThan(0);
+			return fields;
+		});
+	}
+
+	const type = (field: HTMLInputElement | undefined, value: string) => {
+		if (!field) throw new Error("no amount field");
+		field.value = value;
+		field.dispatchEvent(new Event("input", { bubbles: true }));
+	};
+
+	it("accepts any decimal, so the field is never marked invalid for its step", async () => {
+		const root = await show({
+			...EDITOR,
+			page: {
+				pageKind: "content",
+				content: { tiers: [{ amountMinor: 2500, buys: "A coat" }] },
+			},
+		});
+		const [amount] = await openAmounts(root);
+		if (!amount) throw new Error("no amount field");
+		expect(amount.getAttribute("step")).toBe("any");
+		amount.value = "12.345";
+		expect(amount.validity.stepMismatch).toBe(false);
+	});
+
+	it("saves a whole yen amount but not a fractional one", async () => {
+		const tiers = [
+			{ amountMinor: 2500, buys: "A coat" },
+			{ amountMinor: 5000, buys: "Boots" },
+		];
+		const root = await show({
+			...EDITOR,
+			formAmounts: [{ amount: "2500", currency: "JPY" }],
+			page: { pageKind: "content", content: { tiers } },
+		});
+		const [first, second] = await openAmounts(root);
+		expect(first?.getAttribute("step")).toBe("1");
+
+		type(first, "1.5");
+		type(second, "7");
+		await clickButton(root, "Save");
+
+		await vi.waitFor(() => expect(saves()).toHaveLength(1));
+		expect(saves()[0]?.args.page).toEqual({
+			pageKind: "content",
+			content: {
+				tiers: [
+					{ amountMinor: 2500, buys: "A coat" },
+					{ amountMinor: 7, buys: "Boots" },
+				],
+			},
+		});
 	});
 });

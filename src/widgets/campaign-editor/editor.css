@@ -122,6 +122,12 @@
 	padding: 0;
 }
 
+/* the touch .ds-btn rule lifts only the height past .icon-btn's 32px; the width follows here */
+:root[data-touch] .icon-btn {
+	min-width: 44px;
+	min-height: 44px;
+}
+
 .device-toggle {
 	margin: 0;
 	padding: 0;

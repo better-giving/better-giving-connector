@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CAMPAIGNS } from "../../../test/widget-host/fixtures";
 import { formatMoney } from "../../format";
 import { CampaignsData } from "../model";
-import { startHost } from "../test-dom";
+import { applyStyles, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { Campaigns } from "./carousel";
 
@@ -167,5 +167,75 @@ describe("campaign carousel", () => {
 		expect(root.querySelector('[role="alert"]')?.textContent).toContain(
 			"Reconnect Better Giving.",
 		);
+	});
+});
+
+describe("campaign photo status chip", () => {
+	// Walks the sheet text, not happy-dom's CSSOM, so a rule nested in @media,
+	// @container or @layer is reached whether or not the DOM implements it.
+	// `path` joins the enclosing preludes with the rule's own selector.
+	type Rule = { path: string; body: string };
+	function rules(css: string, outer: string[] = []): Rule[] {
+		const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+		const found: Rule[] = [];
+		let depth = 0;
+		let preludeStart = 0;
+		let bodyStart = 0;
+		let prelude = "";
+		for (let i = 0; i < text.length; i++) {
+			const ch = text[i];
+			if (ch === "{") {
+				if (depth === 0) {
+					prelude = text.slice(preludeStart, i).trim();
+					bodyStart = i + 1;
+				}
+				depth++;
+			} else if (ch === "}") {
+				depth--;
+				if (depth === 0) {
+					const body = text.slice(bodyStart, i);
+					const path = [...outer, prelude];
+					if (body.includes("{")) found.push(...rules(body, path));
+					else found.push({ path: path.join(" "), body });
+					preludeStart = i + 1;
+				}
+			} else if (ch === ";" && depth === 0) {
+				preludeStart = i + 1;
+			}
+		}
+		return found;
+	}
+	const paintsFillOrInk = (body: string) =>
+		/(?:^|[;{\s])(?:background(?:-[a-z]+)?|color)\s*:/.test(body);
+
+	it("gives live, draft and ended campaigns each their own class", async () => {
+		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
+		const classes = new Map<string, string>();
+		for (const chip of root.querySelectorAll(".campaign-chip .ds-badge")) {
+			classes.set(chip.textContent ?? "", chip.className);
+		}
+		expect([...classes.keys()].sort()).toEqual(["Draft", "Ended", "Live"]);
+		expect(new Set(classes.values()).size).toBe(3);
+	});
+
+	it("leaves each status's fill and ink to the registry's badge variant", () => {
+		applyStyles("ui/styles.css", "campaigns/carousel.css");
+		const all = rules(document.head.querySelector("style")?.textContent ?? "");
+		const chip = all.filter((r) => r.path.includes(".campaign-chip"));
+
+		// liveness: the edge rule is read, and the walk reaches nested at-rules
+		expect(
+			chip.find((r) => r.path === ".campaign-chip .ds-badge")?.body,
+		).toMatch(/box-shadow:/);
+		expect(all.some((r) => r.path.startsWith("@"))).toBe(true);
+
+		expect(
+			chip.filter((r) => /\.ds-badge-/.test(r.path)).map((r) => r.path),
+		).toEqual([]);
+		expect(
+			chip
+				.filter((r) => r.path.includes(".ds-badge") && paintsFillOrInk(r.body))
+				.map((r) => r.path),
+		).toEqual([]);
 	});
 });

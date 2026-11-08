@@ -81,9 +81,10 @@
 	left: 8px;
 }
 
+/* fill and ink stay the registry's badge variant for each status, which the
+   registry rates for contrast; the chip adds only an edge against the photo */
 .campaign-chip .ds-badge {
-	background: var(--surface);
-	box-shadow: 0 0 0 1px var(--border);
+	box-shadow: 0 0 0 1px var(--surface);
 }
 
 .campaign-title {
