@@ -479,8 +479,38 @@ test("the connect flow is light only", async () => {
 		/\/\*[\s\S]*?\*\//g,
 		"",
 	);
-	expect(own).toContain(".btn");
+	expect(own).toContain(".ds-btn");
 	expect(own).not.toMatch(/\.dark\b/);
+});
+
+const connectSource = () =>
+	readFileSync("src/connect/connect.css", "utf8").replace(
+		/\/\*[\s\S]*?\*\//g,
+		"",
+	);
+
+test("the connect flow draws its focus ring with the registry's --ring, not --primary", () => {
+	const rule = connectSource().match(/:focus-visible\s*\{([^}]*)\}/)?.[1] ?? "";
+
+	expect(rule).toMatch(/outline:[^;]*var\(--ring\)/);
+	expect(rule).not.toContain("var(--primary)");
+});
+
+test("the connect button is at least the registry's control height, a thumb's target", () => {
+	const rule = connectSource().match(/form \.ds-btn\s*\{([^}]*)\}/)?.[1] ?? "";
+
+	expect(rule).toMatch(/min-block-size:\s*var\(--control-height\)\s*;/);
+});
+
+test("a connect page with a way back renders its action as a registry button in a registry card", async () => {
+	const { page } = await unreachablePage();
+
+	const html = shown(await page.text());
+
+	expect(html).toMatch(
+		/<button[^>]*class="ds-btn ds-btn-primary"[^>]*>Back to your AI assistant<\/button>/,
+	);
+	expect(html).toMatch(/<div class="[^"]*\bds-card\b[^"]*">/);
 });
 
 test("/connect/assets/logo.png is served as image/png", async () => {

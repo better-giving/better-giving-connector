@@ -197,14 +197,14 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 				</section>
 				{errorLine}
 				{statusLine}
-				<div class="card-foot">
+				<div class="ds-card-footer card-foot">
 					<div class="gifts-go">
-						<label class="label" for={`${titleId}-gifts`}>
+						<label class="ds-label" for={`${titleId}-gifts`}>
 							Gifts go to:
 						</label>
 						<select
 							id={`${titleId}-gifts`}
-							class="field-input"
+							class="ds-field-input"
 							value={giftsGoTo}
 							onChange={(e: Event) =>
 								setGiftsGoTo((e.target as HTMLSelectElement).value)
@@ -259,7 +259,7 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 			{errorLine}
 			{statusLine}
 			{!ended && (
-				<div class="card-foot">
+				<div class="ds-card-footer card-foot">
 					<Updated />
 					<div class="foot-actions">
 						{data.pendingDraft && (

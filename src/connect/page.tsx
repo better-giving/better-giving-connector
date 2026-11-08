@@ -30,7 +30,7 @@ function Page({ heading, children }: { heading: string; children: Child }) {
 				</head>
 				<body>
 					<main>
-						<div class="card">
+						<div class="ds-card card">
 							<img
 								class="logo"
 								src={LOGO_PATH}
@@ -63,7 +63,7 @@ export function MessagePage(props: {
 			<p>{props.message}</p>
 			{props.back !== undefined && (
 				<form method="post" action={props.back}>
-					<button type="submit" class="btn btn-primary">
+					<button type="submit" class="ds-btn ds-btn-primary">
 						Back to your AI assistant
 					</button>
 				</form>

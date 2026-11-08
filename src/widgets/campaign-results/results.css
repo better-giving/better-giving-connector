@@ -144,7 +144,7 @@
 	margin: 0;
 }
 
-/* fonts.css cuts the display face to 600 and 700: it goes on the figures, never their secondary text */
+/* the registry's fonts-core.css cuts the display face to 600 and 700: it goes on the figures, never their secondary text */
 .raised-figure {
 	font-family: var(--font-display);
 	font-size: 28px;
@@ -232,7 +232,7 @@
 	gap: 6px;
 }
 
-/* a field in the actions row: the md buttons' height and vertical padding, not --field-size */
+/* a field in the actions row: the md buttons' height and vertical padding, not the field height */
 .gifts-go select {
 	width: auto;
 	min-height: var(--control-height);

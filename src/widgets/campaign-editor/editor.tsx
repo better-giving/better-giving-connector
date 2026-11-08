@@ -203,7 +203,7 @@ export function CampaignEditor(props: { data: CampaignEditorData }) {
 				<h2 class="editor-title">{campaign.title}</h2>
 				<StatusBadge status={campaign.status} />
 				{data.pendingDraft && (
-					<span class="badge badge-warning">Draft edits</span>
+					<span class="ds-badge ds-badge-warning">Draft edits</span>
 				)}
 				<span class="editor-saved">{savedLine}</span>
 				<span class="editor-actions">

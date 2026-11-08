@@ -130,7 +130,7 @@ describe("campaign results type", () => {
 			(n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
 		);
 
-	it("sets display-face text only at the weights fonts.css cuts it to", async () => {
+	it("sets display-face text only at the weights fonts-core cuts it to", async () => {
 		const root = await styled(RESULTS_LIVE);
 		const display = getComputedStyle(document.documentElement)
 			.getPropertyValue("--font-display")
@@ -149,25 +149,51 @@ describe("campaign results type", () => {
 
 	it("sets the week-over-week badge in the face the status badge uses", async () => {
 		const root = await styled(RESULTS_LIVE);
-		const [status, trend] = [...root.querySelectorAll(".badge")];
+		const [status, trend] = [...root.querySelectorAll(".ds-badge")];
 		expect(trend?.textContent).toMatch(/(Up|Down) \d+%/);
 		expect(getComputedStyle(trend as Element).fontFamily).toBe(
 			getComputedStyle(status as Element).fontFamily,
 		);
 	});
 
-	it("sizes the draft footer's gift select to the buttons beside it, labelled like a field", async () => {
-		const root = await styled({
+	// the registry's button height is `calc(0.25rem * 9)`: rem times a step count
+	const remToPx = (calc: string) => {
+		const m = /^calc\(([\d.]+)rem \* (\d+)\)$/.exec(calc);
+		if (!m) throw new Error(`not a rem calc: ${calc}`);
+		return Number(m[1]) * Number(m[2]) * 16;
+	};
+	const draftFooter = async () =>
+		await styled({
 			...RESULTS_LIVE,
 			campaign: { ...RESULTS_LIVE.campaign, status: "draft", url: null },
 			programs: [{ id: "p-coats", name: "Coat fund" }],
 		});
+
+	it("grows the gift select and the buttons to 44px on a touch host", async () => {
+		const root = await draftFooter();
+		const select = root.querySelector(".card-foot select") as Element;
+		document.documentElement.setAttribute("data-touch", "");
+		try {
+			expect(getComputedStyle(select).minHeight).toBe("44px");
+			expect(getComputedStyle(button(root, "Publish")).minBlockSize).toBe(
+				"44px",
+			);
+		} finally {
+			document.documentElement.removeAttribute("data-touch");
+		}
+		expect(getComputedStyle(select).minHeight).toBe("36px");
+	});
+
+	it("sizes the draft footer's gift select to the buttons beside it, labelled like a field", async () => {
+		const root = await draftFooter();
 		const select = root.querySelector(".card-foot select");
 		const label = root.querySelector(`label[for="${select?.id}"]`);
-		const height = (el: Element | null) =>
-			getComputedStyle(el as Element).minHeight;
-		expect(height(select)).toBe(height(button(root, "Publish")));
-		expect(height(select)).not.toBe("");
+		const publish = button(root, "Publish");
+		expect(publish.className).toContain("ds-btn");
+		// expected from the Publish button's own computed height, not a hardcoded 36px
+		expect(getComputedStyle(select as Element).minHeight).toBe(
+			`${remToPx(getComputedStyle(publish).minBlockSize)}px`,
+		);
 		expect(getComputedStyle(label as Element).fontWeight).toBe("500");
 	});
 });

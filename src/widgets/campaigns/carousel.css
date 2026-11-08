@@ -81,7 +81,7 @@
 	left: 8px;
 }
 
-.campaign-chip .badge {
+.campaign-chip .ds-badge {
 	background: var(--surface);
 	box-shadow: 0 0 0 1px var(--border);
 }
