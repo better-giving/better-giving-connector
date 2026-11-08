@@ -157,18 +157,19 @@ test.each(["/privacy", "/terms", "/docs", "/support"])(
 	},
 );
 
-test("the page is readable without the script, and its own rules answer to .dark", async () => {
+test("the page is readable without the script, and its dark is the registry's", async () => {
 	const css = styleOf(await (await get("/docs")).text());
 
 	// light is the registry's base
 	expect(css).toContain("var(--background)");
-	// the registry's variables carry a :root.dark block of their own, so the
-	// page's rule is read from the source: it is the one that is not a variable set
+	// the page's own rules take every color from a registry variable, so the
+	// registry's :root.dark block is the whole of its dark
 	const own = readFileSync("src/site/site.css", "utf8").replace(
 		/\/\*[\s\S]*?\*\//g,
 		"",
 	);
-	expect(own).toMatch(/:root\.dark[^{]*\{/);
+	expect(own).not.toMatch(/:root\.dark|prefers-color-scheme/);
+	expect(own).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
 });
 
 test("every face a page's stylesheet names is served as a font", async () => {
