@@ -172,6 +172,25 @@ test("the page is readable without the script, and follows the registry's .dark 
 	expect(own).not.toMatch(/\.dark\b/);
 });
 
+const siteSource = () =>
+	readFileSync("src/site/site.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+test("the site draws its focus ring with the registry's --ring, not --primary", () => {
+	const rule = siteSource().match(/:focus-visible\s*\{([^}]*)\}/)?.[1] ?? "";
+
+	expect(rule).toMatch(/outline:[^;]*var\(--ring\)/);
+	expect(rule).not.toContain("var(--primary)");
+});
+
+test("site.css holds no color of its own: every color is a registry variable", () => {
+	const own = siteSource();
+
+	expect(own).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+	expect(own).not.toMatch(/\b(rgba?|hsla?|oklch)\(/i);
+	// the read is live: the file does name registry colors
+	expect(own).toContain("var(--background)");
+});
+
 test("every face a page's stylesheet names is served as a font", async () => {
 	const html = await (await get("/docs")).text();
 	const urls = [
