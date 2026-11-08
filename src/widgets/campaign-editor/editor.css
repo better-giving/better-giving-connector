@@ -122,7 +122,7 @@
 	padding: 0;
 }
 
-/* :root[data-touch] .ds-btn outranks .icon-btn, so square the target to 44px here */
+/* the touch .ds-btn rule lifts only the height past .icon-btn's 32px; the width follows here */
 :root[data-touch] .icon-btn {
 	min-width: 44px;
 	min-height: 44px;

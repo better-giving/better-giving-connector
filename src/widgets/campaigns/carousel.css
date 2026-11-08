@@ -82,7 +82,7 @@
 }
 
 /* the registry's badge variants are all subtle tints, which wash out on a photo;
-   the chip takes the status role's solid fill and its own ink instead */
+   each status chip takes a solid fill and its matching ink instead */
 .campaign-chip .ds-badge {
 	box-shadow: 0 0 0 1px var(--surface);
 }
