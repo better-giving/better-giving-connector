@@ -1,9 +1,7 @@
 /*
  * The connect flow over the Better Giving design registry (widgets/tokens.css):
  * Red Hat Round, its light colors, one solo card. Light only: the page never
- * takes the registry's `dark` class. The focus ring is
- * --primary, not the registry's --ring (accent-8): that is under WCAG's 3:1 for
- * non-text against the page.
+ * takes the registry's `dark` class.
  */
 @import "../widgets/components.css";
 
@@ -68,6 +66,6 @@ form .btn {
 }
 
 :focus-visible {
-	outline: 2px solid var(--primary);
+	outline: 2px solid var(--ring);
 	outline-offset: 2px;
 }

@@ -65,7 +65,7 @@ test.each(["/privacy", "/terms", "/docs", "/support"])(
 
 		expect(css).toMatch(/font:[^;}]*var\(--font-body\)/);
 		expect(css).toContain('"Red Hat Round Text"');
-		expect(css).toMatch(/var\(--primary\)/);
+		expect(css).toMatch(/var\(--link\)/);
 		expect(css).not.toContain("system-ui");
 		expect(css).not.toContain("prefers-color-scheme");
 		expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
