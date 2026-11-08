@@ -9,3 +9,6 @@ dist/
 test/live/results.ndjson
 # Verification runs. Cleanup deletes the scratch database, not this directory.
 verify-evidence/
+# Proof screenshots from `pnpm widget-shots` and `pnpm surface-shots`; never committed.
+docs/widget-screenshots/
+docs/surface-screenshots/
