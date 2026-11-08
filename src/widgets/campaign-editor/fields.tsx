@@ -262,6 +262,8 @@ export function ContentFields(props: {
 								step={factor === 1 ? "1" : "any"}
 								value={tier.amountMinor / factor}
 								onInput={(n) => {
+									// no minor unit: a fraction stays unsaved, and step="1" marks the field
+									if (factor === 1 && !Number.isInteger(n)) return;
 									const minor = Math.round(n * factor);
 									if (minor <= 0) return;
 									set({

@@ -238,6 +238,26 @@ describe("campaign editor row buttons", () => {
 });
 
 describe("campaign editor tier amounts", () => {
+	async function openAmounts(root: HTMLElement) {
+		const donationForm = [...root.querySelectorAll("button")].find((b) =>
+			b.textContent?.includes("Donation form"),
+		);
+		donationForm?.click();
+		return vi.waitFor(() => {
+			const fields = [
+				...root.querySelectorAll<HTMLInputElement>('input[type="number"]'),
+			];
+			expect(fields.length).toBeGreaterThan(0);
+			return fields;
+		});
+	}
+
+	const type = (field: HTMLInputElement | undefined, value: string) => {
+		if (!field) throw new Error("no amount field");
+		field.value = value;
+		field.dispatchEvent(new Event("input", { bubbles: true }));
+	};
+
 	it("accepts any decimal, so the field is never marked invalid for its step", async () => {
 		const root = await show({
 			...EDITOR,
@@ -246,19 +266,39 @@ describe("campaign editor tier amounts", () => {
 				content: { tiers: [{ amountMinor: 2500, buys: "A coat" }] },
 			},
 		});
-		const donationForm = [...root.querySelectorAll("button")].find((b) =>
-			b.textContent?.includes("Donation form"),
-		);
-		donationForm?.click();
-		const amount = await vi.waitFor(() => {
-			const field = root.querySelector<HTMLInputElement>(
-				'input[type="number"]',
-			);
-			expect(field).not.toBeNull();
-			return field as HTMLInputElement;
-		});
+		const [amount] = await openAmounts(root);
+		if (!amount) throw new Error("no amount field");
 		expect(amount.getAttribute("step")).toBe("any");
 		amount.value = "12.345";
 		expect(amount.validity.stepMismatch).toBe(false);
+	});
+
+	it("saves a whole yen amount but not a fractional one", async () => {
+		const tiers = [
+			{ amountMinor: 2500, buys: "A coat" },
+			{ amountMinor: 5000, buys: "Boots" },
+		];
+		const root = await show({
+			...EDITOR,
+			formAmounts: [{ amount: "2500", currency: "JPY" }],
+			page: { pageKind: "content", content: { tiers } },
+		});
+		const [first, second] = await openAmounts(root);
+		expect(first?.getAttribute("step")).toBe("1");
+
+		type(first, "1.5");
+		type(second, "7");
+		await clickButton(root, "Save");
+
+		await vi.waitFor(() => expect(saves()).toHaveLength(1));
+		expect(saves()[0]?.args.page).toEqual({
+			pageKind: "content",
+			content: {
+				tiers: [
+					{ amountMinor: 2500, buys: "A coat" },
+					{ amountMinor: 7, buys: "Boots" },
+				],
+			},
+		});
 	});
 });
