@@ -236,3 +236,29 @@ describe("campaign editor row buttons", () => {
 		expect(await sizes({})).toEqual(new Set(["32px"]));
 	});
 });
+
+describe("campaign editor tier amounts", () => {
+	it("accepts any decimal, so the field is never marked invalid for its step", async () => {
+		const root = await show({
+			...EDITOR,
+			page: {
+				pageKind: "content",
+				content: { tiers: [{ amountMinor: 2500, buys: "A coat" }] },
+			},
+		});
+		const donationForm = [...root.querySelectorAll("button")].find((b) =>
+			b.textContent?.includes("Donation form"),
+		);
+		donationForm?.click();
+		const amount = await vi.waitFor(() => {
+			const field = root.querySelector<HTMLInputElement>(
+				'input[type="number"]',
+			);
+			expect(field).not.toBeNull();
+			return field as HTMLInputElement;
+		});
+		expect(amount.getAttribute("step")).toBe("any");
+		amount.value = "12.345";
+		expect(amount.validity.stepMismatch).toBe(false);
+	});
+});
