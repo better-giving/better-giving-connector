@@ -1,6 +1,9 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
-import type { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type {
+	AppBridge,
+	McpUiHostContext,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR } from "../../../test/widget-host/fixtures";
 import { CampaignEditorData } from "../model";
@@ -29,8 +32,9 @@ const answer = (data: CampaignEditorData): Answer => ({
 async function show(
 	data: CampaignEditorData,
 	respond: (call: Call) => Answer = () => answer(data),
+	context: McpUiHostContext = {},
 ) {
-	const { bridge, host } = await startHost({ context: {} });
+	const { bridge, host } = await startHost({ context });
 	bridge.oncalltool = async ({ name, arguments: args = {} }) => {
 		const call = { name, args };
 		calls.push(call);
@@ -200,5 +204,35 @@ describe("campaign editor preview", () => {
 		expect(face).toMatch(/^Quicksand/);
 		expect(headings.length).toBeGreaterThan(0);
 		expect(new Set(headings)).toEqual(new Set([face]));
+	});
+});
+
+describe("campaign editor row buttons", () => {
+	const sizes = async (context: McpUiHostContext) => {
+		applyStyles("ui/styles.css", "campaign-editor/editor.css");
+		const root = await show(EDITOR, () => answer(EDITOR), context);
+		const found = [...root.querySelectorAll(".outline .icon-btn")];
+		expect(found.length).toBeGreaterThan(0);
+		await vi.waitFor(() =>
+			expect(document.documentElement.hasAttribute("data-touch")).toBe(
+				context.deviceCapabilities?.touch === true,
+			),
+		);
+		return new Set(
+			found.flatMap((b) => {
+				const style = getComputedStyle(b);
+				return [style.minWidth, style.minHeight];
+			}),
+		);
+	};
+
+	it("squares the up, down and remove buttons at 44px on a touch host", async () => {
+		expect(await sizes({ deviceCapabilities: { touch: true } })).toEqual(
+			new Set(["44px"]),
+		);
+	});
+
+	it("keeps them 32px square where the host is not touch", async () => {
+		expect(await sizes({})).toEqual(new Set(["32px"]));
 	});
 });
