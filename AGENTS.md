@@ -35,8 +35,8 @@ Also:
 - Migrate: `pnpm db:migrate` against a local `file:` database
 - Live check: `pnpm test:live` runs `test/live/*.live.ts` against a real deployment (`vitest.live.config.ts`; `LIVE_ORIGIN` and `LIVE_CODE` from the environment or an ignored `.env.live`). Not part of CI.
 - ChatGPT package: `pnpm chatgpt:package` (`scripts/chatgpt-package.ts`; `test/chatgpt-package.test.ts` pins the entries' hashes)
-- Page screenshots: `pnpm surface-shots [outDir]` writes every site and connect page from `createApp` (default `docs/surface-screenshots/after`). Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
-- Widget screenshots: `pnpm widget-shots` writes `docs/widget-screenshots/`. Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
+- Page screenshots: `pnpm surface-shots [outDir]` writes every site and connect page from `createApp` (default `docs/surface-screenshots/after`, gitignored). Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
+- Widget screenshots: `pnpm widget-shots` writes `docs/widget-screenshots/` (gitignored). Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
 
 Done means the CI checks above are all green: lint, typecheck, test, design registry sync (`pnpm design:check`), build, and bundle-load.
 
