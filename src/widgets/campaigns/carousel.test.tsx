@@ -189,15 +189,10 @@ describe("campaign photo status chip", () => {
 		expect(new Set(classes.values()).size).toBe(3);
 	});
 
-	it("paints each class a solid registry fill with its own ink, not a translucent tint", () => {
+	it("leaves each status's fill and ink to the registry's badge variant", () => {
 		applyStyles("ui/styles.css", "campaigns/carousel.css");
-		const decl = (variant: string) =>
-			[
-				rule(variant).match(/background-color:\s*var\((--[\w-]+)\)/)?.[1],
-				rule(variant).match(/[^-]color:\s*var\((--[\w-]+)\)/)?.[1],
-			].join(" on ");
-		expect(decl("success")).toBe("--success on --success-fg");
-		expect(decl("warning")).toBe("--warning on --warning-fg");
-		expect(decl("neutral")).toBe("--gray-12 on --gray-1");
+		for (const variant of ["success", "warning", "neutral"]) {
+			expect(rule(variant)).toBe("");
+		}
 	});
 });

@@ -81,6 +81,58 @@
 	left: 8px;
 }
 
+/* each status keeps the registry's own badge variant (subtle fill, subtle ink,
+   both rated for contrast); the chip only adds an edge so it holds on a photo */
+.campaign-chip .ds-badge {
+	box-shadow: 0 0 0 1px var(--surface);
+}
+
+.campaign-title {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	font-size: var(--text-base);
+	font-weight: 700;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.campaign-amounts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 4px;
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+.campaign-amounts strong {
+	font-size: var(--text-base);
+	font-weight: 700;
+}
+
+.campaign-amounts .muted {
+	font-size: var(--text-sm);
+}
+
+.campaign-percent {
+	margin-inline-start: auto;
+	font-size: var(--text-sm);
+	font-weight: 700;
+}
+
+.campaign-media {
+	position: relative;
+}
+
+.campaign-chip {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+}
+
 /* the registry's badge variants are all subtle tints, which wash out on a photo;
    each status chip takes a solid fill and its matching ink instead */
 .campaign-chip .ds-badge {
