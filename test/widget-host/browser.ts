@@ -11,6 +11,7 @@ type Transport = Parameters<typeof startFakeHost>[0];
 type Message = Parameters<Transport["send"]>[0];
 type Relay = Record<string, (value: unknown) => void>;
 
+const SPINNER_CLASS = "ds-state-card-spinner";
 const STAND_IN_HOST = new URL(blobImage("x")).host;
 
 /** A photo-like stand-in for every image under the fixtures' blob origin; nothing else loads. */
@@ -97,8 +98,15 @@ export async function showWidget(
 	if (!fullscreen) await withTimeout(sized.promise, "the widget never sized");
 	// the result renders a task after it arrives (ui/states.tsx draws the spinner until then)
 	const frame = page.frameLocator("#widget");
+	// `detached` also passes when nothing matches, so a renamed spinner class
+	// would turn this wait into a no-op; fail while the bundle still names it
+	if (!html.includes(SPINNER_CLASS)) {
+		throw new Error(
+			`the widget bundle no longer draws .${SPINNER_CLASS} (ui/states.tsx); update the loading wait in test/widget-host/browser.ts`,
+		);
+	}
 	await frame
-		.locator(".spinner")
+		.locator(`.${SPINNER_CLASS}`)
 		.waitFor({ state: "detached", timeout: 10_000 });
 	await page.waitForLoadState("networkidle");
 	// the size report for the rendered result lands after the render

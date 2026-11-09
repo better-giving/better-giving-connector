@@ -46,8 +46,10 @@ export function Page({
 							<a href="/privacy">Privacy</a>
 							<a href="/terms">Terms</a>
 						</nav>
-						<h1>{heading}</h1>
-						{children}
+						<div class="ds-prose">
+							<h1>{heading}</h1>
+							{children}
+						</div>
 					</main>
 				</body>
 			</html>

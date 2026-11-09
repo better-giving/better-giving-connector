@@ -148,7 +148,7 @@ describe("campaign carousel", () => {
 			sent.push(params.content);
 			return {};
 		};
-		expect(root.querySelector(".state-title")?.textContent).toBe(
+		expect(root.querySelector(".ds-state-card-title")?.textContent).toBe(
 			"No campaigns yet",
 		);
 		root.querySelector("button")?.click();
@@ -205,37 +205,50 @@ describe("campaign photo status chip", () => {
 		}
 		return found;
 	}
-	const paintsFillOrInk = (body: string) =>
-		/(?:^|[;{\s])(?:background(?:-[a-z]+)?|color)\s*:/.test(body);
 
 	it("gives live, draft and ended campaigns each their own class", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
 		const classes = new Map<string, string>();
 		for (const chip of root.querySelectorAll(".campaign-chip .ds-badge")) {
+			expect(chip.classList.contains("ds-badge-on-photo")).toBe(true);
 			classes.set(chip.textContent ?? "", chip.className);
 		}
 		expect([...classes.keys()].sort()).toEqual(["Draft", "Ended", "Live"]);
 		expect(new Set(classes.values()).size).toBe(3);
 	});
 
-	it("leaves each status's fill and ink to the registry's badge variant", () => {
+	it("paints each status as the registry's on-photo badge, inset from the card's corner", async () => {
+		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
+		applyStyles("ui/styles.css", "campaigns/carousel.css");
+		const chips = [...root.querySelectorAll<HTMLElement>(".campaign-chip")];
+		expect(chips.length).toBeGreaterThan(0);
+		const plain = document.createElement("span");
+		plain.className = "ds-badge ds-badge-warning";
+		root.append(plain);
+		expect(getComputedStyle(plain).boxShadow).not.toMatch(/1px/);
+		for (const chip of chips) {
+			const style = getComputedStyle(chip);
+			expect([style.position, style.top, style.left]).toEqual([
+				"absolute",
+				"12px",
+				"12px",
+			]);
+			const badge = chip.querySelector(".ds-badge") as Element;
+			// the registry's ring in the page color, drawn only by .ds-badge-on-photo
+			expect(getComputedStyle(badge).boxShadow).toMatch(
+				/^0(px)? 0(px)? 0(px)? 1px \S+/,
+			);
+		}
+	});
+
+	it("adds no local fill, ink or edge to the chip's badge", () => {
 		applyStyles("ui/styles.css", "campaigns/carousel.css");
 		const all = rules(document.head.querySelector("style")?.textContent ?? "");
-		const chip = all.filter((r) => r.path.includes(".campaign-chip"));
-
-		// liveness: the edge rule is read, and the walk reaches nested at-rules
+		// liveness: the walker reached carousel.css's own chip rule
+		const chip = all.find((r) => r.path === ".campaign-chip");
+		expect(chip?.body).toContain("position: absolute");
 		expect(
-			chip.find((r) => r.path === ".campaign-chip .ds-badge")?.body,
-		).toMatch(/box-shadow:/);
-		expect(all.some((r) => r.path.startsWith("@"))).toBe(true);
-
-		expect(
-			chip.filter((r) => /\.ds-badge-/.test(r.path)).map((r) => r.path),
-		).toEqual([]);
-		expect(
-			chip
-				.filter((r) => r.path.includes(".ds-badge") && paintsFillOrInk(r.body))
-				.map((r) => r.path),
+			all.filter((r) => /\.campaign-chip\s+\.ds-badge/.test(r.path)),
 		).toEqual([]);
 	});
 });

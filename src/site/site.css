@@ -15,7 +15,7 @@
 
 body {
 	margin: 0;
-	font: 18px / 1.5 var(--font-body);
+	font: 400 1rem / 1.5 var(--font-body);
 	color: var(--gray-12);
 	background: var(--background);
 }
@@ -24,55 +24,6 @@ main {
 	max-width: 40rem;
 	margin: 0 auto;
 	padding: 2.5rem 1rem 4rem;
-}
-
-h1,
-h2,
-h3 {
-	font-family: var(--font-display);
-}
-
-h1 {
-	font-size: 1.6rem;
-	line-height: 1.25;
-	margin: 0 0 0.75rem;
-}
-
-h2 {
-	font-size: 1.2rem;
-	line-height: 1.3;
-	font-weight: 600;
-	margin: 2rem 0 0.5rem;
-}
-
-h3 {
-	font-size: 1.05rem;
-	line-height: 1.3;
-	font-weight: 600;
-	margin: 1.5rem 0 0.4rem;
-}
-
-p,
-ul,
-ol {
-	margin: 0 0 1rem;
-}
-
-ul,
-ol {
-	padding-left: 1.25rem;
-}
-
-a {
-	color: var(--link);
-}
-
-a:hover {
-	color: var(--link-hover);
-}
-
-code {
-	font-family: var(--font-mono);
 }
 
 nav {
@@ -84,7 +35,12 @@ nav {
 }
 
 nav a {
+	color: var(--link);
 	font-weight: 600;
+}
+
+nav a:hover {
+	color: var(--link-hover);
 }
 
 .meta {
@@ -92,45 +48,25 @@ nav a {
 	font-size: 0.95rem;
 }
 
-.table-wrap {
-	overflow-x: auto;
-	margin: 0 0 1rem;
-}
-
-table {
-	border-collapse: collapse;
-	width: 100%;
-	font-size: 0.9rem;
-}
-
-th,
-td {
-	border: 1px solid var(--hairline);
-	padding: 0.45rem 0.55rem;
-	text-align: left;
+/* a cell's lines start at the row's top edge, beside a neighbour's list */
+.ds-table :is(th, td) {
 	vertical-align: top;
-}
-
-th {
-	background: var(--panel);
 }
 
 img.mark {
 	display: block;
 	width: 4rem;
 	height: 4rem;
-	margin: 0 0 1rem;
 }
 
 video {
 	display: block;
 	max-width: 100%;
 	height: auto;
-	margin: 0 0 1rem;
 	background: var(--panel);
 }
 
 :focus-visible {
-	outline: 3px solid var(--ring);
+	outline: 2px solid var(--ring);
 	outline-offset: 2px;
 }

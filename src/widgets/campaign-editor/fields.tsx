@@ -137,15 +137,18 @@ export function BlockFields(props: {
 				}
 				if (typeof value === "boolean") {
 					return (
-						<label key={key} class="switch">
+						<label key={key} class="ds-switch-field">
+							<span class="ds-switch-label">{label}</span>
 							<input
 								type="checkbox"
+								// biome-ignore lint/a11y/useAriaPropsForRole: the native checkbox carries the checked state, as the registry switch asks
+								role="switch"
+								class="ds-switch"
 								checked={value}
 								onChange={(e: Event) =>
 									set(key, (e.target as HTMLInputElement).checked)
 								}
 							/>
-							{label}
 						</label>
 					);
 				}

@@ -114,7 +114,11 @@ describe("registry fonts", () => {
 		"utf8",
 	);
 	const coreFaces = faceFiles(coreCss);
-	const coreFamilies = ["Red Hat Round Display", "Red Hat Round Text"];
+	const coreFamilies = [
+		"Red Hat Round Display",
+		"Red Hat Round Mono",
+		"Red Hat Round Text",
+	];
 
 	it("bundles only the fonts-core faces into a widget document", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "widget-fonts-"));
@@ -138,7 +142,7 @@ describe("registry fonts", () => {
 
 	it("links only the fonts-core faces from a page stylesheet", async () => {
 		const { css } = await buildCss(join(root, "src/connect/connect.css"));
-		expect(coreFaces).toHaveLength(6);
+		expect(coreFaces).toHaveLength(7);
 		expect(faceFiles(css)).toEqual(coreFaces);
 		expect(faceFamilies(css)).toEqual(coreFamilies);
 	});

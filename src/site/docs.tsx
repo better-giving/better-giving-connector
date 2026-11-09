@@ -348,8 +348,8 @@ export function DocsPage() {
 					or resets anything, your AI assistant waits for your explicit yes.
 				</li>
 			</ul>
-			<div class="table-wrap">
-				<table>
+			<section class="ds-table-scroll" aria-label="Tool reference" tabindex={0}>
+				<table class="ds-table">
 					<thead>
 						<tr>
 							<th scope="col">Tool</th>
@@ -381,7 +381,7 @@ export function DocsPage() {
 						))}
 					</tbody>
 				</table>
-			</div>
+			</section>
 
 			<h3>Cards in the chat</h3>
 			<p>

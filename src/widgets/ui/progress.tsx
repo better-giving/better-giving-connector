@@ -18,16 +18,25 @@ export function percentOf(raised: Money, goal: Money | null): number | null {
 export function ProgressBar(props: { percent: number; label: string }) {
 	const fill = Math.min(100, Math.max(0, props.percent));
 	return (
-		<div
-			class={props.percent >= 100 ? "progress met" : "progress"}
-			role="progressbar"
-			aria-label={props.label}
-			aria-valuemin={0}
-			aria-valuemax={100}
-			aria-valuenow={fill}
-			aria-valuetext={`${props.percent}%`}
-		>
-			<div class="progress-fill" style={{ width: `${fill}%` }} />
+		<div class="ds-progress">
+			<div
+				class="ds-progress-track"
+				data-state={
+					props.percent >= 100
+						? "met"
+						: props.percent <= 0
+							? "empty"
+							: undefined
+				}
+				role="progressbar"
+				aria-label={props.label}
+				aria-valuemin={0}
+				aria-valuemax={100}
+				aria-valuenow={fill}
+				aria-valuetext={`${props.percent}%`}
+			>
+				<div class="ds-progress-fill" style={{ width: `${fill}%` }} />
+			</div>
 		</div>
 	);
 }

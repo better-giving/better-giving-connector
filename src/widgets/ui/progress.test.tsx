@@ -27,24 +27,50 @@ describe("ProgressBar", () => {
 		expect(bar?.getAttribute("aria-valuemax")).toBe("100");
 		expect(bar?.getAttribute("aria-valuetext")).toBe("123%");
 		expect(bar?.getAttribute("aria-label")).toBe("Raised of goal");
-		const fill = bar?.querySelector<HTMLElement>(".progress-fill");
+		const fill = bar?.querySelector<HTMLElement>(".ds-progress-fill");
 		expect(fill?.style.width).toBe("100%");
 	});
 
 	it("fills to the percentage below the goal", () => {
 		const root = mount(<ProgressBar percent={37} label="Raised of goal" />);
-		const fill = root.querySelector<HTMLElement>(".progress-fill");
+		const fill = root.querySelector<HTMLElement>(".ds-progress-fill");
 		expect(fill?.style.width).toBe("37%");
 	});
 
-	it("marks a met goal so it draws in the success color", () => {
+	it("marks a met goal with the met state", () => {
 		const met = mount(<ProgressBar percent={100} label="x" />);
-		expect(met.querySelector(".progress")?.classList.contains("met")).toBe(
-			true,
-		);
+		expect(
+			met.querySelector(".ds-progress-track")?.getAttribute("data-state"),
+		).toBe("met");
 		const short = mount(<ProgressBar percent={99} label="x" />);
-		expect(short.querySelector(".progress")?.classList.contains("met")).toBe(
-			false,
-		);
+		expect(
+			short.querySelector(".ds-progress-track")?.getAttribute("data-state"),
+		).toBeNull();
+	});
+
+	it("marks an empty bar and clamps zero and below to an empty fill", () => {
+		const zero = mount(<ProgressBar percent={0} label="x" />);
+		const track = zero.querySelector(".ds-progress-track");
+		expect(track?.getAttribute("data-state")).toBe("empty");
+		expect(track?.getAttribute("aria-valuenow")).toBe("0");
+		expect(
+			zero.querySelector<HTMLElement>(".ds-progress-fill")?.style.width,
+		).toBe("0%");
+
+		const below = mount(<ProgressBar percent={-5} label="x" />);
+		const clamped = below.querySelector(".ds-progress-track");
+		expect(clamped?.getAttribute("data-state")).toBe("empty");
+		expect(clamped?.getAttribute("aria-valuenow")).toBe("0");
+		expect(clamped?.getAttribute("aria-valuetext")).toBe("-5%");
+		expect(
+			below.querySelector<HTMLElement>(".ds-progress-fill")?.style.width,
+		).toBe("0%");
+	});
+
+	it("leaves a bar between empty and met unmarked", () => {
+		const one = mount(<ProgressBar percent={1} label="x" />);
+		expect(
+			one.querySelector(".ds-progress-track")?.getAttribute("data-state"),
+		).toBeNull();
 	});
 });

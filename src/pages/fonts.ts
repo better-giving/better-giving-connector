@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import displayBold from "../widgets/registry/styles/fonts/RedHatRoundDisplay-Bold.woff2";
 import displaySemiBold from "../widgets/registry/styles/fonts/RedHatRoundDisplay-SemiBold.woff2";
+import monoRegular from "../widgets/registry/styles/fonts/RedHatRoundMono-Regular.woff2";
 import textBold from "../widgets/registry/styles/fonts/RedHatRoundText-Bold.woff2";
 import textMedium from "../widgets/registry/styles/fonts/RedHatRoundText-Medium.woff2";
 import textRegular from "../widgets/registry/styles/fonts/RedHatRoundText-Regular.woff2";
@@ -17,6 +18,7 @@ const FONTS = {
 	"RedHatRoundText-Bold.woff2": textBold,
 	"RedHatRoundDisplay-SemiBold.woff2": displaySemiBold,
 	"RedHatRoundDisplay-Bold.woff2": displayBold,
+	"RedHatRoundMono-Regular.woff2": monoRegular,
 } satisfies Record<string, Uint8Array<ArrayBuffer>>;
 
 type FontFile = keyof typeof FONTS;

@@ -156,12 +156,6 @@ describe("campaign results type", () => {
 		);
 	});
 
-	// the registry's button height is `calc(0.25rem * 9)`: rem times a step count
-	const remToPx = (calc: string) => {
-		const m = /^calc\(([\d.]+)rem \* (\d+)\)$/.exec(calc);
-		if (!m) throw new Error(`not a rem calc: ${calc}`);
-		return Number(m[1]) * Number(m[2]) * 16;
-	};
 	const draftFooter = async () =>
 		await styled({
 			...RESULTS_LIVE,
@@ -174,14 +168,16 @@ describe("campaign results type", () => {
 		const select = root.querySelector(".card-foot select") as Element;
 		document.documentElement.setAttribute("data-touch", "");
 		try {
-			expect(getComputedStyle(select).minHeight).toBe("44px");
+			expect(getComputedStyle(select).minBlockSize).toBe("44px");
 			expect(getComputedStyle(button(root, "Publish")).minBlockSize).toBe(
 				"44px",
 			);
 		} finally {
 			document.documentElement.removeAttribute("data-touch");
 		}
-		expect(getComputedStyle(select).minHeight).toBe("36px");
+		expect(getComputedStyle(select).minBlockSize).toBe(
+			getComputedStyle(button(root, "Publish")).minBlockSize,
+		);
 	});
 
 	it("sizes the draft footer's gift select to the buttons beside it, labelled like a field", async () => {
@@ -190,9 +186,10 @@ describe("campaign results type", () => {
 		const label = root.querySelector(`label[for="${select?.id}"]`);
 		const publish = button(root, "Publish");
 		expect(publish.className).toContain("ds-btn");
-		// expected from the Publish button's own computed height, not a hardcoded 36px
-		expect(getComputedStyle(select as Element).minHeight).toBe(
-			`${remToPx(getComputedStyle(publish).minBlockSize)}px`,
+		// the registry button's 9-spacing-unit height, as happy-dom leaves the calc; an unresolved rule reads ""
+		expect(getComputedStyle(publish).minBlockSize).toBe("calc(0.25rem * 9)");
+		expect(getComputedStyle(select as Element).minBlockSize).toBe(
+			"calc(0.25rem * 9)",
 		);
 		expect(getComputedStyle(label as Element).fontWeight).toBe("500");
 	});

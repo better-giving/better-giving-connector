@@ -202,23 +202,37 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 						<label class="ds-label" for={`${titleId}-gifts`}>
 							Gifts go to:
 						</label>
-						<select
-							id={`${titleId}-gifts`}
-							class="ds-field-input"
-							value={giftsGoTo}
-							onChange={(e: Event) =>
-								setGiftsGoTo((e.target as HTMLSelectElement).value)
-							}
-						>
-							<option value={GENERAL} selected={giftsGoTo === GENERAL}>
-								General fund
-							</option>
-							{data.programs.map((p) => (
-								<option key={p.id} value={p.id} selected={giftsGoTo === p.id}>
-									{p.name}
+						<div class="ds-select ds-select-inline">
+							<select
+								id={`${titleId}-gifts`}
+								class="ds-field-input"
+								value={giftsGoTo}
+								onChange={(e: Event) =>
+									setGiftsGoTo((e.target as HTMLSelectElement).value)
+								}
+							>
+								<option value={GENERAL} selected={giftsGoTo === GENERAL}>
+									General fund
 								</option>
-							))}
-						</select>
+								{data.programs.map((p) => (
+									<option key={p.id} value={p.id} selected={giftsGoTo === p.id}>
+										{p.name}
+									</option>
+								))}
+							</select>
+							<svg
+								class="ds-select-chevron"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="m6 9 6 6 6-6" />
+							</svg>
+						</div>
 					</div>
 					<div class="foot-actions">
 						<Button variant="secondary" onClick={preview}>
