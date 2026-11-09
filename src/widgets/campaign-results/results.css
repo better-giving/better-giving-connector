@@ -232,15 +232,6 @@
 	gap: 6px;
 }
 
-/* a field in the actions row: the md buttons' height and vertical padding, not the field height */
-.gifts-go select {
-	width: auto;
-	min-height: var(--control-height);
-	padding: 8px 12px;
-	color: var(--gray-12);
-	font-weight: 700;
-}
-
 .confirm {
 	background: var(--destructive-subtle);
 	border: 1px solid var(--destructive);

@@ -102,25 +102,6 @@ h3 {
 	background: var(--destructive-subtle-active);
 }
 
-/* progress */
-
-.progress {
-	height: 8px;
-	overflow: hidden;
-	background: var(--gray-4);
-	border-radius: 9999px;
-}
-
-.progress-fill {
-	height: 100%;
-	background: var(--primary);
-	border-radius: inherit;
-}
-
-.progress.met .progress-fill {
-	background: var(--success);
-}
-
 /* sparkline */
 
 .sparkline {
@@ -188,54 +169,6 @@ h3 {
 .radio:has(.radio-input:focus-visible) {
 	outline: 2px solid var(--ring);
 	outline-offset: 2px;
-}
-
-/* loading, error and empty states */
-
-.state {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 8px;
-	padding: 32px 16px;
-	text-align: center;
-	color: var(--gray-11);
-	background: var(--card);
-	border: 1px solid var(--hairline);
-	border-radius: var(--radius-card);
-}
-
-.state-title {
-	color: var(--gray-12);
-	font-size: var(--text-base);
-	font-weight: 600;
-}
-
-.state-error {
-	background: var(--destructive-subtle);
-	border-color: var(--destructive-6);
-	color: var(--gray-12);
-}
-
-.spinner {
-	width: 20px;
-	height: 20px;
-	border: 2px solid var(--gray-6);
-	border-top-color: var(--primary);
-	border-radius: 50%;
-	animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-	to {
-		transform: rotate(1turn);
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.spinner {
-		animation: none;
-	}
 }
 
 /* layout helpers */

@@ -14,9 +14,14 @@ const VARIANT: Record<CampaignStatus, "warning" | "success" | "neutral"> = {
 	ended: "neutral",
 };
 
-export function StatusBadge(props: { status: CampaignStatus }) {
+export function StatusBadge(props: {
+	status: CampaignStatus;
+	onPhoto?: boolean;
+}) {
 	return (
-		<span class={`ds-badge ds-badge-${VARIANT[props.status]}`}>
+		<span
+			class={`ds-badge ds-badge-${VARIANT[props.status]}${props.onPhoto ? " ds-badge-on-photo" : ""}`}
+		>
 			{LABEL[props.status]}
 		</span>
 	);

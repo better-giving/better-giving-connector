@@ -59,13 +59,13 @@ export function PrivacyPage() {
 
 			<h2>2. Data we process</h2>
 			<h3>2.1 Data we store</h3>
-			<div class="table-wrap">
-				<table>
+			<section class="ds-table-scroll" aria-label="Data we store" tabindex={0}>
+				<table class="ds-table">
 					<thead>
 						<tr>
-							<th>Category</th>
-							<th>Examples</th>
-							<th>Source</th>
+							<th scope="col">Category</th>
+							<th scope="col">Examples</th>
+							<th scope="col">Source</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -129,7 +129,7 @@ export function PrivacyPage() {
 						</tr>
 					</tbody>
 				</table>
-			</div>
+			</section>
 
 			<h3>2.2 Data relayed to your site</h3>
 			<p>
@@ -196,13 +196,13 @@ export function PrivacyPage() {
 			</p>
 
 			<h2>4. Who receives it (recipients)</h2>
-			<div class="table-wrap">
-				<table>
+			<section class="ds-table-scroll" aria-label="Recipients" tabindex={0}>
+				<table class="ds-table">
 					<thead>
 						<tr>
-							<th>Recipient</th>
-							<th>Role</th>
-							<th>Location</th>
+							<th scope="col">Recipient</th>
+							<th scope="col">Role</th>
+							<th scope="col">Location</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -233,7 +233,7 @@ export function PrivacyPage() {
 						</tr>
 					</tbody>
 				</table>
-			</div>
+			</section>
 			<p>
 				Your Better Giving site receives the connection key with each request.
 				It also receives tool requests, and disconnect and revoke calls.

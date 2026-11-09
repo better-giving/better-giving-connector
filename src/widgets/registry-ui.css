@@ -1,7 +1,7 @@
 /*
  * The registry's plain-css components the widgets and the served pages share,
- * over its variables (tokens.css): button, badge, card, field, checkbox and
- * radio, all `ds-` classes, copied by `bg-design` and never edited here.
+ * over its variables (tokens.css): button, badge, card, field, checkbox,
+ * radio, progress, select, switch, state-card, prose and table, all `ds-` classes, copied by `bg-design` and never edited here.
  * What stays local is below: the type sizes the surfaces' own rules read and
  * the touch height. The card's flush footer is `.card-foot` in ui/styles.css.
  */
@@ -12,6 +12,12 @@
 @import "./registry/styles/field-css.css";
 @import "./registry/styles/checkbox-css.css";
 @import "./registry/styles/radio-css.css";
+@import "./registry/styles/progress-css.css";
+@import "./registry/styles/select-css.css";
+@import "./registry/styles/switch-css.css";
+@import "./registry/styles/state-card-css.css";
+@import "./registry/styles/prose-css.css";
+@import "./registry/styles/table-css.css";
 
 :root {
 	/* the registry's items keep their type ladder on their own classes (--ds-*), so the surfaces' rules read these */
@@ -26,7 +32,8 @@
 	--control-height: 44px;
 }
 
-/* buttons grow to a thumb's target on touch */
-:root[data-touch] .ds-btn {
+/* buttons and the inline select grow to a thumb's target on touch */
+:root[data-touch] .ds-btn,
+:root[data-touch] .ds-select-inline > select {
 	min-block-size: var(--control-height);
 }

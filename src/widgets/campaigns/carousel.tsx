@@ -74,7 +74,7 @@ function CampaignTile(props: {
 							origins={props.imageOrigins}
 						/>
 						<span class="campaign-chip">
-							<StatusBadge status={campaign.status} />
+							<StatusBadge status={campaign.status} onPhoto />
 						</span>
 					</div>
 				}

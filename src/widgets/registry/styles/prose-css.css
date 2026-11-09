@@ -1,0 +1,194 @@
+/* the registry's prose column as plain css, no tailwind: long-form text
+   capped at 65ch, styled by element. reads only the variables the `variables`
+   item declares. prose-css.test.tsx renders the React `Prose` beside it and
+   asserts the same computed look in light and dark, for the default and
+   example themes, at a phone and a desktop width.
+
+   the spacing step, the type ladder, the leading, the tracking and the column
+   width live only in tailwind's theme; they are declared here under ds- names
+   with the same values, and the test holds them equal. 48rem in the media
+   query is tailwind's md, written out because a query cannot read a
+   variable. with no tailwind preflight under it, the stylesheet zeroes the
+   browser's own margins, list spacing and rule before it sets its own. */
+.ds-prose {
+  --ds-spacing: 0.25rem;
+  --ds-text-sm: 0.875rem;
+  --ds-text-sm-lh: calc(1.25 / 0.875);
+  --ds-text-base: 1rem;
+  --ds-text-lg: 1.125rem;
+  --ds-text-lg-lh: calc(1.75 / 1.125);
+  --ds-text-xl: 1.25rem;
+  --ds-text-xl-lh: calc(1.75 / 1.25);
+  --ds-text-2xl: 1.5rem;
+  --ds-text-2xl-lh: calc(2 / 1.5);
+  --ds-text-3xl: 1.875rem;
+  --ds-text-3xl-lh: calc(2.25 / 1.875);
+  --ds-text-4xl: 2.25rem;
+  --ds-text-4xl-lh: calc(2.5 / 2.25);
+  --ds-leading-relaxed: 1.625;
+  --ds-tracking-tight: -0.025em;
+  --ds-max-width-prose: 65ch;
+  max-inline-size: var(--ds-max-width-prose);
+  font-size: var(--ds-text-base);
+  line-height: var(--ds-leading-relaxed);
+  color: var(--gray-12);
+}
+
+/* the browser's own margins, zeroed at every depth as tailwind's preflight
+   does, at no specificity so any rule below or a nested component's own wins */
+:where(.ds-prose *) {
+  margin: 0;
+}
+
+/* 16px between blocks; 40/32/24px above an h2/h3/h4; 12px under any of them,
+   a heading straight after a heading included */
+.ds-prose > * + * {
+  margin-top: calc(var(--ds-spacing) * 4);
+}
+.ds-prose > h2 {
+  margin-top: calc(var(--ds-spacing) * 10);
+}
+.ds-prose > h3 {
+  margin-top: calc(var(--ds-spacing) * 8);
+}
+.ds-prose > h4 {
+  margin-top: calc(var(--ds-spacing) * 6);
+}
+.ds-prose > :is(h2, h3, h4) + * {
+  margin-top: calc(var(--ds-spacing) * 3);
+}
+.ds-prose > :is(h2, h3, h4) + :is(h2, h3, h4) {
+  margin-top: calc(var(--ds-spacing) * 3);
+}
+/* nothing collapses out of the column: these outrank the heading and rule
+   margins */
+.ds-prose > :first-child {
+  margin-top: 0;
+}
+.ds-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.ds-prose :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.ds-prose h1 {
+  font-size: var(--ds-text-3xl);
+  line-height: var(--ds-text-3xl-lh);
+  letter-spacing: var(--ds-tracking-tight);
+  text-wrap: balance;
+}
+.ds-prose h2 {
+  font-size: var(--ds-text-2xl);
+  line-height: var(--ds-text-2xl-lh);
+  letter-spacing: var(--ds-tracking-tight);
+  text-wrap: balance;
+}
+.ds-prose h3 {
+  font-size: var(--ds-text-xl);
+  line-height: var(--ds-text-xl-lh);
+}
+.ds-prose h4 {
+  font-size: var(--ds-text-lg);
+  line-height: var(--ds-text-lg-lh);
+}
+
+/* the standfirst under the h1 */
+.ds-prose-lead {
+  font-size: var(--ds-text-lg);
+  line-height: var(--ds-text-lg-lh);
+  color: var(--gray-11);
+  text-wrap: pretty;
+}
+
+@media (width >= 48rem) {
+  .ds-prose h1 {
+    font-size: var(--ds-text-4xl);
+    line-height: var(--ds-text-4xl-lh);
+  }
+  .ds-prose h2 {
+    font-size: var(--ds-text-3xl);
+    line-height: var(--ds-text-3xl-lh);
+  }
+  .ds-prose h3 {
+    font-size: var(--ds-text-2xl);
+    line-height: var(--ds-text-2xl-lh);
+  }
+  .ds-prose-lead {
+    font-size: var(--ds-text-xl);
+    line-height: var(--ds-text-xl-lh);
+  }
+}
+
+/* a byline or date line of its own is a block; a small inside a sentence
+   stays inline */
+.ds-prose > small {
+  display: block;
+}
+.ds-prose small {
+  font-size: var(--ds-text-sm);
+  line-height: var(--ds-text-sm-lh);
+  color: var(--gray-11);
+}
+
+/* a link in a sentence: the link ink, underlined, the ring 2px outside. a
+   link that is a button (`ds-btn`) keeps the button's look */
+.ds-prose a:not(.ds-btn) {
+  color: var(--link);
+  text-decoration-line: underline;
+  text-underline-offset: 2px;
+}
+.ds-prose a:not(.ds-btn):hover {
+  color: var(--link-hover);
+}
+.ds-prose a:not(.ds-btn):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.ds-prose :is(ul, ol) {
+  padding-inline-start: calc(var(--ds-spacing) * 6);
+}
+.ds-prose ul {
+  list-style-type: disc;
+}
+.ds-prose ol {
+  list-style-type: decimal;
+}
+.ds-prose li {
+  padding-inline-start: var(--ds-spacing);
+}
+.ds-prose li + li,
+.ds-prose li > :is(ul, ol) {
+  margin-top: var(--ds-spacing);
+}
+.ds-prose li::marker {
+  color: var(--gray-11);
+}
+
+.ds-prose code {
+  padding: calc(var(--ds-spacing) * 0.5) calc(var(--ds-spacing) * 1.5);
+  border-radius: var(--radius);
+  background-color: var(--panel);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.ds-prose blockquote {
+  padding-inline-start: calc(var(--ds-spacing) * 4);
+  border: 0 solid var(--gray-7);
+  border-inline-start-width: 4px;
+  color: var(--gray-11);
+  font-style: italic;
+}
+
+.ds-prose hr {
+  block-size: 0;
+  border: 0 solid var(--hairline);
+  border-top-width: 1px;
+  color: inherit;
+}
+.ds-prose > hr {
+  margin-block: calc(var(--ds-spacing) * 10);
+}
