@@ -1,10 +1,10 @@
 {
-	"instructions": "These tools act on \"Hope Shelter\", the operator's live Better Giving donation site: what they change, donors see. Before publish_campaign, end_campaign or reset_donation_page, say what will change and wait for the operator's explicit yes in this chat.",
+	"instructions": "These tools act on \"Hope Shelter\", the operator's live Better Giving donation site: what they change, donors see. Show the operator a card, not the campaign written out as text: show_campaigns for browsing campaigns; show_campaign_results for one campaign's status, goal, progress, results, publishing and ending; open_campaign_editor for editing a campaign page; show_campaign_create for starting a campaign; show_photo for a cover photo. After a card, add at most one short line and don't restate what it shows. Before publish_campaign, end_campaign or reset_donation_page, say what will change and wait for the operator's explicit yes in this chat.",
 	"tools": [
 		{
 			"name": "list_campaigns",
 			"title": "List campaigns",
-			"description": "Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
+			"description": "Lists the site's campaigns with their status, public link, and id. For the amount raised, use get_results. To show campaigns to the operator, call show_campaigns instead: this tool is for your own reasoning, such as finding an id or checking a value before an edit. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -36,7 +36,7 @@
 		{
 			"name": "get_campaign",
 			"title": "Get a campaign",
-			"description": "Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it on sites with get_content_catalog, or its blocks on sites with get_block_catalog. For the amount raised, use get_results. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
+			"description": "Reads one campaign: settings, status, public link, and its page. The page is its content (title, story, photos, gift tiers, questions) and the design the site picked from it on sites with get_content_catalog, or its blocks on sites with get_block_catalog. For the amount raised, use get_results. To show a campaign to the operator, call show_campaign_results instead: this tool is for your own reasoning, such as finding an id or checking a value before an edit. Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.",
 			"inputSchema": {
 				"type": "object",
 				"$schema": "https://json-schema.org/draft/2020-12/schema",

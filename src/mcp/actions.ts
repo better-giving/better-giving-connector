@@ -228,7 +228,7 @@ const CONFIRMED =
 	"Donors see this immediately, so the operator confirms it in the chat first.";
 // Ends every campaign tool's description: a chat app otherwise guesses a
 // dashboard path or a link the site never returned.
-const LINKS_ONLY =
+export const LINKS_ONLY =
 	"Link only to URLs a Better Giving tool returned; never describe click-paths or invent URLs.";
 const editsContent = (read: string) =>
 	`Each block follows a schema from get_block_catalog. ${read} returns the current content; send every block the page should keep. For sites that edit pages as blocks.`;

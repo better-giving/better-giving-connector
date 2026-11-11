@@ -9,7 +9,7 @@ import {
 } from "vitest";
 import { createApp } from "../src/app";
 import type { Db } from "../src/db";
-import { MAX_NOTE } from "../src/mcp/actions";
+import { LINKS_ONLY, MAX_NOTE } from "../src/mcp/actions";
 import {
 	ALL_ACTIONS,
 	BLOCK_ACTIONS,
@@ -225,6 +225,119 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			/Before (.+), say what will change/,
 		)?.[1];
 		expect(waiting).toBe("publish_campaign or end_campaign");
+	});
+
+	// The card tools in the order the instructions list them, and the data
+	// tool that points at each card it shares data with.
+	const CARD_TOOLS = [
+		"show_campaigns",
+		"show_campaign_results",
+		"open_campaign_editor",
+		"show_campaign_create",
+		"show_photo",
+	];
+	const POINTS_AT = {
+		list_campaigns: { card: "show_campaigns", action: "campaigns.list" },
+		get_campaign: { card: "show_campaign_results", action: "campaigns.get" },
+	};
+
+	const withoutActions = (...dropped: string[]) =>
+		ALL_ACTIONS.filter((a) => !dropped.includes(a));
+
+	// What a fresh connection is told: its instructions and its tools.
+	const connectSeeing = async (
+		actions: readonly string[],
+		opts: { scope?: string } = {},
+	) => {
+		deployment.setActions(actions);
+		const token = (await connectFlow(call, deployment, BASE, opts).connect())
+			.access_token;
+		const listing = `Bearer ${token}`;
+		const { instructions } = (await rpc(await call(mcpOpen(version, listing))))
+			.result;
+		const tools: { name: string; description: string }[] = (
+			await rpc(
+				await call(
+					mcpRequest(version, listing, "tools/list", undefined, ++rpcId),
+				),
+			)
+		).result.tools;
+		// "Show the operator a card, ...: show_campaigns for browsing campaigns; ..."
+		const line = instructions.match(/Show the operator a card[^:]*: (.+?)\.\s/);
+		const cardsNamed: string[] =
+			line === null
+				? []
+				: line[1].split("; ").map((entry: string) => entry.split(" for ")[0]);
+		return { instructions, tools, cardsNamed };
+	};
+
+	test.each([
+		{ served: ALL_ACTIONS, cards: CARD_TOOLS },
+		{
+			// results.summary is needed by every card but the editor and the photo
+			served: withoutActions("results.summary"),
+			cards: ["open_campaign_editor", "show_photo"],
+		},
+		{
+			served: withoutActions("campaigns.get", "results.summary"),
+			cards: [],
+		},
+		{
+			// the results card needs donations.list, the campaigns card does not:
+			// list_campaigns keeps its pointer and get_campaign has none
+			served: withoutActions("donations.list"),
+			cards: ["show_campaigns", "open_campaign_editor", "show_photo"],
+		},
+	])(
+		"the instructions name each registered card tool and no other: $cards",
+		async ({ served, cards }) => {
+			const { instructions, tools, cardsNamed } = await connectSeeing(served);
+
+			expect(CARD_TOOLS.filter((c) => tools.some((t) => t.name === c))).toEqual(
+				cards,
+			);
+			expect(cardsNamed).toEqual(cards);
+			for (const card of CARD_TOOLS)
+				expect(instructions.includes(card)).toBe(cards.includes(card));
+
+			for (const [name, { card, action }] of Object.entries(POINTS_AT)) {
+				const tool = tools.find((t) => t.name === name);
+				if (!(served as readonly string[]).includes(action)) {
+					expect(tool).toBeUndefined();
+					continue;
+				}
+				if (tool === undefined) throw new Error(`${name} is not listed`);
+				// its own card only, and only where that card is registered
+				for (const other of CARD_TOOLS)
+					expect(tool.description.includes(other)).toBe(
+						other === card && cards.includes(card),
+					);
+				expect(tool.description.endsWith(LINKS_ONLY)).toBe(true);
+				if (cards.includes(card))
+					expect(tool.description).toContain(
+						`call ${card} instead: this tool is for your own reasoning`,
+					);
+			}
+		},
+	);
+
+	test("a read-only connection is pointed at the two view cards only", async () => {
+		const { instructions, tools, cardsNamed } = await connectSeeing(
+			ALL_ACTIONS,
+			{ scope: "offline_access read_only" },
+		);
+
+		expect(instructions).toContain("This connection is read-only");
+		expect(cardsNamed).toEqual(["show_campaigns", "show_campaign_results"]);
+		for (const card of [
+			"open_campaign_editor",
+			"show_campaign_create",
+			"show_photo",
+		])
+			expect(instructions.includes(card)).toBe(false);
+		// the pointers lead somewhere this connection can call
+		for (const card of cardsNamed)
+			expect(tools.map((t) => t.name)).toContain(card);
 	});
 
 	test("the instructions name a single confirm tool bare, with no 'or'", async () => {
