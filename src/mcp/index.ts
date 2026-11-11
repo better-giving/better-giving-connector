@@ -21,7 +21,8 @@ import {
 import type { ActionName, DeploymentClient } from "../deployment";
 import { localeOf } from "../format";
 import { log } from "../log";
-import { actionsFor, LIVE_EDITS_DRAFT } from "./actions";
+import { RENDER_TOOLS, type WidgetName } from "../widgets/model";
+import { actionsFor, LINKS_ONLY, LIVE_EDITS_DRAFT } from "./actions";
 import { LOCAL_TOOLS } from "./local";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 import { isAppOnly, loggedName, type ToolSpec } from "./spec";
@@ -218,7 +219,7 @@ function rendersApps(envelope: object | undefined): boolean | null {
 function servedSpecs(connection: ToolConnection): ToolSpec[] {
 	const serves = (action: ActionName) =>
 		connection.actions === null || connection.actions.includes(action);
-	return [
+	const specs = [
 		...actionsFor(connection.platform).filter((spec) => serves(spec.action)),
 		...LOCAL_TOOLS.filter(
 			(spec) =>
@@ -230,6 +231,63 @@ function servedSpecs(connection: ToolConnection): ToolSpec[] {
 				: { ...spec, description: spec.standaloneDescription },
 		),
 	];
+	return pointDataToolsAtCards(specs);
+}
+
+// What each card is for, in the words the instructions use for when to call
+// it; `readOnly` is those words on a read-only connection, null for a card
+// whose work goes through app-only writes a read-only token refuses. Key order
+// is how the instructions list them.
+const CARD_FOR: Record<WidgetName, { when: string; readOnly: string | null }> =
+	{
+		campaigns: {
+			when: "browsing campaigns",
+			readOnly: "browsing campaigns",
+		},
+		"campaign-results": {
+			when: "one campaign's status, goal, progress, results, publishing and ending",
+			readOnly: "one campaign's status, goal, progress and results",
+		},
+		"campaign-editor": { when: "editing a campaign page", readOnly: null },
+		"campaign-create": { when: "starting a campaign", readOnly: null },
+		photo: { when: "a cover photo", readOnly: null },
+	};
+
+const isRegistered = (specs: readonly ToolSpec[], card: WidgetName) =>
+	specs.some((spec) => spec.tool === RENDER_TOOLS[card].tool);
+
+function cardsIn(specs: readonly ToolSpec[], readOnly: boolean): string[] {
+	return (Object.keys(CARD_FOR) as WidgetName[]).flatMap((card) => {
+		const when = readOnly ? CARD_FOR[card].readOnly : CARD_FOR[card].when;
+		return when !== null && isRegistered(specs, card)
+			? [`${RENDER_TOOLS[card].tool} for ${when}`]
+			: [];
+	});
+}
+
+// list_campaigns and get_campaign return the data their cards show, so a model
+// that sees only them writes the campaign out as text. Each one's description
+// names its own card, when that card is registered.
+const DATA_TOOL_CARD: Record<string, { card: WidgetName; shows: string }> = {
+	list_campaigns: { card: "campaigns", shows: "campaigns" },
+	get_campaign: { card: "campaign-results", shows: "a campaign" },
+};
+
+function pointDataToolsAtCards(specs: ToolSpec[]): ToolSpec[] {
+	return specs.map((spec) => {
+		const target = DATA_TOOL_CARD[spec.tool];
+		if (target === undefined || !isRegistered(specs, target.card)) return spec;
+		const pointer = `To show ${target.shows} to the operator, call ${RENDER_TOOLS[target.card].tool} instead: this tool is for your own reasoning, such as finding an id or checking a value before an edit.`;
+		return { ...spec, description: beforeLinksOnly(spec, pointer) };
+	});
+}
+
+// Throws rather than dropping the pointer when the description no longer ends
+// with LINKS_ONLY, so a reworded description fails every /mcp request.
+function beforeLinksOnly(spec: ToolSpec, sentence: string): string {
+	if (!spec.description.endsWith(LINKS_ONLY))
+		throw new Error(`${spec.tool}'s description must end with LINKS_ONLY`);
+	return `${spec.description.slice(0, -LINKS_ONLY.length)}${sentence} ${LINKS_ONLY}`;
 }
 
 const isRead = (spec: ToolSpec) => spec.annotations.readOnlyHint;
@@ -326,6 +384,13 @@ function instructionsFor(
 	if (readOnly) {
 		lines.push(
 			"This connection is read-only: it can view the site but not change anything.",
+		);
+	}
+	const cards = cardsIn(specs, readOnly);
+	if (cards.length > 0) {
+		lines.push(
+			`Show the operator a card, not the campaign written out as text: ${cards.join("; ")}.`,
+			"After a card, add at most one short line and don't restate what it shows.",
 		);
 	}
 	if (specs.some((spec) => spec.description.includes(LIVE_EDITS_DRAFT))) {
