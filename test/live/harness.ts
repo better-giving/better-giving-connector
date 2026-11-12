@@ -30,8 +30,8 @@ export type LiveRow = {
 		| "unknown_action"
 		| "key_refused"
 		| "error"
-		// never called: a write or publish the deployment serves, or get_donor
-		// when list_donors lists no donor to read
+		// never called: an other tool the deployment serves, or get_donor when
+		// list_donors lists no donor to read
 		| "skipped";
 	ms: number;
 	bytes: number;
@@ -47,15 +47,16 @@ export type LiveHarnessOptions = {
 };
 
 /**
- * Hello, exchange, the 13 minimum tools (create and record twice), the other
- * 12 as actions this deployment does not serve, then disconnect and one refused
- * call. On Platform a form is created first when create_form is served, because
- * a nonprofit starts with none. A deployment that does not serve
- * donations.record (Platform) gets record_donation once, refused, and get_donor
- * reads the first donor list_donors lists, or is skipped when there is none.
- * An other tool the deployment serves is skipped, not called: it would write,
- * publish or reset real records. The results file never receives arguments,
- * response bodies, or the key.
+ * Hello, exchange, the 13 minimum tools (create_campaign twice, and
+ * record_donation twice where served), the other 12 as actions this deployment
+ * does not serve, then disconnect and one refused call. On Platform a form is
+ * created first when create_form is served, because a nonprofit starts with
+ * none. A deployment that does not serve donations.record (Platform) gets
+ * record_donation once, refused, and get_donor reads the first donor
+ * list_donors lists, or is skipped when there is none. An other tool the
+ * deployment serves is skipped, not called: most of them write, publish or
+ * reset real records. The results file never receives arguments, response
+ * bodies, or the key.
  */
 export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 	const rows: LiveRow[] = [];
@@ -115,8 +116,9 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			expectOutcome(rows.at(-1), tool, "ok");
 		}
 
-		// Platform never makes a default form, so its list starts empty.
-		// Unstated actions (null) offer every action, as runTool reads them.
+		// Platform makes no default form, so a new nonprofit may list none.
+		// Unstated actions (null) offer every action, as servedSpecs in
+		// src/mcp/index.ts reads them.
 		const serves = (action: string): boolean =>
 			hello.actions === null ||
 			(hello.actions as readonly string[]).includes(action);
@@ -313,7 +315,7 @@ async function run(
 	return text;
 }
 
-// The specs the connector serves this connection, as `servedSpecs` in src/mcp/index.ts does.
+// The specs the connector serves on this connection, as `servedSpecs` in src/mcp/index.ts picks them.
 const specNamed = (tool: string, platform: boolean): ActionSpec => {
 	const spec = actionsFor(platform).find((item) => item.tool === tool);
 	if (!spec) throw new Error(`no tool ${tool}`);

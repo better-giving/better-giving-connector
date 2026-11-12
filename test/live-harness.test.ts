@@ -79,7 +79,7 @@ test("the harness runs the minimum tools against the fake and records no secrets
 	expect(dep.issuedKeys).toHaveLength(1);
 });
 
-// What the fake Platform lists, plus record_donation, which the 13 minimum tools need.
+// What the fake Platform lists, plus record_donation, as a release that records gifts would.
 const PLATFORM_SERVES = [
 	...Object.values(PLATFORM_ACTION_OF),
 	"donations.record",
@@ -170,9 +170,6 @@ test("on Platform with create_form served, the harness creates a form, lists it 
 	});
 });
 
-// Red before the fix: one default-size page lists 25 of the 122 forms, and the
-// form create_form made is the last of them, so the harness threw
-// "list_forms does not list the form create_form made".
 test("on Platform the harness follows list_forms pages to the form it made", async () => {
 	const dep = fakeDeployment({
 		name: "Hope Shelter",
@@ -208,7 +205,7 @@ test("on Platform the harness skips the other tools it serves and calls only the
 	const rows = await runOnPlatform(dep);
 
 	const otherTools = ACTIONS.filter((spec) => !MVP.has(spec.action));
-	// create_form is served but called, to make the form the run reads
+	// create_form is served and still called, to make the form the run reads
 	const servedOthers = otherTools
 		.filter((spec) => PLATFORM_SERVES.includes(spec.action))
 		.filter((spec) => spec.action !== "forms.create")
@@ -253,8 +250,6 @@ const donationPosts = (dep: ReturnType<typeof fakeDeployment>) =>
 		(call) => call.method === "POST" && call.path.endsWith("/donations"),
 	);
 
-// Red before the fix: the harness expected record_donation to answer ok on
-// Platform and threw "record_donation returned unknown_action, expected ok".
 test("on Platform, which does not record gifts, record_donation is refused once and get_donor reads the donor list_donors lists", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(PLATFORM_LISTED);
@@ -279,7 +274,6 @@ test("on Platform, which does not record gifts, record_donation is refused once 
 	).toBe(true);
 });
 
-// Red before the fix: the same throw, before get_donor was reached.
 test("on Platform with no donor listed, get_donor is skipped and not called", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(PLATFORM_LISTED);
@@ -389,8 +383,7 @@ test("on Platform with no form and create_form not served, the harness fails nam
 	expect(readFileSync(resultsPath, "utf8")).toContain('"tool":"list_forms"');
 });
 
-// Standalone serves create_form here yet never runs it, which the old wording
-// ("create_form not served") got wrong.
+// Standalone serves create_form here yet never runs it.
 test("on Standalone with no form listed, the harness fails with the same cause even when create_form is served", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", defaultForm: false });
 	dep.setCampaignForms(false);
@@ -413,7 +406,6 @@ test("on Standalone with no form listed, the harness fails with the same cause e
 	).toBe(false);
 });
 
-// Red without the throw: the harness would go on to read the made form.
 test("on Platform the harness fails when list_forms does not list the form create_form made, and still writes its results", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(PLATFORM_SERVES);
