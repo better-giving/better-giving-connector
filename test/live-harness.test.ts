@@ -121,7 +121,7 @@ const formPath = (dep: ReturnType<typeof fakeDeployment>): string | undefined =>
 		(call) => call.method === "GET" && /\/forms\/[^/]+$/.test(call.path),
 	)?.path;
 
-async function runOnPlatform(
+async function runHarness(
 	dep: ReturnType<typeof fakeDeployment>,
 ): Promise<Record<string, unknown>[]> {
 	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
@@ -147,7 +147,7 @@ test("on Platform with create_form served, the harness creates a form, lists it 
 	});
 	dep.setActions(PLATFORM_SERVES);
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 	const tools = rows.map((row) => row.tool);
 
 	expect(
@@ -177,17 +177,42 @@ test("on Platform the harness follows list_forms pages to the form it made", asy
 		fillerForms: 120,
 	});
 	dep.setActions(PLATFORM_SERVES);
+	// what the deployment answered to each list_forms call
+	const answered: { next_cursor: string | null }[] = [];
+	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
+	const resultsPath = join(dir, "results.ndjson");
 
-	const rows = await runOnPlatform(dep);
+	await runLiveHarness({
+		origin: dep.origin,
+		code: dep.mintCode(),
+		fetch: async (input, init) => {
+			const res = await dep.fetch(input, init);
+			const url = new URL(input instanceof Request ? input.url : String(input));
+			const isList =
+				(init?.method ?? "GET") === "GET" && url.pathname.endsWith("/forms");
+			if (isList) answered.push(await res.clone().json());
+			return res;
+		},
+		resultsPath,
+		now: new Date("2026-10-17T15:04:05.000Z"),
+	});
+	const rows = readFileSync(resultsPath, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line) as Record<string, unknown>);
 
-	// frm_1 and 120 fillers fill the first page of 100; the made form is on the second
+	// frm_1 and 120 fillers overfill the first page, so the made form is on a later one
 	const listCalls = dep.calls.filter(
 		(call) => call.method === "GET" && call.path.endsWith("/forms"),
 	);
-	expect(listCalls.map((call) => call.query)).toEqual([
-		{ limit: "100" },
-		{ limit: "100", cursor: "100" },
-	]);
+	expect(listCalls).toHaveLength(2);
+	// the second call asks for the cursor the first answer gave
+	expect(answered[0]?.next_cursor).toEqual(expect.any(String));
+	expect(listCalls[1]?.query.cursor).toBe(answered[0]?.next_cursor);
+	expect(listCalls[0]?.query.cursor).toBeUndefined();
+	expect(listCalls.every((call) => Number(call.query.limit) <= 100)).toBe(
+		true,
+	);
 	expect(formPath(dep)).toMatch(/\/forms\/(?!frm_1$|frm_fill_)[^/]+$/);
 	expect(rows.find((row) => row.tool === "get_form")).toMatchObject({
 		outcome: "ok",
@@ -202,7 +227,7 @@ test("on Platform the harness skips the other tools it serves and calls only the
 	});
 	dep.setActions(PLATFORM_SERVES);
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 
 	const otherTools = ACTIONS.filter((spec) => !MVP.has(spec.action));
 	// create_form is served and still called, to make the form the run reads
@@ -255,7 +280,7 @@ test("on Platform, which does not record gifts, record_donation is refused once 
 	dep.setActions(PLATFORM_LISTED);
 	dep.seedGift({ amount: "5.00", date: "2026-10-01" });
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 
 	expect(
 		rows
@@ -274,11 +299,67 @@ test("on Platform, which does not record gifts, record_donation is refused once 
 	).toBe(true);
 });
 
+test("on Platform, get_donor reads the first donor list_donors lists, not a later one", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
+	dep.setActions(PLATFORM_LISTED);
+	const donor = (id: string) => ({
+		id,
+		name: id,
+		email: null,
+		total: { amount: "5.00", currency: "USD" },
+		gift_count: 1,
+	});
+	dep.intercept((req) => {
+		const path = new URL(req.url).pathname;
+		if (req.method !== "GET") return undefined;
+		if (path.endsWith("/donors")) {
+			return Response.json({
+				data: [donor("dnr_first"), donor("dnr_second")],
+				next_cursor: null,
+			});
+		}
+		const read = /\/donors\/(dnr_first|dnr_second)$/.exec(path);
+		return read?.[1] === undefined
+			? undefined
+			: Response.json({
+					...donor(read[1]),
+					gifts: { data: [], next_cursor: null },
+				});
+	});
+
+	const rows = await runHarness(dep);
+
+	expect(rows.find((row) => row.tool === "get_donor")).toMatchObject({
+		outcome: "ok",
+	});
+	expect(
+		dep.calls
+			.filter(
+				(call) => call.method === "GET" && /\/donors\/[^/]+$/.test(call.path),
+			)
+			.map((call) => call.path.split("/").at(-1)),
+	).toEqual(["dnr_first"]);
+});
+
+test("on Platform serving donations.record, record_donation records the gift and replays it", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
+	dep.setActions(PLATFORM_SERVES);
+
+	const rows = await runHarness(dep);
+
+	expect(
+		rows
+			.filter((row) => row.tool === "record_donation")
+			.map((row) => row.outcome),
+	).toEqual(["ok", "replay"]);
+	expect(donationPosts(dep)).toHaveLength(2);
+});
+
 test("on Platform with no donor listed, get_donor is skipped and not called", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(PLATFORM_LISTED);
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 
 	expect(rows.find((row) => row.tool === "get_donor")).toEqual({
 		tool: "get_donor",
@@ -324,16 +405,40 @@ test("on Platform a list_donors answer with no data array fails the run instead 
 	expect(tools).not.toContain("get_donor");
 });
 
-test("on Platform the live check is live: a non-served write would reach the fake", async () => {
+test("on Platform the live check is live: every other tool, not served, reaches the fake on its own route", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(MVP_ACTIONS);
 
-	await runOnPlatform(dep);
+	await runHarness(dep);
 
-	// MVP-only: every other tool is called and refused, so the fake saw their routes
-	expect(reachedOther(dep)).toEqual(
-		expect.arrayContaining([expect.stringMatching(/^POST .*\/publish$/)]),
-	);
+	// MVP-only: runTool validates no input, so each other tool is sent and refused.
+	// A route whose method or path matches nothing the tool sends would leave the
+	// "sent none" checks beside this one green for nothing.
+	const unreached = OTHER_ROUTES.filter(
+		(route) => reachedOther(dep, [route.action]).length === 0,
+	).map((route) => route.action);
+	expect(unreached).toEqual([]);
+});
+
+test("on Platform each tool runs with the spec its connection is served: the edit and publish tools read the campaign first", async () => {
+	const campaignReads = (dep: ReturnType<typeof fakeDeployment>) =>
+		dep.calls.filter(
+			(call) =>
+				call.method === "GET" && /\/campaigns\/[^/]+$/.test(call.path),
+		).length;
+	const platform = fakeDeployment({ name: "Hope Shelter", platform: true });
+	platform.setActions(MVP_ACTIONS);
+	const standalone = fakeDeployment({ name: "Hope Shelter" });
+	standalone.setActions(MVP_ACTIONS);
+
+	await runHarness(platform);
+	await runHarness(standalone);
+
+	// Platform's update and publish tools read the campaign to keep a live
+	// campaign's edit as a draft; Standalone's specs send them without a read.
+	// get_campaign reads once on both.
+	expect(campaignReads(standalone)).toBe(1);
+	expect(campaignReads(platform)).toBeGreaterThan(campaignReads(standalone));
 });
 
 test("on Standalone serving the writes, the harness skips every other tool and sends none", async () => {
@@ -343,7 +448,7 @@ test("on Standalone serving the writes, the harness skips every other tool and s
 		...OTHER_ROUTES.map((route) => route.action),
 	]);
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 
 	expect(rows.filter((row) => row.outcome === "skipped")).toHaveLength(12);
 	expect(rows.filter((row) => row.outcome === "unknown_action")).toEqual([]);
@@ -363,7 +468,7 @@ test("when hello states no actions, every action is offered and the harness skip
 			: undefined,
 	);
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 
 	expect(rows.filter((row) => row.outcome === "skipped")).toHaveLength(12);
 	expect(reachedOther(dep)).toEqual([]);
@@ -377,7 +482,7 @@ test("on Platform with create_form not served, the harness uses the form that is
 	});
 	dep.setActions(MVP_ACTIONS);
 
-	const rows = await runOnPlatform(dep);
+	const rows = await runHarness(dep);
 
 	expect(
 		rows.some((row) => row.tool === "create_form" && row.outcome === "ok"),
