@@ -222,6 +222,12 @@ export function fakeDeployment(
 		platform?: boolean;
 		/** Platform: false for a nonprofit with no slug, whose live campaigns have no public_url. */
 		nonprofitSlug?: boolean;
+		/** False for a nonprofit that has made no form, as a new Platform one: the list starts empty. */
+		defaultForm?: boolean;
+		/** A second form, "frm_other", listed before any form made later: the harness has to pick the right one. */
+		extraForm?: boolean;
+		/** This many more forms, "frm_fill_1" on, listed ahead of any form made later. */
+		fillerForms?: number;
 	} = {},
 ): FakeDeployment {
 	const host = opts.host ?? "give.example.org";
@@ -231,6 +237,22 @@ export function fakeDeployment(
 		opts.platform ?? false,
 	);
 	state.nonprofitSlug = opts.nonprofitSlug ?? true;
+	const defaultForm = state.forms.get("frm_1");
+	if (opts.defaultForm === false) state.forms.clear();
+	if (opts.extraForm && defaultForm) {
+		state.forms.set("frm_other", {
+			...defaultForm,
+			id: "frm_other",
+			name: "Other form",
+		});
+	}
+	for (let n = 1; defaultForm && n <= (opts.fillerForms ?? 0); n++) {
+		state.forms.set(`frm_fill_${n}`, {
+			...defaultForm,
+			id: `frm_fill_${n}`,
+			name: `Filler form ${n}`,
+		});
+	}
 	const calls: RecordedCall[] = [];
 	let interceptor: Interceptor | null = null;
 	const app = deploymentApp(state);
@@ -1036,6 +1058,11 @@ function deploymentApp(state: State) {
 						...Object.keys(PLATFORM_ACTION_OF).filter((tool) =>
 							state.actions.has(PLATFORM_ACTION_OF[tool] as string),
 						),
+						// Platform's own hello never lists it; a test serves it to model a
+						// release that does, and then hello has to say so.
+						...(state.actions.has("donations.record")
+							? ["record_donation"]
+							: []),
 					]
 				: [...state.actions],
 		}),

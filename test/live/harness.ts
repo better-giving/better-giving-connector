@@ -1,9 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { deploymentClient } from "../../src/deployment";
+import type { ActionName } from "../../src/deployment/contract";
 import { parseOrigin } from "../../src/deployment/origin";
 import { DEFAULT_LOCALE } from "../../src/format";
-import { ACTIONS, type ActionSpec } from "../../src/mcp/actions";
+import { ACTIONS, type ActionSpec, actionsFor } from "../../src/mcp/actions";
 import {
 	type RunToolContext,
 	runTool,
@@ -19,9 +20,20 @@ const REFUSED = "no longer accepts this connection";
 
 const MVP = new Set<string>(MVP_ACTIONS);
 
+/** The largest `limit` a list tool's input takes (`page` in src/mcp/actions.ts). */
+const MAX_LIMIT = 100;
+
 export type LiveRow = {
 	tool: string;
-	outcome: "ok" | "replay" | "unknown_action" | "key_refused" | "error";
+	outcome:
+		| "ok"
+		| "replay"
+		| "unknown_action"
+		| "key_refused"
+		| "error"
+		// never called: an other tool the deployment serves, or get_donor when
+		// list_donors lists no donor to read
+		| "skipped";
 	ms: number;
 	bytes: number;
 };
@@ -30,15 +42,25 @@ export type LiveHarnessOptions = {
 	origin: string;
 	code: string;
 	fetch: typeof fetch;
-	/** Overwritten with one JSON line per tool: tool, outcome, ms, bytes. */
+	/**
+	 * Overwritten with one JSON line per call: tool, outcome, ms, bytes. A tool
+	 * run twice, or paged, has a line each time.
+	 */
 	resultsPath: string;
 	now?: Date;
 };
 
 /**
- * Hello, exchange, the 13 minimum tools (create and record twice), the other
- * 12 as actions this deployment does not serve, then disconnect and one refused
- * call. The results file never receives arguments, response bodies, or the key.
+ * Hello, exchange, the 13 minimum tools (create_campaign twice, and
+ * record_donation twice where served), each of the other 12 the deployment
+ * does not serve, then disconnect and one refused call. An other tool the
+ * deployment serves is skipped, not called: most of them write, publish or
+ * reset real records. On Platform, when create_form is served, the run makes a
+ * form after the campaign reads and before list_forms, since a nonprofit starts
+ * with none. Where donations.record is not served (Platform), record_donation
+ * runs once and is refused, and get_donor reads the first donor list_donors
+ * lists, or is skipped when there is none. The results file never receives
+ * arguments, response bodies, or the key.
  */
 export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 	const rows: LiveRow[] = [];
@@ -93,65 +115,114 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			"get_campaign",
 			"get_donation_page",
 			"get_block_catalog",
-			"list_forms",
 		] as const) {
-			const text = await run(
-				rows,
-				ctx,
-				connection,
-				tool,
-				minimumArgs(tool, ids),
-			);
+			await run(rows, ctx, connection, tool, minimumArgs(tool, ids));
 			expectOutcome(rows.at(-1), tool, "ok");
-			if (tool === "list_forms") {
-				ids.form = stringField(
-					text,
-					(value) => {
-						const data = value.data;
-						if (!Array.isArray(data)) return undefined;
-						const first = data[0];
-						if (typeof first !== "object" || first === null) return undefined;
-						return (first as { id?: unknown }).id;
-					},
-					"list_forms",
-				);
-			}
 		}
 
+		// Unstated actions (null) offer every action, as servedSpecs in
+		// src/mcp/index.ts reads them.
+		const serves = (action: ActionName): boolean =>
+			hello.actions === null || hello.actions.includes(action);
+		// Platform makes no default form: create_form makes the one the run reads.
+		const makesForm = hello.platform && serves("forms.create");
+		if (makesForm) {
+			const made = await run(rows, ctx, connection, "create_form", {
+				name: stamp,
+			});
+			expectOutcome(rows.at(-1), "create_form", "ok");
+			ids.form = stringField(made, (value) => value.id, "create_form");
+		}
+		// Every run on Platform leaves a form behind, so the one just made can be
+		// past the first page: follow pages until it shows or there are no more.
+		const listedIds: string[] = [];
+		const cursors = new Set<string>();
+		let cursor: string | undefined;
+		do {
+			const listed = await run(rows, ctx, connection, "list_forms", {
+				limit: MAX_LIMIT,
+				...(cursor === undefined ? {} : { cursor }),
+			});
+			expectOutcome(rows.at(-1), "list_forms", "ok");
+			listedIds.push(...dataIds(listed, "list_forms"));
+			cursor =
+				makesForm && !listedIds.includes(ids.form)
+					? nextCursor(listed, "list_forms")
+					: undefined;
+			if (cursor !== undefined && cursors.has(cursor)) {
+				throw new Error("list_forms repeats a cursor");
+			}
+			if (cursor !== undefined) cursors.add(cursor);
+		} while (cursor !== undefined);
+		if (makesForm) {
+			if (!listedIds.includes(ids.form)) {
+				throw new Error("list_forms does not list the form create_form made");
+			}
+		} else {
+			const first = listedIds[0];
+			if (first === undefined) {
+				throw new Error(
+					"list_forms listed no form, and create_form was not run",
+				);
+			}
+			ids.form = first;
+		}
 		await run(rows, ctx, connection, "get_form", { id: ids.form });
 		expectOutcome(rows.at(-1), "get_form", "ok");
+		let donorsListed = "";
 		for (const tool of [
 			"get_results",
 			"list_donations",
 			"list_donors",
 		] as const) {
-			await run(rows, ctx, connection, tool, {});
+			const text = await run(rows, ctx, connection, tool, {});
 			expectOutcome(rows.at(-1), tool, "ok");
+			if (tool === "list_donors") donorsListed = text;
 		}
 
-		const recorded = await run(
-			rows,
-			ctx,
-			connection,
-			"record_donation",
-			gift(stamp, day),
-		);
-		await run(rows, ctx, connection, "record_donation", gift(stamp, day));
-		expectOutcome(rows.at(-2), "record_donation", "ok");
-		expectOutcome(rows.at(-1), "record_donation", "replay");
-		ids.donor = stringField(
-			recorded,
-			(value) => value.donor_id,
-			"record_donation",
-		);
+		if (serves("donations.record")) {
+			const recorded = await run(
+				rows,
+				ctx,
+				connection,
+				"record_donation",
+				gift(stamp, day),
+			);
+			await run(rows, ctx, connection, "record_donation", gift(stamp, day));
+			expectOutcome(rows.at(-2), "record_donation", "ok");
+			expectOutcome(rows.at(-1), "record_donation", "replay");
+			ids.donor = stringField(
+				recorded,
+				(value) => value.donor_id,
+				"record_donation",
+			);
+		} else {
+			// Platform does not record a gift: the call is refused, and get_donor
+			// reads a donor the site already lists.
+			await run(rows, ctx, connection, "record_donation", gift(stamp, day));
+			expectOutcome(rows.at(-1), "record_donation", "unknown_action");
+			ids.donor = dataIds(donorsListed, "list_donors")[0] ?? "";
+		}
 
-		await run(rows, ctx, connection, "get_donor", { id: ids.donor, limit: 5 });
-		expectOutcome(rows.at(-1), "get_donor", "ok");
+		if (ids.donor === "") {
+			rows.push({ tool: "get_donor", outcome: "skipped", ms: 0, bytes: 0 });
+		} else {
+			await run(rows, ctx, connection, "get_donor", {
+				id: ids.donor,
+				limit: 5,
+			});
+			expectOutcome(rows.at(-1), "get_donor", "ok");
+		}
 		await run(rows, ctx, connection, "list_recurring_gifts", {});
 		expectOutcome(rows.at(-1), "list_recurring_gifts", "ok");
 		if (dropped) throw new Error("a minimum tool dropped the connection");
 
 		for (const spec of rest) {
+			if (makesForm && spec.tool === "create_form") continue;
+			if (serves(spec.action)) {
+				rows.push({ tool: spec.tool, outcome: "skipped", ms: 0, bytes: 0 });
+				continue;
+			}
 			await run(
 				rows,
 				ctx,
@@ -232,7 +303,7 @@ async function run(
 	tool: string,
 	args: Record<string, unknown>,
 ): Promise<string> {
-	const spec = specNamed(tool);
+	const spec = specNamed(tool, connection.platform);
 	const started = performance.now();
 	const result = await runTool(spec, connection, args, ctx, DEFAULT_LOCALE);
 	// the text answer; a success's summary line follows it
@@ -247,8 +318,9 @@ async function run(
 	return text;
 }
 
-const specNamed = (tool: string): ActionSpec => {
-	const spec = ACTIONS.find((item) => item.tool === tool);
+// The specs the connector serves on this connection, as `servedSpecs` in src/mcp/index.ts picks them.
+const specNamed = (tool: string, platform: boolean): ActionSpec => {
+	const spec = actionsFor(platform).find((item) => item.tool === tool);
 	if (!spec) throw new Error(`no tool ${tool}`);
 	return spec;
 };
@@ -276,11 +348,7 @@ function expectOutcome(
 	}
 }
 
-function stringField(
-	text: string,
-	read: (value: Record<string, unknown>) => unknown,
-	label: string,
-): string {
+function lastJson(text: string, label: string): Record<string, unknown> {
 	let parsed: unknown;
 	try {
 		// The JSON is the last line, below the lead and any replay notice.
@@ -291,7 +359,33 @@ function stringField(
 	if (typeof parsed !== "object" || parsed === null) {
 		throw new Error(`${label} returned no id`);
 	}
-	const value = read(parsed as Record<string, unknown>);
+	return parsed as Record<string, unknown>;
+}
+
+/** The ids in a list answer's `data`, in the order the site sends them. */
+function dataIds(text: string, label: string): string[] {
+	const data = lastJson(text, label).data;
+	if (!Array.isArray(data)) throw new Error(`${label} returned no data array`);
+	return data.map((item) => {
+		const id = (item as { id?: unknown } | null)?.id;
+		if (typeof id !== "string" || id === "") {
+			throw new Error(`${label} listed an item with no id`);
+		}
+		return id;
+	});
+}
+
+function nextCursor(text: string, label: string): string | undefined {
+	const cursor = lastJson(text, label).next_cursor;
+	return typeof cursor === "string" && cursor !== "" ? cursor : undefined;
+}
+
+function stringField(
+	text: string,
+	read: (value: Record<string, unknown>) => unknown,
+	label: string,
+): string {
+	const value = read(lastJson(text, label));
 	if (typeof value !== "string" || value === "") {
 		throw new Error(`${label} returned no id`);
 	}
