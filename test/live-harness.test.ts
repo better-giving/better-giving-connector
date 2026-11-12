@@ -210,9 +210,7 @@ test("on Platform the harness follows list_forms pages to the form it made", asy
 	expect(answered[0]?.next_cursor).toEqual(expect.any(String));
 	expect(listCalls[1]?.query.cursor).toBe(answered[0]?.next_cursor);
 	expect(listCalls[0]?.query.cursor).toBeUndefined();
-	expect(listCalls.every((call) => Number(call.query.limit) <= 100)).toBe(
-		true,
-	);
+	expect(listCalls.every((call) => Number(call.query.limit) <= 100)).toBe(true);
 	expect(formPath(dep)).toMatch(/\/forms\/(?!frm_1$|frm_fill_)[^/]+$/);
 	expect(rows.find((row) => row.tool === "get_form")).toMatchObject({
 		outcome: "ok",
@@ -423,8 +421,7 @@ test("on Platform the live check is live: every other tool, not served, reaches 
 test("on Platform each tool runs with the spec its connection is served: the edit and publish tools read the campaign first", async () => {
 	const campaignReads = (dep: ReturnType<typeof fakeDeployment>) =>
 		dep.calls.filter(
-			(call) =>
-				call.method === "GET" && /\/campaigns\/[^/]+$/.test(call.path),
+			(call) => call.method === "GET" && /\/campaigns\/[^/]+$/.test(call.path),
 		).length;
 	const platform = fakeDeployment({ name: "Hope Shelter", platform: true });
 	platform.setActions(MVP_ACTIONS);
