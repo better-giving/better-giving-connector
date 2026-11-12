@@ -207,10 +207,30 @@ test("on Platform the harness skips the other tools it serves and calls only the
 
 	const rows = await runOnPlatform(dep);
 
+	const otherTools = ACTIONS.filter((spec) => !MVP.has(spec.action));
+	// create_form is served but called, to make the form the run reads
+	const servedOthers = otherTools
+		.filter((spec) => PLATFORM_SERVES.includes(spec.action))
+		.filter((spec) => spec.action !== "forms.create")
+		.map((spec) => spec.tool);
+	const unservedOthers = otherTools
+		.filter((spec) => !PLATFORM_SERVES.includes(spec.action))
+		.map((spec) => spec.tool);
+	// both sets are real, so an over-skipping or an under-skipping harness differs
+	expect(servedOthers.length).toBeGreaterThan(0);
+	expect(unservedOthers.length).toBeGreaterThan(0);
+
 	const skipped = rows.filter((row) => row.outcome === "skipped");
-	expect(skipped.length).toBeGreaterThan(0);
-	expect(skipped.map((row) => row.tool)).toContain("update_form");
+	expect(skipped.map((row) => row.tool).toSorted()).toEqual(
+		servedOthers.toSorted(),
+	);
 	expect(skipped.every((row) => row.ms === 0 && row.bytes === 0)).toBe(true);
+	expect(
+		rows
+			.filter((row) => row.outcome === "unknown_action")
+			.map((row) => row.tool)
+			.toSorted(),
+	).toEqual(unservedOthers.toSorted());
 	// a served write or publish never reached the deployment; create_form is
 	// the one served other tool called, to make the form the run reads
 	expect(
@@ -365,6 +385,59 @@ test("on Platform with no form and create_form not served, the harness fails nam
 			resultsPath,
 			now: new Date("2026-10-17T15:04:05.000Z"),
 		}),
-	).rejects.toThrow("no form and create_form not served");
+	).rejects.toThrow("list_forms listed no form, and create_form was not run");
 	expect(readFileSync(resultsPath, "utf8")).toContain('"tool":"list_forms"');
+});
+
+// Standalone serves create_form here yet never runs it, which the old wording
+// ("create_form not served") got wrong.
+test("on Standalone with no form listed, the harness fails with the same cause even when create_form is served", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", defaultForm: false });
+	dep.setCampaignForms(false);
+	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
+
+	await expect(
+		runLiveHarness({
+			origin: dep.origin,
+			code: dep.mintCode(),
+			fetch: dep.fetch,
+			resultsPath: join(dir, "results.ndjson"),
+			now: new Date("2026-10-17T15:04:05.000Z"),
+		}),
+	).rejects.toThrow("list_forms listed no form, and create_form was not run");
+	expect(dep.calls.some((call) => call.path.endsWith("/forms"))).toBe(true);
+	expect(
+		dep.calls.some(
+			(call) => call.method === "POST" && call.path.endsWith("/forms"),
+		),
+	).toBe(false);
+});
+
+// Red without the throw: the harness would go on to read the made form.
+test("on Platform the harness fails when list_forms does not list the form create_form made, and still writes its results", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
+	dep.setActions(PLATFORM_SERVES);
+	dep.intercept((req) =>
+		req.method === "GET" && new URL(req.url).pathname.endsWith("/forms")
+			? Response.json({ data: [], next_cursor: null })
+			: undefined,
+	);
+	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
+	const resultsPath = join(dir, "results.ndjson");
+
+	await expect(
+		runLiveHarness({
+			origin: dep.origin,
+			code: dep.mintCode(),
+			fetch: dep.fetch,
+			resultsPath,
+			now: new Date("2026-10-17T15:04:05.000Z"),
+		}),
+	).rejects.toThrow("list_forms does not list the form create_form made");
+	const tools = readFileSync(resultsPath, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => (JSON.parse(line) as { tool: string }).tool);
+	expect(tools).toContain("create_form");
+	expect(tools).not.toContain("get_form");
 });

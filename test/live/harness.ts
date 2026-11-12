@@ -156,7 +156,9 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		} else {
 			const first = listedIds[0];
 			if (first === undefined) {
-				throw new Error("no form and create_form not served");
+				throw new Error(
+					"list_forms listed no form, and create_form was not run",
+				);
 			}
 			ids.form = first;
 		}
