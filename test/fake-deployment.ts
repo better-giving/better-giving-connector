@@ -1049,6 +1049,11 @@ function deploymentApp(state: State) {
 						...Object.keys(PLATFORM_ACTION_OF).filter((tool) =>
 							state.actions.has(PLATFORM_ACTION_OF[tool] as string),
 						),
+						// Platform's own hello never lists it; a test serves it to model a
+						// release that does, and then hello has to say so.
+						...(state.actions.has("donations.record")
+							? ["record_donation"]
+							: []),
 					]
 				: [...state.actions],
 		}),

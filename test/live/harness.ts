@@ -27,7 +27,8 @@ export type LiveRow = {
 		| "unknown_action"
 		| "key_refused"
 		| "error"
-		// served by the deployment and a write or publish, so never called
+		// never called: a write or publish the deployment serves, or get_donor
+		// when list_donors lists no donor to read
 		| "skipped";
 	ms: number;
 	bytes: number;
@@ -46,9 +47,12 @@ export type LiveHarnessOptions = {
  * Hello, exchange, the 13 minimum tools (create and record twice), the other
  * 12 as actions this deployment does not serve, then disconnect and one refused
  * call. On Platform a form is created first when create_form is served, because
- * a nonprofit starts with none. An other tool the deployment serves is skipped,
- * not called: it would write, publish or reset real records. The results file
- * never receives arguments, response bodies, or the key.
+ * a nonprofit starts with none. A deployment that does not serve
+ * donations.record (Platform) gets record_donation once, refused, and get_donor
+ * reads the first donor list_donors lists, or is skipped when there is none.
+ * An other tool the deployment serves is skipped, not called: it would write,
+ * publish or reset real records. The results file never receives arguments,
+ * response bodies, or the key.
  */
 export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 	const rows: LiveRow[] = [];
@@ -123,7 +127,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		}
 		const listed = await run(rows, ctx, connection, "list_forms", {});
 		expectOutcome(rows.at(-1), "list_forms", "ok");
-		const listedIds = formIds(listed);
+		const listedIds = dataIds(listed, "list_forms");
 		if (makesForm) {
 			if (!listedIds.includes(ids.form)) {
 				throw new Error("list_forms does not list the form create_form made");
@@ -137,33 +141,50 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		}
 		await run(rows, ctx, connection, "get_form", { id: ids.form });
 		expectOutcome(rows.at(-1), "get_form", "ok");
+		let donorsListed = "";
 		for (const tool of [
 			"get_results",
 			"list_donations",
 			"list_donors",
 		] as const) {
-			await run(rows, ctx, connection, tool, {});
+			const text = await run(rows, ctx, connection, tool, {});
 			expectOutcome(rows.at(-1), tool, "ok");
+			if (tool === "list_donors") donorsListed = text;
 		}
 
-		const recorded = await run(
-			rows,
-			ctx,
-			connection,
-			"record_donation",
-			gift(stamp, day),
-		);
-		await run(rows, ctx, connection, "record_donation", gift(stamp, day));
-		expectOutcome(rows.at(-2), "record_donation", "ok");
-		expectOutcome(rows.at(-1), "record_donation", "replay");
-		ids.donor = stringField(
-			recorded,
-			(value) => value.donor_id,
-			"record_donation",
-		);
+		if (serves("donations.record")) {
+			const recorded = await run(
+				rows,
+				ctx,
+				connection,
+				"record_donation",
+				gift(stamp, day),
+			);
+			await run(rows, ctx, connection, "record_donation", gift(stamp, day));
+			expectOutcome(rows.at(-2), "record_donation", "ok");
+			expectOutcome(rows.at(-1), "record_donation", "replay");
+			ids.donor = stringField(
+				recorded,
+				(value) => value.donor_id,
+				"record_donation",
+			);
+		} else {
+			// Platform does not record a gift: the call is refused, and get_donor
+			// reads a donor the site already lists.
+			await run(rows, ctx, connection, "record_donation", gift(stamp, day));
+			expectOutcome(rows.at(-1), "record_donation", "unknown_action");
+			ids.donor = dataIds(donorsListed, "list_donors")[0] ?? "";
+		}
 
-		await run(rows, ctx, connection, "get_donor", { id: ids.donor, limit: 5 });
-		expectOutcome(rows.at(-1), "get_donor", "ok");
+		if (ids.donor === "") {
+			rows.push({ tool: "get_donor", outcome: "skipped", ms: 0, bytes: 0 });
+		} else {
+			await run(rows, ctx, connection, "get_donor", {
+				id: ids.donor,
+				limit: 5,
+			});
+			expectOutcome(rows.at(-1), "get_donor", "ok");
+		}
 		await run(rows, ctx, connection, "list_recurring_gifts", {});
 		expectOutcome(rows.at(-1), "list_recurring_gifts", "ok");
 		if (dropped) throw new Error("a minimum tool dropped the connection");
@@ -312,9 +333,9 @@ function lastJson(text: string, label: string): Record<string, unknown> {
 	return parsed as Record<string, unknown>;
 }
 
-/** The ids in list_forms' `data`, newest first as the site sends them. */
-function formIds(text: string): string[] {
-	const data = lastJson(text, "list_forms").data;
+/** The ids in a list answer's `data`, in the order the site sends them. */
+function dataIds(text: string, label: string): string[] {
+	const data = lastJson(text, label).data;
 	if (!Array.isArray(data)) return [];
 	return data.flatMap((form) => {
 		const id = (form as { id?: unknown } | null)?.id;

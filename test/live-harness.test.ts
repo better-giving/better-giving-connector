@@ -198,6 +198,62 @@ test("on Platform the harness skips the other tools it serves and calls only the
 	);
 });
 
+// What Platform's hello lists: no donations.record.
+const PLATFORM_LISTED = Object.values(PLATFORM_ACTION_OF);
+
+const donationPosts = (dep: ReturnType<typeof fakeDeployment>) =>
+	dep.calls.filter(
+		(call) => call.method === "POST" && call.path.endsWith("/donations"),
+	);
+
+// Red before the fix: the harness expected record_donation to answer ok on
+// Platform and threw "record_donation returned unknown_action, expected ok".
+test("on Platform, which does not record gifts, record_donation is refused once and get_donor reads the donor list_donors lists", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
+	dep.setActions(PLATFORM_LISTED);
+	dep.seedGift({ amount: "5.00", date: "2026-10-01" });
+
+	const rows = await runOnPlatform(dep);
+
+	expect(
+		rows
+			.filter((row) => row.tool === "record_donation")
+			.map((row) => row.outcome),
+	).toEqual(["unknown_action"]);
+	// the one refused call; the fake stored no gift for a second to replay
+	expect(donationPosts(dep)).toHaveLength(1);
+	expect(rows.find((row) => row.tool === "get_donor")).toMatchObject({
+		outcome: "ok",
+	});
+	expect(
+		dep.calls.some(
+			(call) => call.method === "GET" && /\/donors\/dnr_\d+$/.test(call.path),
+		),
+	).toBe(true);
+});
+
+// Red before the fix: the same throw, before get_donor was reached.
+test("on Platform with no donor listed, get_donor is skipped and not called", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
+	dep.setActions(PLATFORM_LISTED);
+
+	const rows = await runOnPlatform(dep);
+
+	expect(rows.find((row) => row.tool === "get_donor")).toEqual({
+		tool: "get_donor",
+		outcome: "skipped",
+		ms: 0,
+		bytes: 0,
+	});
+	expect(
+		dep.calls.filter((call) => /\/donors\/[^/]+$/.test(call.path)),
+	).toEqual([]);
+	expect(rows.at(-1)).toMatchObject({
+		tool: "list_campaigns",
+		outcome: "key_refused",
+	});
+});
+
 test("on Platform the live check is live: a non-served write would reach the fake", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(MVP_ACTIONS);
