@@ -224,6 +224,8 @@ export function fakeDeployment(
 		nonprofitSlug?: boolean;
 		/** False for a nonprofit that has made no form, as a new Platform one: the list starts empty. */
 		defaultForm?: boolean;
+		/** A second form, "frm_other", listed after the first: the harness has to pick the right one. */
+		extraForm?: boolean;
 	} = {},
 ): FakeDeployment {
 	const host = opts.host ?? "give.example.org";
@@ -233,7 +235,15 @@ export function fakeDeployment(
 		opts.platform ?? false,
 	);
 	state.nonprofitSlug = opts.nonprofitSlug ?? true;
+	const defaultForm = state.forms.get("frm_1");
 	if (opts.defaultForm === false) state.forms.clear();
+	if (opts.extraForm && defaultForm) {
+		state.forms.set("frm_other", {
+			...defaultForm,
+			id: "frm_other",
+			name: "Other form",
+		});
+	}
 	const calls: RecordedCall[] = [];
 	let interceptor: Interceptor | null = null;
 	const app = deploymentApp(state);

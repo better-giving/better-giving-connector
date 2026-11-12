@@ -109,8 +109,10 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		}
 
 		// Platform never makes a default form, so its list starts empty.
+		// Unstated actions (null) offer every action, as runTool reads them.
 		const serves = (action: string): boolean =>
-			(hello.actions as readonly string[] | null)?.includes(action) ?? false;
+			hello.actions === null ||
+			(hello.actions as readonly string[]).includes(action);
 		const makesForm = hello.platform && serves("forms.create");
 		if (makesForm) {
 			const made = await run(rows, ctx, connection, "create_form", {
@@ -168,7 +170,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 
 		for (const spec of rest) {
 			if (makesForm && spec.tool === "create_form") continue;
-			if (hello.platform && serves(spec.action)) {
+			if (serves(spec.action)) {
 				rows.push({ tool: spec.tool, outcome: "skipped", ms: 0, bytes: 0 });
 				continue;
 			}
