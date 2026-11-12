@@ -471,6 +471,15 @@ test("docs and support describe the connector and name the support address", asy
 	expect(docs).toContain("in cash or by check");
 	expect(docs).toContain("distinguishing note");
 	expect(docs).toContain("explicit yes");
+	const yes =
+		"Pressing Publish, or confirming End campaign, on a card is your yes.";
+	expect(docs.split(yes)).toHaveLength(3);
+	expect(docs).toMatch(
+		/Publish or end a campaign\.[\s\S]*?waits for your explicit yes\. Pressing Publish, or confirming End campaign, on a card is your yes\./,
+	);
+	expect(docs).toMatch(
+		/Sensitive write:[\s\S]*?explicit yes\. Pressing Publish, or confirming End campaign, on a card is your yes\./,
+	);
 	expect(docs).toContain("general fund");
 	expect(docs).not.toMatch(/bank transfer/i);
 	expect(docs).toContain("For the amount raised, use fundraising results.");
@@ -614,6 +623,9 @@ test("the demo captions describe signing in at better.giving", async () => {
 	const vtt = await captions.text();
 	expect(vtt).toMatch(/^WEBVTT/);
 	expect(vtt).toContain("Sign in at better.giving.");
+	expect(vtt).toContain(
+		"00:00:36.000 --> 00:00:44.000\nConnected. Publishing waits for an explicit yes.\n",
+	);
 	expect(vtt).not.toMatch(/own Better Giving site|donation site/);
 });
 

@@ -644,7 +644,7 @@ test("the instructions say a live campaign's edits wait as a draft, and publishi
 		"An edit to a live campaign is saved as a draft donors don't see until publish_campaign sends it; get_campaign shows it under pendingDraft.",
 	);
 	expect(instructions).toMatch(
-		/Before publish_campaign or end_campaign, say what will change and wait for the operator's explicit yes in this chat\.$/,
+		/Before publish_campaign or end_campaign, say what will change and wait for the operator's explicit yes in this chat\. Once the operator says they pressed a card's Publish, Publish changes or End campaign button, that press already made the change: don't call the tool for it again, and don't ask\.$/,
 	);
 });
 

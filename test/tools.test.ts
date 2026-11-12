@@ -340,6 +340,50 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			expect(tools.map((t) => t.name)).toContain(card);
 	});
 
+	const PRESS_IS_YES =
+		"that press already made the change: don't call the tool for it again, and don't ask.";
+
+	test.each([
+		{
+			case: "every action served",
+			served: ALL_ACTIONS,
+			opts: {},
+			buttons: "Publish, Publish changes or End campaign",
+		},
+		{
+			case: "only publishing waits",
+			served: withoutActions("campaigns.end", "donation_page.reset"),
+			opts: {},
+			buttons: "Publish or Publish changes",
+		},
+		{
+			case: "only resetting waits",
+			served: withoutActions("campaigns.publish", "campaigns.end"),
+			opts: {},
+			buttons: null,
+		},
+		{
+			case: "a read-only connection",
+			served: ALL_ACTIONS,
+			opts: { scope: "offline_access read_only" },
+			buttons: null,
+		},
+	])(
+		"the instructions tell the model a card press is the operator's yes only where its buttons exist: $case",
+		async ({ served, opts, buttons }) => {
+			const { instructions } = await connectSeeing(served, opts);
+
+			if (buttons === null) {
+				expect(instructions).not.toContain("pressed a card's");
+				expect(instructions).not.toContain(PRESS_IS_YES);
+			} else {
+				expect(instructions).toContain(
+					`Once the operator says they pressed a card's ${buttons} button, ${PRESS_IS_YES}`,
+				);
+			}
+		},
+	);
+
 	test("the instructions name a single confirm tool bare, with no 'or'", async () => {
 		// Only one of the four confirm actions is served, so orList takes its
 		// one-name branch: the bare name, never "or".
@@ -358,7 +402,8 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			/Before (.+), say what will change/,
 		)?.[1];
 		expect(waiting).toBe("publish_campaign");
-		expect(instructions).not.toContain(" or ");
+		// The card sentence names two buttons with "or", so scan only the "Before" one.
+		expect(instructions.match(/Before [^.]*\./)?.[0]).not.toContain(" or ");
 	});
 
 	test("publish, end and reset are destructive; an overwrite is not", async () => {
