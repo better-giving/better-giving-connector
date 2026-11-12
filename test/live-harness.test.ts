@@ -121,6 +121,10 @@ const formPath = (dep: ReturnType<typeof fakeDeployment>): string | undefined =>
 		(call) => call.method === "GET" && /\/forms\/[^/]+$/.test(call.path),
 	)?.path;
 
+// The fake gives the form create_form makes a UUID id. Every form listed
+// before it (frm_1, frm_other, fillers, the campaign's own) has a short one.
+const MADE_FORM = /\/forms\/frm_[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+
 async function runHarness(
 	dep: ReturnType<typeof fakeDeployment>,
 ): Promise<Record<string, unknown>[]> {
@@ -162,8 +166,8 @@ test("on Platform with create_form served, the harness creates a form, lists it 
 		(call) => call.method === "POST" && call.path.endsWith("/forms"),
 	);
 	expect(posted).toHaveLength(1);
-	// frm_1 and frm_other list first; the form read is the one create_form made
-	expect(formPath(dep)).toMatch(/\/forms\/(?!frm_1$|frm_other$)[^/]+$/);
+	// frm_1, frm_other and the campaign's form list before the one made
+	expect(formPath(dep)).toMatch(MADE_FORM);
 	expect(rows.at(-1)).toMatchObject({
 		tool: "list_campaigns",
 		outcome: "key_refused",
@@ -212,7 +216,7 @@ test("on Platform the harness follows list_forms pages to the form it made", asy
 	expect(listCalls[1]?.query.cursor).toBe(answered[0]?.next_cursor);
 	expect(listCalls[0]?.query.cursor).toBeUndefined();
 	expect(listCalls.every((call) => Number(call.query.limit) <= 100)).toBe(true);
-	expect(formPath(dep)).toMatch(/\/forms\/(?!frm_1$|frm_fill_)[^/]+$/);
+	expect(formPath(dep)).toMatch(MADE_FORM);
 	expect(rows.find((row) => row.tool === "get_form")).toMatchObject({
 		outcome: "ok",
 	});
