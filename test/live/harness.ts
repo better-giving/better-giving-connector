@@ -19,6 +19,9 @@ const REFUSED = "no longer accepts this connection";
 
 const MVP = new Set<string>(MVP_ACTIONS);
 
+/** The largest `limit` a list tool's input takes (`page` in src/mcp/actions.ts). */
+const MAX_LIMIT = 100;
+
 export type LiveRow = {
 	tool: string;
 	outcome:
@@ -125,9 +128,27 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			expectOutcome(rows.at(-1), "create_form", "ok");
 			ids.form = stringField(made, (value) => value.id, "create_form");
 		}
-		const listed = await run(rows, ctx, connection, "list_forms", {});
-		expectOutcome(rows.at(-1), "list_forms", "ok");
-		const listedIds = dataIds(listed, "list_forms");
+		// Every run on Platform leaves a form behind, so the one just made can be
+		// past the first page: follow pages until it shows or there are no more.
+		const listedIds: string[] = [];
+		const cursors = new Set<string>();
+		let cursor: string | undefined;
+		do {
+			const listed = await run(rows, ctx, connection, "list_forms", {
+				limit: MAX_LIMIT,
+				...(cursor === undefined ? {} : { cursor }),
+			});
+			expectOutcome(rows.at(-1), "list_forms", "ok");
+			listedIds.push(...dataIds(listed, "list_forms"));
+			cursor =
+				makesForm && !listedIds.includes(ids.form)
+					? nextCursor(listed, "list_forms")
+					: undefined;
+			if (cursor !== undefined && cursors.has(cursor)) {
+				throw new Error("list_forms repeats a cursor");
+			}
+			if (cursor !== undefined) cursors.add(cursor);
+		} while (cursor !== undefined);
 		if (makesForm) {
 			if (!listedIds.includes(ids.form)) {
 				throw new Error("list_forms does not list the form create_form made");
@@ -341,6 +362,11 @@ function dataIds(text: string, label: string): string[] {
 		const id = (form as { id?: unknown } | null)?.id;
 		return typeof id === "string" && id !== "" ? [id] : [];
 	});
+}
+
+function nextCursor(text: string, label: string): string | undefined {
+	const cursor = lastJson(text, label).next_cursor;
+	return typeof cursor === "string" && cursor !== "" ? cursor : undefined;
 }
 
 function stringField(

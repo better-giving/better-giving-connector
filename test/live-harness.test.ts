@@ -170,6 +170,33 @@ test("on Platform with create_form served, the harness creates a form, lists it 
 	});
 });
 
+// Red before the fix: one default-size page lists 25 of the 122 forms, and the
+// form create_form made is the last of them, so the harness threw
+// "list_forms does not list the form create_form made".
+test("on Platform the harness follows list_forms pages to the form it made", async () => {
+	const dep = fakeDeployment({
+		name: "Hope Shelter",
+		platform: true,
+		fillerForms: 120,
+	});
+	dep.setActions(PLATFORM_SERVES);
+
+	const rows = await runOnPlatform(dep);
+
+	// frm_1 and 120 fillers fill the first page of 100; the made form is on the second
+	const listCalls = dep.calls.filter(
+		(call) => call.method === "GET" && call.path.endsWith("/forms"),
+	);
+	expect(listCalls.map((call) => call.query)).toEqual([
+		{ limit: "100" },
+		{ limit: "100", cursor: "100" },
+	]);
+	expect(formPath(dep)).toMatch(/\/forms\/(?!frm_1$|frm_fill_)[^/]+$/);
+	expect(rows.find((row) => row.tool === "get_form")).toMatchObject({
+		outcome: "ok",
+	});
+});
+
 test("on Platform the harness skips the other tools it serves and calls only the ones it does not", async () => {
 	const dep = fakeDeployment({
 		name: "Hope Shelter",

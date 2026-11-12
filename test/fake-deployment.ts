@@ -226,6 +226,8 @@ export function fakeDeployment(
 		defaultForm?: boolean;
 		/** A second form, "frm_other", listed after the first: the harness has to pick the right one. */
 		extraForm?: boolean;
+		/** This many more forms, "frm_fill_1" on, listed ahead of any form made later. */
+		fillerForms?: number;
 	} = {},
 ): FakeDeployment {
 	const host = opts.host ?? "give.example.org";
@@ -242,6 +244,13 @@ export function fakeDeployment(
 			...defaultForm,
 			id: "frm_other",
 			name: "Other form",
+		});
+	}
+	for (let n = 1; defaultForm && n <= (opts.fillerForms ?? 0); n++) {
+		state.forms.set(`frm_fill_${n}`, {
+			...defaultForm,
+			id: `frm_fill_${n}`,
+			name: `Filler form ${n}`,
 		});
 	}
 	const calls: RecordedCall[] = [];
