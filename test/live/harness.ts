@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { deploymentClient } from "../../src/deployment";
 import { parseOrigin } from "../../src/deployment/origin";
 import { DEFAULT_LOCALE } from "../../src/format";
-import { ACTIONS, type ActionSpec } from "../../src/mcp/actions";
+import { ACTIONS, type ActionSpec, actionsFor } from "../../src/mcp/actions";
 import {
 	type RunToolContext,
 	runTool,
@@ -296,7 +296,7 @@ async function run(
 	tool: string,
 	args: Record<string, unknown>,
 ): Promise<string> {
-	const spec = specNamed(tool);
+	const spec = specNamed(tool, connection.platform);
 	const started = performance.now();
 	const result = await runTool(spec, connection, args, ctx, DEFAULT_LOCALE);
 	// the text answer; a success's summary line follows it
@@ -311,8 +311,9 @@ async function run(
 	return text;
 }
 
-const specNamed = (tool: string): ActionSpec => {
-	const spec = ACTIONS.find((item) => item.tool === tool);
+// The specs the connector serves this connection, as `servedSpecs` in src/mcp/index.ts does.
+const specNamed = (tool: string, platform: boolean): ActionSpec => {
+	const spec = actionsFor(platform).find((item) => item.tool === tool);
 	if (!spec) throw new Error(`no tool ${tool}`);
 	return spec;
 };
