@@ -177,8 +177,9 @@ test("on Platform the harness follows list_forms pages to the form it made", asy
 		fillerForms: 120,
 	});
 	dep.setActions(PLATFORM_SERVES);
+	type ListAnswer = { next_cursor: string | null };
 	// what the deployment answered to each list_forms call
-	const answered: { next_cursor: string | null }[] = [];
+	const answered: ListAnswer[] = [];
 	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
 	const resultsPath = join(dir, "results.ndjson");
 
@@ -190,7 +191,7 @@ test("on Platform the harness follows list_forms pages to the form it made", asy
 			const url = new URL(input instanceof Request ? input.url : String(input));
 			const isList =
 				(init?.method ?? "GET") === "GET" && url.pathname.endsWith("/forms");
-			if (isList) answered.push(await res.clone().json());
+			if (isList) answered.push((await res.clone().json()) as ListAnswer);
 			return res;
 		},
 		resultsPath,
