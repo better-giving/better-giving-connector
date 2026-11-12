@@ -272,9 +272,11 @@ export function DocsPage() {
 				</li>
 				<li>
 					Publish or end a campaign. These change what donors see. Your AI
-					assistant says what will change and waits for your explicit yes. The
-					first time a campaign is published, it asks where the gifts go: a
-					program, or the general fund. An ended campaign stays ended.
+					assistant asks before it publishes or ends a campaign on its own: it
+					says what will change and waits for your explicit yes. Pressing
+					Publish, or confirming End campaign, on a card is your yes. The first
+					time a campaign is published, it asks where the gifts go: a program,
+					or the general fund. An ended campaign stays ended.
 				</li>
 				<li>
 					Create and edit donation forms, including the donation page's form and
@@ -346,6 +348,7 @@ export function DocsPage() {
 				<li>
 					Sensitive write: changes what donors see. Before it publishes, ends,
 					or resets anything, your AI assistant waits for your explicit yes.
+					Pressing Publish, or confirming End campaign, on a card is your yes.
 				</li>
 			</ul>
 			<section class="ds-table-scroll" aria-label="Tool reference" tabindex={0}>

@@ -406,7 +406,29 @@ function instructionsFor(
 			`Before ${orList(waiting)}, say what will change and wait for the operator's explicit yes in this chat.`,
 		);
 	}
+	const buttons = cardButtonsIn(specs);
+	if (buttons.length > 0) {
+		lines.push(
+			`Once the operator says they pressed a card's ${orList(buttons)} button, that press already made the change: don't call the tool for it again, and don't ask.`,
+		);
+	}
 	return lines.join(" ");
+}
+
+// The card buttons that change what donors see, by their labels. A press calls
+// an app-only tool the model never sees, so it learns of one only from the
+// operator; a label is named only when its card and its tool are registered.
+function cardButtonsIn(specs: readonly ToolSpec[]): string[] {
+	const has = (tool: string) => specs.some((spec) => spec.tool === tool);
+	const results = isRegistered(specs, "campaign-results");
+	const publishes =
+		has("app_publish_campaign") &&
+		(results || isRegistered(specs, "campaign-editor"));
+	const ends = has("app_end_campaign") && results;
+	return [
+		...(publishes ? ["Publish", "Publish changes"] : []),
+		...(ends ? ["End campaign"] : []),
+	];
 }
 
 // "a", "a or b", "a, b or c": the tool names as one English list.
