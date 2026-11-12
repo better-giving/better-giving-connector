@@ -224,7 +224,7 @@ export function fakeDeployment(
 		nonprofitSlug?: boolean;
 		/** False for a nonprofit that has made no form, as a new Platform one: the list starts empty. */
 		defaultForm?: boolean;
-		/** A second form, "frm_other", listed after "frm_1" (the only form when defaultForm is false) and before any form made later: the harness has to pick the right one. */
+		/** A second form, "frm_other", listed before any form made later: the harness has to pick the right one. */
 		extraForm?: boolean;
 		/** This many more forms, "frm_fill_1" on, listed ahead of any form made later. */
 		fillerForms?: number;

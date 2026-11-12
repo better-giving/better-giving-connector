@@ -42,22 +42,25 @@ export type LiveHarnessOptions = {
 	origin: string;
 	code: string;
 	fetch: typeof fetch;
-	/** Overwritten with one JSON line per call: tool, outcome, ms, bytes. A tool run twice, or paged, has a line each time. */
+	/**
+	 * Overwritten with one JSON line per call: tool, outcome, ms, bytes. A tool
+	 * run twice, or paged, has a line each time.
+	 */
 	resultsPath: string;
 	now?: Date;
 };
 
 /**
  * Hello, exchange, the 13 minimum tools (create_campaign twice, and
- * record_donation twice where served), the other 12 as actions this deployment
- * does not serve, then disconnect and one refused call. On Platform, when
- * create_form is served, a form is created after the campaign reads and before
- * list_forms, because a nonprofit starts with none. A deployment that does not serve donations.record (Platform) gets
- * record_donation once, refused, and get_donor reads the first donor
- * list_donors lists, or is skipped when there is none. An other tool the
+ * record_donation twice where served), each of the other 12 the deployment
+ * does not serve, then disconnect and one refused call. An other tool the
  * deployment serves is skipped, not called: most of them write, publish or
- * reset real records. The results file never receives arguments, response
- * bodies, or the key.
+ * reset real records. On Platform, when create_form is served, the run makes a
+ * form after the campaign reads and before list_forms, since a nonprofit starts
+ * with none. Where donations.record is not served (Platform), record_donation
+ * runs once and is refused, and get_donor reads the first donor list_donors
+ * lists, or is skipped when there is none. The results file never receives
+ * arguments, response bodies, or the key.
  */
 export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 	const rows: LiveRow[] = [];
