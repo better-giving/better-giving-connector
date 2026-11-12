@@ -222,6 +222,8 @@ export function fakeDeployment(
 		platform?: boolean;
 		/** Platform: false for a nonprofit with no slug, whose live campaigns have no public_url. */
 		nonprofitSlug?: boolean;
+		/** False for a nonprofit that has made no form, as a new Platform one: the list starts empty. */
+		defaultForm?: boolean;
 	} = {},
 ): FakeDeployment {
 	const host = opts.host ?? "give.example.org";
@@ -231,6 +233,7 @@ export function fakeDeployment(
 		opts.platform ?? false,
 	);
 	state.nonprofitSlug = opts.nonprofitSlug ?? true;
+	if (opts.defaultForm === false) state.forms.clear();
 	const calls: RecordedCall[] = [];
 	let interceptor: Interceptor | null = null;
 	const app = deploymentApp(state);

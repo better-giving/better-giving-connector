@@ -21,7 +21,14 @@ const MVP = new Set<string>(MVP_ACTIONS);
 
 export type LiveRow = {
 	tool: string;
-	outcome: "ok" | "replay" | "unknown_action" | "key_refused" | "error";
+	outcome:
+		| "ok"
+		| "replay"
+		| "unknown_action"
+		| "key_refused"
+		| "error"
+		// served by the deployment and a write or publish, so never called
+		| "skipped";
 	ms: number;
 	bytes: number;
 };
@@ -38,7 +45,10 @@ export type LiveHarnessOptions = {
 /**
  * Hello, exchange, the 13 minimum tools (create and record twice), the other
  * 12 as actions this deployment does not serve, then disconnect and one refused
- * call. The results file never receives arguments, response bodies, or the key.
+ * call. On Platform a form is created first when create_form is served, because
+ * a nonprofit starts with none. An other tool the deployment serves is skipped,
+ * not called: it would write, publish or reset real records. The results file
+ * never receives arguments, response bodies, or the key.
  */
 export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 	const rows: LiveRow[] = [];
@@ -93,31 +103,36 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			"get_campaign",
 			"get_donation_page",
 			"get_block_catalog",
-			"list_forms",
 		] as const) {
-			const text = await run(
-				rows,
-				ctx,
-				connection,
-				tool,
-				minimumArgs(tool, ids),
-			);
+			await run(rows, ctx, connection, tool, minimumArgs(tool, ids));
 			expectOutcome(rows.at(-1), tool, "ok");
-			if (tool === "list_forms") {
-				ids.form = stringField(
-					text,
-					(value) => {
-						const data = value.data;
-						if (!Array.isArray(data)) return undefined;
-						const first = data[0];
-						if (typeof first !== "object" || first === null) return undefined;
-						return (first as { id?: unknown }).id;
-					},
-					"list_forms",
-				);
-			}
 		}
 
+		// Platform never makes a default form, so its list starts empty.
+		const serves = (action: string): boolean =>
+			(hello.actions as readonly string[] | null)?.includes(action) ?? false;
+		const makesForm = hello.platform && serves("forms.create");
+		if (makesForm) {
+			const made = await run(rows, ctx, connection, "create_form", {
+				name: stamp,
+			});
+			expectOutcome(rows.at(-1), "create_form", "ok");
+			ids.form = stringField(made, (value) => value.id, "create_form");
+		}
+		const listed = await run(rows, ctx, connection, "list_forms", {});
+		expectOutcome(rows.at(-1), "list_forms", "ok");
+		const listedIds = formIds(listed);
+		if (makesForm) {
+			if (!listedIds.includes(ids.form)) {
+				throw new Error("list_forms does not list the form create_form made");
+			}
+		} else {
+			const first = listedIds[0];
+			if (first === undefined) {
+				throw new Error("no form and create_form not served");
+			}
+			ids.form = first;
+		}
 		await run(rows, ctx, connection, "get_form", { id: ids.form });
 		expectOutcome(rows.at(-1), "get_form", "ok");
 		for (const tool of [
@@ -152,6 +167,11 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		if (dropped) throw new Error("a minimum tool dropped the connection");
 
 		for (const spec of rest) {
+			if (makesForm && spec.tool === "create_form") continue;
+			if (hello.platform && serves(spec.action)) {
+				rows.push({ tool: spec.tool, outcome: "skipped", ms: 0, bytes: 0 });
+				continue;
+			}
 			await run(
 				rows,
 				ctx,
@@ -276,11 +296,7 @@ function expectOutcome(
 	}
 }
 
-function stringField(
-	text: string,
-	read: (value: Record<string, unknown>) => unknown,
-	label: string,
-): string {
+function lastJson(text: string, label: string): Record<string, unknown> {
 	let parsed: unknown;
 	try {
 		// The JSON is the last line, below the lead and any replay notice.
@@ -291,7 +307,25 @@ function stringField(
 	if (typeof parsed !== "object" || parsed === null) {
 		throw new Error(`${label} returned no id`);
 	}
-	const value = read(parsed as Record<string, unknown>);
+	return parsed as Record<string, unknown>;
+}
+
+/** The ids in list_forms' `data`, newest first as the site sends them. */
+function formIds(text: string): string[] {
+	const data = lastJson(text, "list_forms").data;
+	if (!Array.isArray(data)) return [];
+	return data.flatMap((form) => {
+		const id = (form as { id?: unknown } | null)?.id;
+		return typeof id === "string" && id !== "" ? [id] : [];
+	});
+}
+
+function stringField(
+	text: string,
+	read: (value: Record<string, unknown>) => unknown,
+	label: string,
+): string {
+	const value = read(lastJson(text, label));
 	if (typeof value !== "string" || value === "") {
 		throw new Error(`${label} returned no id`);
 	}
