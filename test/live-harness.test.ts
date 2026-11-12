@@ -295,6 +295,35 @@ test("on Platform with no donor listed, get_donor is skipped and not called", as
 	});
 });
 
+test("on Platform a list_donors answer with no data array fails the run instead of skipping get_donor", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
+	dep.setActions(PLATFORM_LISTED);
+	dep.seedGift({ amount: "5.00", date: "2026-10-01" });
+	dep.intercept((req) =>
+		req.method === "GET" && new URL(req.url).pathname.endsWith("/donors")
+			? Response.json({ data: "oops", next_cursor: null })
+			: undefined,
+	);
+	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
+	const resultsPath = join(dir, "results.ndjson");
+
+	await expect(
+		runLiveHarness({
+			origin: dep.origin,
+			code: dep.mintCode(),
+			fetch: dep.fetch,
+			resultsPath,
+			now: new Date("2026-10-17T15:04:05.000Z"),
+		}),
+	).rejects.toThrow("list_donors returned no data array");
+	const tools = readFileSync(resultsPath, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => (JSON.parse(line) as { tool: string }).tool);
+	expect(tools).toContain("list_donors");
+	expect(tools).not.toContain("get_donor");
+});
+
 test("on Platform the live check is live: a non-served write would reach the fake", async () => {
 	const dep = fakeDeployment({ name: "Hope Shelter", platform: true });
 	dep.setActions(MVP_ACTIONS);

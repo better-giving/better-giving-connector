@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { deploymentClient } from "../../src/deployment";
+import type { ActionName } from "../../src/deployment/contract";
 import { parseOrigin } from "../../src/deployment/origin";
 import { DEFAULT_LOCALE } from "../../src/format";
 import { ACTIONS, type ActionSpec, actionsFor } from "../../src/mcp/actions";
@@ -41,7 +42,7 @@ export type LiveHarnessOptions = {
 	origin: string;
 	code: string;
 	fetch: typeof fetch;
-	/** Overwritten with one JSON line per tool: tool, outcome, ms, bytes. */
+	/** Overwritten with one JSON line per call: tool, outcome, ms, bytes. A tool run twice, or paged, has a line each time. */
 	resultsPath: string;
 	now?: Date;
 };
@@ -49,9 +50,9 @@ export type LiveHarnessOptions = {
 /**
  * Hello, exchange, the 13 minimum tools (create_campaign twice, and
  * record_donation twice where served), the other 12 as actions this deployment
- * does not serve, then disconnect and one refused call. On Platform a form is
- * created first when create_form is served, because a nonprofit starts with
- * none. A deployment that does not serve donations.record (Platform) gets
+ * does not serve, then disconnect and one refused call. On Platform, when
+ * create_form is served, a form is created after the campaign reads and before
+ * list_forms, because a nonprofit starts with none. A deployment that does not serve donations.record (Platform) gets
  * record_donation once, refused, and get_donor reads the first donor
  * list_donors lists, or is skipped when there is none. An other tool the
  * deployment serves is skipped, not called: most of them write, publish or
@@ -116,12 +117,11 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			expectOutcome(rows.at(-1), tool, "ok");
 		}
 
-		// Platform makes no default form, so a new nonprofit may list none.
 		// Unstated actions (null) offer every action, as servedSpecs in
 		// src/mcp/index.ts reads them.
-		const serves = (action: string): boolean =>
-			hello.actions === null ||
-			(hello.actions as readonly string[]).includes(action);
+		const serves = (action: ActionName): boolean =>
+			hello.actions === null || hello.actions.includes(action);
+		// Platform makes no default form: create_form makes the one the run reads.
 		const makesForm = hello.platform && serves("forms.create");
 		if (makesForm) {
 			const made = await run(rows, ctx, connection, "create_form", {
@@ -362,10 +362,13 @@ function lastJson(text: string, label: string): Record<string, unknown> {
 /** The ids in a list answer's `data`, in the order the site sends them. */
 function dataIds(text: string, label: string): string[] {
 	const data = lastJson(text, label).data;
-	if (!Array.isArray(data)) return [];
-	return data.flatMap((form) => {
-		const id = (form as { id?: unknown } | null)?.id;
-		return typeof id === "string" && id !== "" ? [id] : [];
+	if (!Array.isArray(data)) throw new Error(`${label} returned no data array`);
+	return data.map((item) => {
+		const id = (item as { id?: unknown } | null)?.id;
+		if (typeof id !== "string" || id === "") {
+			throw new Error(`${label} listed an item with no id`);
+		}
+		return id;
 	});
 }
 
