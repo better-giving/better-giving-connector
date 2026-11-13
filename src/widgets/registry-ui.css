@@ -1,7 +1,7 @@
 /*
  * The registry's plain-css components the widgets and the served pages share,
  * over its variables (tokens.css): button, badge, card, field, checkbox,
- * radio, progress, select, switch, state-card, prose and table, all `ds-` classes, copied by `bg-design` and never edited here.
+ * radio, progress, select, switch, spinner, state-card, prose and table, all `ds-` classes, copied by `bg-design` and never edited here.
  * What stays local is below: the type sizes the surfaces' own rules read and
  * the touch height. The card's flush footer is `.card-foot` in ui/styles.css.
  */
@@ -15,6 +15,7 @@
 @import "./registry/styles/progress-css.css";
 @import "./registry/styles/select-css.css";
 @import "./registry/styles/switch-css.css";
+@import "./registry/styles/spinner-css.css";
 @import "./registry/styles/state-card-css.css";
 @import "./registry/styles/prose-css.css";
 @import "./registry/styles/table-css.css";

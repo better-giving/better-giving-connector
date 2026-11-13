@@ -82,26 +82,6 @@ h3 {
 	margin: 0 -24px -20px;
 }
 
-/* no registry variant: an outlined button in the destructive color, on .ds-btn */
-.btn-outline-destructive {
-	background: transparent;
-	border: 1px solid var(--destructive);
-	color: var(--destructive-subtle-fg);
-}
-
-.btn-outline-destructive:disabled {
-	background: var(--gray-3);
-	color: var(--gray-11);
-}
-
-.btn-outline-destructive:hover:not(:disabled) {
-	background: var(--destructive-subtle);
-}
-
-.btn-outline-destructive:active:not(:disabled) {
-	background: var(--destructive-subtle-active);
-}
-
 /* sparkline */
 
 .sparkline {
@@ -204,22 +184,10 @@ h3 {
 	font-weight: 600;
 }
 
-/* form controls: the registry's .ds-label and .ds-field-input */
-
-.field {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	min-width: 0;
-}
+/* form controls: the registry's .ds-field, .ds-label, .ds-field-input and .ds-field-help */
 
 textarea.ds-field-input {
 	resize: vertical;
-}
-
-.hint {
-	color: var(--gray-11);
-	font-size: var(--text-xs);
 }
 
 /* a done / not-done / failed line: the glyph and the words both say it */

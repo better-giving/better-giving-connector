@@ -1,9 +1,10 @@
 /*
  * Widget tokens: the Better Giving design registry's `variables` item
- * (registry/, copied by `bg-design`, never edited here). Every color, face,
+ * (registry/, copied by `bg-design`, never edited here) and the `fonts` item's faces, which `variables.css` no longer imports. Every color, face,
  * corner, shadow and speed a widget reads is one of its custom properties.
  *
  * Dark is the `dark` class on <html>, set by the widget script: it follows the
  * host's theme, or the browser's where there is no host (host.ts).
  */
 @import "./registry/styles/variables.css";
+@import "./registry/styles/fonts.css";

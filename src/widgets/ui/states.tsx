@@ -8,7 +8,7 @@ export function LoadingState(props: { label: string }) {
 			role="status"
 			aria-live="polite"
 		>
-			<span class="ds-state-card-spinner" aria-hidden="true" />
+			<span class="ds-spinner" aria-hidden="true" />
 			{props.label}
 		</div>
 	);

@@ -26,7 +26,7 @@ function Text(props: {
 			props.onInput((e.target as HTMLInputElement | HTMLTextAreaElement).value),
 	};
 	return (
-		<div class="field">
+		<div class="ds-field">
 			<label class="ds-label" for={id}>
 				{props.label}
 			</label>
@@ -47,7 +47,7 @@ function NumberField(props: {
 }) {
 	const id = useId();
 	return (
-		<div class="field">
+		<div class="ds-field">
 			<label class="ds-label" for={id}>
 				{props.label}
 			</label>
@@ -87,11 +87,11 @@ export function PhotoReplace(props: { campaignId: string }) {
 		});
 	};
 	return (
-		<div class="field">
+		<div class="ds-field">
 			<Button variant="secondary" onClick={() => void open()}>
 				Replace photo
 			</Button>
-			<p class="hint">
+			<p class="ds-field-help">
 				Opens a one-time upload page. Reopen the editor afterwards to see the
 				new photo.
 			</p>
@@ -166,7 +166,7 @@ export function BlockFields(props: {
 				<p class="muted">This block has no settings to edit here.</p>
 			)}
 			{more > 0 && (
-				<p class="hint">
+				<p class="ds-field-help">
 					{more === 1 ? "One more setting" : `${more} more settings`} can be
 					changed by asking in the chat.
 				</p>
@@ -248,7 +248,7 @@ export function ContentFields(props: {
 						value={plainText(content.story)}
 						onInput={(story) => set({ story: storyDocument(story) })}
 					/>
-					<p class="hint">Leave a blank line between paragraphs.</p>
+					<p class="ds-field-help">Leave a blank line between paragraphs.</p>
 				</div>
 			);
 		case "form": {

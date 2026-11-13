@@ -11,7 +11,7 @@ type Transport = Parameters<typeof startFakeHost>[0];
 type Message = Parameters<Transport["send"]>[0];
 type Relay = Record<string, (value: unknown) => void>;
 
-const SPINNER_CLASS = "ds-state-card-spinner";
+const SPINNER_CLASS = "ds-spinner";
 const STAND_IN_HOST = new URL(blobImage("x")).host;
 
 /** A photo-like stand-in for every image under the fixtures' blob origin; nothing else loads. */

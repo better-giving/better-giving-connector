@@ -187,9 +187,11 @@ describe("campaign results type", () => {
 		const publish = button(root, "Publish");
 		expect(publish.className).toContain("ds-btn");
 		// the registry button's 9-spacing-unit height, as happy-dom leaves the calc; an unresolved rule reads ""
-		expect(getComputedStyle(publish).minBlockSize).toBe("calc(0.25rem * 9)");
+		expect(getComputedStyle(publish).minBlockSize).toBe(
+			"calc(calc(0.25 * 1rem) * 9)",
+		);
 		expect(getComputedStyle(select as Element).minBlockSize).toBe(
-			"calc(0.25rem * 9)",
+			"calc(calc(0.25 * 1rem) * 9)",
 		);
 		expect(getComputedStyle(label as Element).fontWeight).toBe("500");
 	});
