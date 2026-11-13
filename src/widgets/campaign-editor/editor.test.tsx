@@ -245,6 +245,7 @@ describe("campaign editor row buttons", () => {
 
 describe("campaign editor Replace photo", () => {
 	it("is described by its help, and a button without one is undescribed", async () => {
+		applyStyles("ui/styles.css", "campaign-editor/editor.css");
 		const root = await show({
 			...EDITOR,
 			page: { pageKind: "content", content: { heading: "Clean water" } },

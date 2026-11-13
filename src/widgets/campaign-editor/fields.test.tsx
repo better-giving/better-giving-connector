@@ -48,6 +48,35 @@ describe("ContentFields' Story hint", () => {
 	});
 });
 
+describe("BlockFields' more-settings line", () => {
+	const moreLine = (block: Block): string | undefined => {
+		const root = mount(
+			<BlockFields campaignId="c-1" block={block} onChange={() => {}} />,
+		);
+		return [...root.querySelectorAll("p")]
+			.map((p) => p.textContent?.replace(/\s+/g, " ").trim())
+			.find((t) => t?.includes("can be changed by asking in the chat"));
+	};
+
+	it("says one more setting when one is not editable here", () => {
+		expect(moreLine({ type: "story", title: "Hi", items: [1] })).toBe(
+			"One more setting can be changed by asking in the chat.",
+		);
+	});
+
+	it("counts the settings when several are not editable here", () => {
+		expect(
+			moreLine({ type: "story", title: "Hi", items: [1], style: { a: 1 } }),
+		).toBe("2 more settings can be changed by asking in the chat.");
+	});
+
+	it("is absent when every setting is editable here", () => {
+		expect(moreLine({ type: "story", title: "Hi", showDate: true })).toBe(
+			undefined,
+		);
+	});
+});
+
 describe("BlockFields' boolean setting", () => {
 	it("is a switch named by its label, and toggling it reports the new value", async () => {
 		const changes: Block[] = [];
