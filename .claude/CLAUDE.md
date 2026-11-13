@@ -23,7 +23,6 @@ One package at the repo root; seats and versions are read from `package.json`:
 - **ui** → `kru:hono-ui-builder` — `src/widgets/`, `bg-design.json`, `test/widget-host/`, `test/fixtures/widget/`, `scripts/widget-shots.ts`, `scripts/surface-shots.ts`, and the server-rendered pages: `src/connect/page.tsx`, `src/connect/connect.css`, `src/connect/assets/`, `src/pages/` and everything in `src/site/` but `index.tsx`, `icon.ts` and `demo.mp4` ← `hono` 4.13.13 in `package.json`, `jsxImportSource` `hono/jsx` (`tsconfig.json`) and `hono/jsx/dom` (`tsconfig.widgets.json`)
 - **package** → `kru:node-developer` — `scripts/chatgpt-package.ts` and `assets/chatgpt/`: the ChatGPT app package `pnpm chatgpt:package` writes ← `package.json` scripts
 - **cursor** → no kru seat, on purpose. `.cursor/` holds the cloud-agent environment and the `verify-better-giving-connector` skill's scripts (`drive.ts`, `fake-server.ts`, launch scripts); the routing table has no lane for it.
-- **cloud** → `.claude/cloud-setup.md` and `.claude/cloud-install.sh` are `skills/setup/SKILL.md`'s output: re-derive them with this sheet ← the SessionStart hook in `.claude/settings.json`
 - **no seat** → `AGENTS.md` and `LICENSE`
 - **skills** → `kru:vitest`, `kru:zod` — vitest 5.0.3, zod 4.6.5
 - **screens** → the site and connect pages and the widgets are UI; they take the registry (`## Design system` above)
