@@ -26,7 +26,7 @@ api.vercel.com
 
 ```bash
 #!/bin/bash
-# kru v0.194.0
+# kru v0.195.0
 set -uo pipefail
 exec > >(tee -a /tmp/setup.log) 2>&1
 
