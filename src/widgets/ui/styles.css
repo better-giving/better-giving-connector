@@ -184,13 +184,13 @@ h3 {
 	font-weight: 600;
 }
 
-/* form controls are the registry's .ds-field parts; only the textarea's resize is set here */
+/* form controls are the registry's .ds-field parts; the rules below add what they lack */
 
 textarea.ds-field-input {
 	resize: vertical;
 }
 
-/* the button fills its column, as it did when .field was a flex column; .ds-field is block */
+/* a button is only as wide as its label inside the block .ds-field, and button-css has no full-width modifier */
 .photo-replace {
 	width: 100%;
 }

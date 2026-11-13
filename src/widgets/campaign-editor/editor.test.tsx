@@ -268,7 +268,7 @@ describe("campaign editor Replace photo", () => {
 			"Opens a one-time upload page. Reopen the editor afterwards to see the new photo.",
 		);
 		expect(help?.closest(".ds-field")).toBe(replace.closest(".ds-field"));
-		// the full width of its column, as on the flex column that .ds-field replaced
+		// the full width of its column
 		expect(replace.parentElement?.classList.contains("ds-field")).toBe(true);
 		expect(getComputedStyle(replace).width).toBe("100%");
 
