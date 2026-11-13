@@ -1,48 +1,48 @@
 {
   "schemaVersion": 1,
   "dir": "src/widgets/registry",
-  "registryVersion": "2.2.0",
+  "registryVersion": "2.3.0",
   "items": {
     "badge-css": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
-        "styles/badge-css.css": "2bb977dc24766df2b903c6f804d44ae622b8b53778051a706304d24349308c04",
-        "styles/badge-css.usage.md": "ce7dc664e77e7b6c943a44015d0e4a4fd0cb2bb5d31266dee3c2209799d12207"
+        "styles/badge-css.css": "c94e66790a2a5c0be2b2200ee807e3c880b7c84d5ae2be88f91602b3ffbec075",
+        "styles/badge-css.usage.md": "b2481ee71ee6084bf276d89843d7bc64bc5027fae8d492507419768687382060"
       }
     },
     "button-css": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
-        "styles/button-css.css": "b00222ba01a0558e41da622f2138ca5854ec9fd568cf7b23928f6a38f489660d",
-        "styles/button-css.usage.md": "035b9ebed3353ab6865d2de5ac6ed1686cf7ec8c74e52de4d2137f72e840c633"
+        "styles/button-css.css": "ba4a69d813ba126941def4500b994294d586f46615e7000151f7880eedff2084",
+        "styles/button-css.usage.md": "94a88a5c8ec6b7eef0f3911c2e0f243ecaf4ce654f777b6c39fcbf933f099f11"
       }
     },
     "card-css": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
-        "styles/card-css.css": "9ac943fde3a064ee8c925f106e2a6acb54dc5856608446024c61d7cce2e5f89f",
-        "styles/card-css.usage.md": "ad9297f1921cc98f607a5f387d120760ed039895407b41b4f51d4f140bf640c6"
+        "styles/card-css.css": "3a2b8fb706adec6aae2b14ae02318ff5c469c487220eaa7d4a16ea2f718845fb",
+        "styles/card-css.usage.md": "3ab90e34fb2ffbfd001829f124d7f0329e42a094b18faa48504a25dfe04d42a7"
       }
     },
     "checkbox-css": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
-        "styles/checkbox-css.css": "29ce61c900774b7c94afd0d9a06080cf6ad81854e252ee7b7f4c8ebbd5f7667e",
-        "styles/checkbox-css.usage.md": "b6dff597762a17d31c5455d9d227ccf90c3f53d3d6d21934b66462c3eca46982"
+        "styles/checkbox-css.css": "1ffd3ce61a27e67523739a37bb5a83c4c3995decf1942bad30df5d48df18ceac",
+        "styles/checkbox-css.usage.md": "034d2e293fb6efe1944d1e48b08eb70812594eb85d77297fa6b8b790064270f5"
       }
     },
     "field-css": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
-        "styles/field-css.css": "8c95b96e5b8042a7e334b0e5554a990dd335ed9d6a8ff3099e6b6079120b1743",
-        "styles/field-css.usage.md": "3881608aa3d300f02dd20569dd827c759f653782baa8e8fbd944a92c972ec436"
+        "styles/field-css.css": "bd6a7c38e2ddcff9a6a80e0bc4784f35dc9f9154e6121dbcbef1e8c1f6885de2",
+        "styles/field-css.usage.md": "003718f4d53d8da28608a060162d70daab2436d74d9cf15be03dd5266b7e525f"
       }
     },
     "fonts": {
-      "version": "1.2.0",
+      "version": "1.2.1",
       "files": {
         "styles/fonts.css": "068ed24b904b607d3bb76bdc9e52dc975c08b64e1ff3f3209d18aa36dbc8b0ab",
-        "styles/fonts.usage.md": "e378c63aa142e95d420ca0e99a4a9fdbdd15a93e9ef01fe5bb9e914bcacfecab",
+        "styles/fonts.usage.md": "7bd43c839d8eccafb67e0b03996cf03fbac0d4d3b5067c4f4c80c8aa1a76098a",
         "styles/fonts/gochi-hand-400-normal.woff2": "d384305c44ced32de561fac36e22143b2aeb61fd35d2a410f7f69cfe73561c55",
         "styles/fonts/gochi-hand-OFL.txt": "b36cb03d6ddc163452d9935ce6f325741434272d3889acf42cc23584f31a85bf",
         "styles/fonts/red-hat-round-OFL.txt": "4f1417e27511207cd217656c964f1b0d8b0c4a30156a1a699cf16dc5eba0dff6",
@@ -83,10 +83,10 @@
       }
     },
     "fonts-core": {
-      "version": "1.1.0",
+      "version": "1.1.1",
       "files": {
         "styles/fonts-core.css": "9380b89230cfedadcf2bdc70195b1c434037fd575162028daa9ae762d4cf7169",
-        "styles/fonts-core.usage.md": "ae2703b61d8c9c357ac5c09531351dd19f51bd795b3292e451e8943ccdc4fb37",
+        "styles/fonts-core.usage.md": "a06fa06140b7a118e2500bba512e6869a2fa97a2bfe35004a5f0955f7c2f8b1e",
         "styles/fonts/red-hat-round-OFL.txt": "4f1417e27511207cd217656c964f1b0d8b0c4a30156a1a699cf16dc5eba0dff6",
         "styles/fonts/RedHatRoundDisplay-Bold.woff2": "4295291ab3ce6fa70d9030312d35562fc2f3a2efee7fd14ba8277ba09da8977a",
         "styles/fonts/RedHatRoundDisplay-SemiBold.woff2": "0c9f21f423cc0d3be52529ee523e953edf9b68417b2c6d845d7582396c09601b",
@@ -98,61 +98,68 @@
       }
     },
     "progress-css": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
-        "styles/progress-css.css": "0cd8b379f989620c766f96aaf170b6d1d6742eca8498643ee615df20b4551b58",
-        "styles/progress-css.usage.md": "5ce43bdba22c93621589e9e6c6616aaa8c4e4eb8d976ff19d485bb07b3b3bc60"
+        "styles/progress-css.css": "6d8ab32b3df7e0666de9e153bfaf036f0647d145804bff218158a71234e93b64",
+        "styles/progress-css.usage.md": "75b11f158a8b85da2272ffde8ace604fac9c16202e288007d668cf34540f6907"
       }
     },
     "prose-css": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
-        "styles/prose-css.css": "cf06757dbd1113e6609ca4fdf7a4546886c9b70c5186aadc3c90ec99dd24f164",
-        "styles/prose-css.usage.md": "e2c0a2dc264c67c9090396dd7b62de46be88ffc5d2d97b5bf3d0d94948ba692d"
+        "styles/prose-css.css": "372a060b0f10874a13738dc1807d10077e540a85c2fca6442780ea52d03363c8",
+        "styles/prose-css.usage.md": "9578b3ade976fbb4027fd8a279bcf6c4b3dc2684b593b34cac9548daecabf475"
       }
     },
     "radio-css": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
-        "styles/radio-css.css": "e3384baadb733740b8240d2312b9ec0584a2173fa8e27879193a45c29f06dc89",
-        "styles/radio-css.usage.md": "30cba78c3000c72865bf0470dd487c1932ea1900679ef0222c874dc2cf8b442e"
+        "styles/radio-css.css": "24f1e76537a392889a8eb1e1352108847fef4997d33ae9bbdaca7176d2d7bf7f",
+        "styles/radio-css.usage.md": "19745a47a5648028b09d894b2e145503a39fa0c164b3f6c37b098029db12348c"
       }
     },
     "select-css": {
+      "version": "1.1.0",
+      "files": {
+        "styles/select-css.css": "d01f1a978d0f4544efda8533ca51411e1a19bddc64dc4fbaa4b46a06c0756a89",
+        "styles/select-css.usage.md": "373622d4892fab9e1fa8692a70b544f320d61e28508ec5e72b284af3d10780cc"
+      }
+    },
+    "spinner-css": {
       "version": "1.0.0",
       "files": {
-        "styles/select-css.css": "b60cdb4ec8194c869fbaf543393d8d12ab20d0c647d156e96261a8a1924fdb7a",
-        "styles/select-css.usage.md": "f5a64699bcc96d312ea6f237eaf3018da4267c7a757c82eb35725e7ba72642d2"
+        "styles/spinner-css.css": "6b218ecc740c517f46918d7d1cc48c19991f00544e6d2ba53cc31d879fa066a7",
+        "styles/spinner-css.usage.md": "7930ca9748309847dfce826640fecd4383b5fd7b7d3503d5cd45d384172405af"
       }
     },
     "state-card-css": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
-        "styles/state-card-css.css": "3922fab9ddca565ba4e1aab36e8ba176a5586cd4017224bd04f73ce9d6d18cbc",
-        "styles/state-card-css.usage.md": "8edf5a19f506602e2d61f55ba3ac33c96857bf58c01491f2f219487f6efd5e7f"
+        "styles/state-card-css.css": "2c3ddad6e69b25d59fc621012e7dbe24319e97c6cf51a7db01ad21bddbd3ece6",
+        "styles/state-card-css.usage.md": "b6ce1d1f0298ebb37fd0f002fcdd4ce5d78dbf39290e6a1ba78abc572f8de272"
       }
     },
     "switch-css": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
-        "styles/switch-css.css": "cac7e6db9436ca32d65a4ddce85e11a25f8a9da8751dfa6a246e45de0e597d7d",
-        "styles/switch-css.usage.md": "a5bf4ee18286da22c6d08a84a4b3ae14781990fabfbd3ec58127744b1c33f1ef"
+        "styles/switch-css.css": "603be1ce4eaef791b251f8790c4f8d4d407b004a53208e6e90728c78750304af",
+        "styles/switch-css.usage.md": "02d4c49417ba30e3950ca5d9b1f8f8f069a4342b36a664ef12f3d149740b49d3"
       }
     },
     "table-css": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
-        "styles/table-css.css": "403f2ce4723904d5b619c192becd0591b56f46b5ca806b88917fdd5ba6cbdcd3",
-        "styles/table-css.usage.md": "50c2513f14bbb979d0b2900f51f4196967b75b6502c2575c8cdab2ae064fd8b9"
+        "styles/table-css.css": "298de382baf000d8616eaa39779ea8613a483e99207f8ecf250b2327f154c6bc",
+        "styles/table-css.usage.md": "4037054f845934c728b28e316ebe9bcc4550be4abf5f779fbebaf3944b248a3f"
       }
     },
     "variables": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "files": {
         "styles/colors.css": "092f1bd986929b2416f92cee21c3fef87323d95e129eff82bb81ebf8d9d63f7b",
         "styles/themes/default.css": "a823dc572937a1a4112eb0943ec085a1a8c83a2fd420eee60278763e1e6f17a6",
-        "styles/variables.css": "a1cadd8be4cfc52cd94c5947179d642db259c631335d07b3a05b658c083c3808",
-        "styles/variables.usage.md": "796271bce2dc0ae64acc340783753eabfba1fa87fb95e94b27fd650b236b1803"
+        "styles/variables.css": "102dedf886e4d570f061a9420292c75601be39f9f67bdd11468b54f2d115eb1e",
+        "styles/variables.usage.md": "f7bdeaefc8dfc5cd43ac8e9553f5336de7334c2cf51c1bbd98fe34a6d86bd900"
       }
     }
   }

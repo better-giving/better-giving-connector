@@ -15,18 +15,21 @@ function Text(props: {
 	value: string;
 	long?: boolean;
 	rows?: number;
+	hint?: string;
 	onInput: (value: string) => void;
 }) {
 	const id = useId();
+	const hintId = `${id}-help`;
 	const common = {
 		id,
 		class: "ds-field-input",
 		value: props.value,
+		"aria-describedby": props.hint ? hintId : undefined,
 		onInput: (e: Event) =>
 			props.onInput((e.target as HTMLInputElement | HTMLTextAreaElement).value),
 	};
 	return (
-		<div class="field">
+		<div class="ds-field">
 			<label class="ds-label" for={id}>
 				{props.label}
 			</label>
@@ -34,6 +37,11 @@ function Text(props: {
 				<textarea rows={props.rows ?? 4} {...common} />
 			) : (
 				<input type="text" {...common} />
+			)}
+			{props.hint && (
+				<p class="ds-field-help" id={hintId}>
+					{props.hint}
+				</p>
 			)}
 		</div>
 	);
@@ -47,7 +55,7 @@ function NumberField(props: {
 }) {
 	const id = useId();
 	return (
-		<div class="field">
+		<div class="ds-field">
 			<label class="ds-label" for={id}>
 				{props.label}
 			</label>
@@ -69,6 +77,7 @@ function NumberField(props: {
 /** Replaces the cover through the site's own upload page: a single-use link the operator opens. */
 export function PhotoReplace(props: { campaignId: string }) {
 	const { host } = useSession();
+	const hintId = useId();
 	const [error, setError] = useState<string | null>(null);
 	const open = async () => {
 		setError(null);
@@ -87,11 +96,16 @@ export function PhotoReplace(props: { campaignId: string }) {
 		});
 	};
 	return (
-		<div class="field">
-			<Button variant="secondary" onClick={() => void open()}>
+		<div class="ds-field">
+			<Button
+				variant="secondary"
+				class="photo-replace"
+				describedBy={hintId}
+				onClick={() => void open()}
+			>
 				Replace photo
 			</Button>
-			<p class="hint">
+			<p class="ds-field-help" id={hintId}>
 				Opens a one-time upload page. Reopen the editor afterwards to see the
 				new photo.
 			</p>
@@ -245,10 +259,10 @@ export function ContentFields(props: {
 						label="Story"
 						long
 						rows={8}
+						hint="Leave a blank line between paragraphs."
 						value={plainText(content.story)}
 						onInput={(story) => set({ story: storyDocument(story) })}
 					/>
-					<p class="hint">Leave a blank line between paragraphs.</p>
 				</div>
 			);
 		case "form": {

@@ -13,7 +13,7 @@ Import `styles/fonts-core.css` in place of `styles/fonts.css`, and name the face
 - Mono 400 is included, so code samples set in `--font-mono` use Red Hat Round Mono instead of the system monospace. Mono at any other weight is not, and a bold code sample is synthesized from the 400 face.
 - Not included: the other Mono weights, Gochi Hand, italics, and the light, extra-bold and black weights. A widget that sets `--font-gochi` gets the next family in the stack.
 - `fonts` and `fonts-core` ship the same bytes for the seven faces they share, so the CLI lets both sit in one app: add them in one `add` call or one after the other, in either order.
-- The `variables` item imports `fonts.css`, so `variables` always brings `fonts`. To ship the core subset with it, add `fonts-core` too (in the same `add` as `variables` or later), point that import at `fonts-core.css` in your bundle and leave `fonts.css` out of it.
+- The `variables` and `tokens` items import no font stylesheet, so an app that wants only the core subset adds `fonts-core` alone and imports `fonts-core.css` beside `variables.css` or `index.css`.
 
 ## Notes
 

@@ -243,6 +243,42 @@ describe("campaign editor row buttons", () => {
 	});
 });
 
+describe("campaign editor Replace photo", () => {
+	it("is described by its help, and a button without one is undescribed", async () => {
+		applyStyles("ui/styles.css", "campaign-editor/editor.css");
+		const root = await show({
+			...EDITOR,
+			page: { pageKind: "content", content: { heading: "Clean water" } },
+		});
+		[...root.querySelectorAll("button")]
+			.find((b) => b.textContent?.includes("Hero photo"))
+			?.click();
+		const replace = await vi.waitFor(() => {
+			const found = [...root.querySelectorAll("button")].find(
+				(b) => b.textContent === "Replace photo",
+			);
+			if (!found) throw new Error("no Replace photo button");
+			return found;
+		});
+		const describedBy = replace.getAttribute("aria-describedby");
+		if (!describedBy) throw new Error("Replace photo has no aria-describedby");
+		const help = document.getElementById(describedBy);
+		expect(help?.classList.contains("ds-field-help")).toBe(true);
+		expect(help?.textContent).toBe(
+			"Opens a one-time upload page. Reopen the editor afterwards to see the new photo.",
+		);
+		expect(help?.closest(".ds-field")).toBe(replace.closest(".ds-field"));
+		// the full width of its column
+		expect(replace.parentElement?.classList.contains("ds-field")).toBe(true);
+		expect(getComputedStyle(replace).width).toBe("100%");
+
+		const save = [...root.querySelectorAll("button")].find(
+			(b) => b.textContent === "Save",
+		);
+		expect(save?.hasAttribute("aria-describedby")).toBe(false);
+	});
+});
+
 describe("campaign editor tier amounts", () => {
 	async function openAmounts(root: HTMLElement) {
 		const donationForm = [...root.querySelectorAll("button")].find((b) =>

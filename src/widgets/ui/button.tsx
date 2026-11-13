@@ -5,7 +5,7 @@ export type ButtonVariant =
 	| "primary"
 	| "secondary"
 	| "destructive"
-	| "outline-destructive";
+	| "destructive-outline";
 
 /** A button; `busy` disables it and tells assistive tech it is working. */
 export function Button(props: {
@@ -17,14 +17,16 @@ export function Button(props: {
 	label?: string;
 	class?: string;
 	id?: string;
+	describedBy?: string;
 }) {
 	const busy = props.busy === true;
 	return (
 		<button
 			type="button"
 			id={props.id}
-			class={`ds-btn ${props.variant === "outline-destructive" ? "btn-outline-destructive" : `ds-btn-${props.variant}`}${props.class ? ` ${props.class}` : ""}`}
+			class={`ds-btn ds-btn-${props.variant}${props.class ? ` ${props.class}` : ""}`}
 			aria-label={props.label}
+			aria-describedby={props.describedBy}
 			aria-busy={busy ? "true" : undefined}
 			disabled={busy || props.disabled === true}
 			onClick={props.onClick}

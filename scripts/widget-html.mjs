@@ -17,8 +17,8 @@ const escapeForScript = (js) =>
 const escapeForStyle = (css) => css.replace(/<(\/style)/gi, "\\3C $1");
 
 // The registry's fonts.css names every face it ships (about 2 MB once inlined);
-// its `fonts-core` item is the subset a widget or page sets. The `variables`
-// item imports fonts.css, so this swaps in fonts-core.css for that import.
+// its `fonts-core` item is the subset a widget or page sets. tokens.css imports
+// the `fonts` item beside `variables`, so this swaps in fonts-core.css for it.
 const FONTS_CORE = fileURLToPath(
 	new URL("../src/widgets/registry/styles/fonts-core.css", import.meta.url),
 );
@@ -26,7 +26,7 @@ const registryFontsPlugin = {
 	name: "registry-fonts-core",
 	setup(b) {
 		b.onResolve({ filter: /(^|\/)fonts\.css$/ }, (args) =>
-			args.resolveDir.endsWith("registry/styles")
+			args.path.endsWith("registry/styles/fonts.css")
 				? { path: FONTS_CORE }
 				: undefined,
 		);

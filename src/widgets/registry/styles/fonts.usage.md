@@ -8,7 +8,7 @@ Self-hosted faces under the SIL Open Font License (texts in `red-hat-round-OFL.t
 
 ## Using it
 
-Import `styles/fonts.css` (the `variables` and `tokens` items already do). The faces are named by role variables in the `variables` item:
+Import `styles/fonts.css` beside `variables.css` or `index.css`; neither the `variables` nor the `tokens` item imports a font stylesheet. The faces are named by role variables in the `variables` item:
 
 - `--font-display`: headings and figures.
 - `--font-body`: everything else.

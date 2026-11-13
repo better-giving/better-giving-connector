@@ -186,11 +186,46 @@ describe("campaign results type", () => {
 		const label = root.querySelector(`label[for="${select?.id}"]`);
 		const publish = button(root, "Publish");
 		expect(publish.className).toContain("ds-btn");
-		// the registry button's 9-spacing-unit height, as happy-dom leaves the calc; an unresolved rule reads ""
-		expect(getComputedStyle(publish).minBlockSize).toBe("calc(0.25rem * 9)");
-		expect(getComputedStyle(select as Element).minBlockSize).toBe(
-			"calc(0.25rem * 9)",
-		);
+		// the registry button's 9-spacing-unit height, as happy-dom leaves the calc
+		// unresolved; an unapplied rule reads "", which the pattern rejects
+		const nineUnits = /\* 9\)$/;
+		expect(getComputedStyle(publish).minBlockSize).toMatch(nineUnits);
+		expect(getComputedStyle(select as Element).minBlockSize).toMatch(nineUnits);
 		expect(getComputedStyle(label as Element).fontWeight).toBe("500");
+	});
+
+	it("draws End campaign as the registry's destructive outline, not the secondary button", async () => {
+		const root = await styled(RESULTS_LIVE);
+		const end = button(root, "End campaign");
+		const secondary = button(root, "View page");
+		expect(end.classList.contains("ds-btn")).toBe(true);
+		expect(end.classList.contains("ds-btn-destructive-outline")).toBe(true);
+		expect(secondary.classList.contains("ds-btn-secondary")).toBe(true);
+
+		// button-css sets the outline's fill to transparent and the secondary's to a gray step
+		const endFill = getComputedStyle(end).backgroundColor;
+		expect(endFill).toMatch(
+			/^(transparent|rgba\(0, ?0, ?0, ?0\)|rgb\(0 0 0 \/ 0\))$/,
+		);
+		expect(endFill).not.toBe(getComputedStyle(secondary).backgroundColor);
+	});
+
+	it("sets the ended status badge in the card's status slot as the outline badge", async () => {
+		const root = await styled({
+			...RESULTS_LIVE,
+			campaign: { ...RESULTS_LIVE.campaign, status: "ended" },
+		});
+		const badge = root.querySelector(
+			".head > .ds-card-status > .ds-badge-outline",
+		);
+		expect(badge?.textContent).toBe("Ended");
+		expect(badge?.classList.contains("ds-badge")).toBe(true);
+	});
+
+	it("keeps a live campaign's status badge out of the outline variant", async () => {
+		const root = await styled(RESULTS_LIVE);
+		const badge = root.querySelector(".head > .ds-card-status > .ds-badge");
+		expect(badge?.textContent).toBe("Live");
+		expect(badge?.classList.contains("ds-badge-outline")).toBe(false);
 	});
 });

@@ -96,7 +96,7 @@ describe("?css import", () => {
 	});
 });
 
-// The registry's `variables` imports the full fonts.css (every face, about 2 MB
+// tokens.css imports the registry's full fonts.css (every face, about 2 MB
 // inlined); both builders swap in fonts-core.css, the subset a surface sets.
 describe("registry fonts", () => {
 	const root = join(__dirname, "..");

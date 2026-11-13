@@ -72,7 +72,9 @@ function Header(props: { data: CampaignResultsData; id: string }) {
 				</h2>
 				<p class="subtitle">{sub}</p>
 			</div>
-			<StatusBadge status={campaign.status} />
+			<span class="ds-card-status">
+				<StatusBadge status={campaign.status} />
+			</span>
 		</div>
 	);
 }
@@ -287,7 +289,7 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 						)}
 						<Button
 							id={`${titleId}-end`}
-							variant="outline-destructive"
+							variant="destructive-outline"
 							onClick={() => setConfirming(true)}
 						>
 							End campaign

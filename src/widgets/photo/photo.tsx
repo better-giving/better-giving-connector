@@ -172,7 +172,7 @@ export function PhotoCard(props: { data: PhotoData }) {
 						{file.name} · {kilobytes(file.size, locale)} · {file.type}. It shows
 						16:9 on the donor page.
 					</p>
-					<div class="field">
+					<div class="ds-field">
 						<label class="ds-label" for={altId}>
 							Photo description (alt text)
 						</label>
