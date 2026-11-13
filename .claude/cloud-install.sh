@@ -11,8 +11,8 @@ exe="$home/.tools/pnpm-exe/$ver/pnpm"
 
 # link the binary, not the `pnpm` wrapper in PNPM_HOME: the wrapper resolves the
 # binary beside its own path, so a link to it breaks. the directory holds only
-# this link and the node link below. pnpm 12's installer lays down no .tools binary, so its
-# wrapper's own directory goes on PATH whole.
+# this link and the node link below. pnpm 12's installer lays down no .tools
+# binary, so its wrapper's own directory goes on PATH whole.
 if [ -x "$exe" ]; then
   bin="$HOME/.kru-bin"
   mkdir -p "$bin"
