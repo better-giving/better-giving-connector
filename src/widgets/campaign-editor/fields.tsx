@@ -77,6 +77,7 @@ function NumberField(props: {
 /** Replaces the cover through the site's own upload page: a single-use link the operator opens. */
 export function PhotoReplace(props: { campaignId: string }) {
 	const { host } = useSession();
+	const hintId = useId();
 	const [error, setError] = useState<string | null>(null);
 	const open = async () => {
 		setError(null);
@@ -96,10 +97,14 @@ export function PhotoReplace(props: { campaignId: string }) {
 	};
 	return (
 		<div class="ds-field">
-			<Button variant="secondary" onClick={() => void open()}>
+			<Button
+				variant="secondary"
+				describedBy={hintId}
+				onClick={() => void open()}
+			>
 				Replace photo
 			</Button>
-			<p class="ds-field-help">
+			<p class="ds-field-help" id={hintId}>
 				Opens a one-time upload page. Reopen the editor afterwards to see the
 				new photo.
 			</p>

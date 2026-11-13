@@ -17,6 +17,7 @@ export function Button(props: {
 	label?: string;
 	class?: string;
 	id?: string;
+	describedBy?: string;
 }) {
 	const busy = props.busy === true;
 	return (
@@ -25,6 +26,7 @@ export function Button(props: {
 			id={props.id}
 			class={`ds-btn ds-btn-${props.variant}${props.class ? ` ${props.class}` : ""}`}
 			aria-label={props.label}
+			aria-describedby={props.describedBy}
 			aria-busy={busy ? "true" : undefined}
 			disabled={busy || props.disabled === true}
 			onClick={props.onClick}
