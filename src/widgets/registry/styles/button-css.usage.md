@@ -33,7 +33,7 @@ Import `styles/variables.css` and `styles/button-css.css`. A button is a `<butto
 
 - Use a `<button>` for an action and an `<a href>` for navigation.
 - An icon-only button needs `aria-label`.
-- Target size: `ds-btn-sm` is drawn at 24px. Where the pointer is coarse its hit area grows to 44px tall, and at least 44px wide, centred on it, through a `::after` on the button; the drawn size and the layout do not change. Every `ds-btn` is `position: relative` with no specificity, so a class of yours that positions it (a close button `absolute` in a corner) wins wherever its stylesheet loads, and the hit area still follows the button. Keep at least 20px between neighbouring icon-only `ds-btn-sm` buttons, or use md; where areas meet, the later button takes the tap.
+- Target size: `ds-btn-sm` is drawn at 24px. Where the pointer is coarse its hit area grows to `--ds-hit-target` tall (44px there, declared by `variables` 1.3.0 and later; with an older `variables` copy it falls back to 44px; see its note for an embed), and at least that wide, centred on it, through a `::after` on the button; the drawn size and the layout do not change. Every `ds-btn` is `position: relative` with no specificity, so a class of yours that positions it (a close button `absolute` in a corner) wins wherever its stylesheet loads, and the hit area still follows the button. Keep at least 20px between neighbouring icon-only `ds-btn-sm` buttons, or use md; where areas meet, the later button takes the tap.
 
 ## Theming
 

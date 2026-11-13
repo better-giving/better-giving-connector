@@ -76,6 +76,26 @@
   --form-secondary: var(--form-subtle);
 }
 
+/* the hit area a control too small to tap draws around itself (a ::after),
+   without changing its drawn size: 24px, 44px where the pointer is coarse.
+   declared where the roles are, so it re-resolves on a [data-theme] root that
+   sets its own --ds-rem (an embed under a host whose root size differs).
+   beside it the two tracking roles, theme.css's --tracking-label and
+   --tracking-badge under ds- names: the uppercase label's, and the badge role,
+   which no item reads yet */
+:root,
+[data-theme] {
+  --ds-hit-target: calc(1.5 * var(--ds-rem, 1rem));
+  --ds-tracking-label: 0.12em;
+  --ds-tracking-badge: 0.08em;
+}
+@media (pointer: coarse) {
+  :root,
+  [data-theme] {
+    --ds-hit-target: calc(2.75 * var(--ds-rem, 1rem));
+  }
+}
+
 /* the reduced-motion guard rides on the three speeds, as in ./theme.css. */
 @media (prefers-reduced-motion: reduce) {
   :root {

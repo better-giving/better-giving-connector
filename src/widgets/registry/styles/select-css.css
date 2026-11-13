@@ -110,9 +110,9 @@
   rotate: 180deg;
 }
 
-/* the popup: the floating fill and shadow on the container corner, a 4px
-   inset and 2px between rows. where it sits, and its stacking, are the
-   caller's */
+/* the popup: the floating fill, hairline edge and shadow on the container
+   corner, a 4px inset and 2px between rows. where it sits, and its stacking,
+   are the caller's */
 .ds-listbox {
   --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
   box-sizing: border-box;
@@ -121,9 +121,13 @@
   gap: calc(var(--ds-spacing) * 0.5);
   max-block-size: calc(var(--ds-spacing) * 80);
   overflow-y: auto;
+  /* a popover's own inset: 0 would keep right set beside the page's left,
+     and under dir="rtl" left is the one dropped */
+  inset: auto;
   margin: 0;
   padding: calc(var(--ds-spacing) * 1);
   list-style: none;
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-card);
   background-color: var(--popover);
   color: var(--gray-12);

@@ -15,10 +15,11 @@ Import `styles/variables.css` and `styles/card-css.css`:
 ```
 
 - `ds-card`: the container on the 12px corner, the card fill and a hairline edge, no shadow. It clips overflow so a slot's rule stays inside the corner.
-- `ds-card-header`: a rule below it, 24px by 16px padding. A heading anywhere inside it has no margin and takes the header's size and line-height, in the display face at 700, so the header is the same height with or without a CSS reset. For a heading size, give the heading a class of your own, declared after `card-css.css`; beside a `ds-card-status`, size the header instead (below).
+- `ds-card-header`: a rule below it, 24px by 16px padding (16px at the sides on a phone, below). A heading anywhere inside it has no margin and takes the header's size and line-height, in the display face at 700, so the header is the same height with or without a CSS reset. For a heading size, give the heading a class of your own, declared after `card-css.css`; beside a `ds-card-status`, size the header instead (below).
 - `ds-card-status`: the box for a status, badge, count or icon beside text that can wrap (below).
 - `ds-card-body`: 24px by 20px padding.
 - `ds-card-footer`: the actions row, on the well fill one rung in from the card, with a rule above it. It is a flex row with a 12px gap.
+- Under 40rem (640px) the header, body and footer are 16px in from the sides, keeping their top and bottom padding, as the React card is under Tailwind's `sm`.
 - Use the slots you need. Use `<section>`, `<header>`, `<footer>` as above, or `<div>` for any of them.
 
 ### A status beside text that can wrap
@@ -32,10 +33,10 @@ A status, badge, count or icon beside text that can wrap sits on the text's firs
 </header>
 ```
 
-- `ds-card-status` is a flex box exactly one line tall (`block-size: 1lh`), the mark centred in it, kept at its own width. `1lh` is the box's own line-height, which it inherits from its row.
+- `ds-card-status` is a flex box exactly one line tall (`block-size: 1lh`), the mark centred in it, kept at its own width, several marks 8px apart. It is the `lead-css` item's box under the card's name. `1lh` is the box's own line-height, which it inherits from its row.
 - A `ds-card-header` with a `ds-card-status` as a direct child is the row: a flex row aligned to the start (`align-items: flex-start`), the title first and the status at the end, 8px apart. A one-line title looks as a centred row would; a wrapped one keeps the mark on its first line. Don't centre that row's items: it centres the box against the whole title again.
 - Give the title's size to the header (a class of your own, `title-lg` above, setting `font-size` and `line-height`), not to the heading. The heading and the box then inherit the same size and line-height, so the box is one of the title's lines tall. A size on the heading alone gives it a taller line than the box, and the mark sits high.
-- Any row of yours does the same: `display: flex; align-items: flex-start` on the row, `ds-card-status` around the mark, the text's size set on the row.
+- Any row of yours does the same: add the `lead-css` item and use its row and box classes (its note), the text's size set on the row.
 - The mark is yours: a badge from the `badge-css` item (add it alongside), a count or an icon. The plain `<span>Ends soon</span>` above stands in for it. `card-css` draws only the box around it.
 
 ### Create card

@@ -39,11 +39,14 @@
    first line, not the middle of the block: the row aligns to the start and the
    status's box is one line tall, the mark centred in it. 1lh is the box's own
    line-height, inherited from the row, so the text beside it takes its size
-   from the row too. */
+   from the row too. the same box as lead-css's ds-lead-1lh, under the card's
+   name, so card-css needs no other item; several marks sit 8px apart. */
 .ds-card-status {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
   display: flex;
   flex: none;
   align-items: center;
+  gap: calc(var(--ds-spacing) * 2);
   block-size: 1lh;
 }
 /* the header holding a status is that row. :where() keeps it at one class, so
@@ -71,6 +74,15 @@
   background-color: var(--panel);
   padding-inline: calc(var(--ds-spacing) * 6);
   padding-block: calc(var(--ds-spacing) * 4);
+}
+/* on a phone the slots are 16px in from the sides, as the React card's under
+   tailwind's sm (40rem) */
+@media (width < 40rem) {
+  .ds-card-header,
+  .ds-card-body,
+  .ds-card-footer {
+    padding-inline: calc(var(--ds-spacing) * 4);
+  }
 }
 
 /* the card that starts making a new one, on an <a> or a <button>: the card

@@ -19,8 +19,10 @@ Import `styles/variables.css` and `styles/field-css.css`:
 - `ds-field`: the container; lets the field shrink inside a flex or grid row.
 - `ds-label`: the label. `data-required="true"` adds a star; `data-required="false"` adds "(optional)". The label sits 4px above the control, or flush against a `ds-field-hint` that follows it.
 - `ds-field-hint`: help text under the label.
-- `ds-field-input`: the control, on an `<input>` or a `<textarea>`. Full width, at least 50px tall, the control corner.
+- `ds-field-input`: the control, on an `<input>` or a `<textarea>`. Full width, at least 50px tall, the control corner. On a `<textarea>` it is a block, so the field ends at the textarea's bottom edge with no line gap under it.
 - `ds-field-input-container`: a wrapper that carries the control's look around an input of its own (the ring and states follow the input inside it). Put a bare input in it: the class takes away the input's own edge, fill and focus outline and gives it the field's padding, so the container draws one edge and one ring.
+- `ds-field-affix` with `ds-field-prefix` or `ds-field-suffix`: a sign or unit inside a `ds-field-input-container`, before or after its input (see below).
+- `ds-field-meta` and `ds-field-counter`: the message slot of a field with a character limit, the message at the start and the counter at the end (see below).
 - `ds-field-err`: the message under the control, 4px below it, starting at the control's start edge (`text-align: start`). When it is empty it takes no room.
 - `ds-field-warn`: a message that does not block, in the same slot as the error: warning ink and a 12px mark, the edge unchanged, never `aria-invalid`. Show one message at a time; when there is an error, leave the warning out. When it is empty it takes no room but stays rendered, so it stays a live region.
 - `ds-field-help`: the hint under the control, 4px below the message (or the input), small and muted. When it is empty it takes no room.
@@ -28,6 +30,40 @@ Import `styles/variables.css` and `styles/field-css.css`:
 - `ds-sr-only`: text for assistive technology only, such as the "Warning: " before a warning.
 - The label, the hint and both error classes set their own margins, so a `<p>` or `<label>` renders the same with or without a CSS reset.
 - `ds-field-error`: the same message taken out of the flow, over the field's bottom edge, on the input's start edge. The container needs `position: relative`.
+
+## A prefix or a suffix
+
+```html
+<div class="ds-field">
+  <label class="ds-label" for="goal">Goal (US dollars)</label>
+  <div class="ds-field-input-container">
+    <span class="ds-field-affix ds-field-prefix" aria-hidden="true">$</span>
+    <input id="goal" name="goal" inputmode="decimal">
+  </div>
+</div>
+```
+
+A `ds-field-input-container` holding a `ds-field-affix` becomes a flex row, centred, at least the control's height; its input takes the free width. The prefix (`ds-field-affix ds-field-prefix`, before the input) sits 16px in from the start edge, the suffix (`ds-field-affix ds-field-suffix`, after it) 16px in from the end, both gray-11, unselectable and unwrapped, and the input's inset on that side drops to 4px. Give the affix both classes: the side class reads the spacing the affix class declares. Hover, the ring, invalid, read-only and disabled stay the container's, keyed off the input as before. Keep the affix `aria-hidden` and say the unit in the label or the hint ("End in (days)"). A press on the affix should focus the input, as a press on the label does: on its `mousedown`, call `preventDefault()` (so the press blurs nothing) and `focus()` the input.
+
+## A character counter
+
+```html
+<div class="ds-field">
+  <label class="ds-label" for="story">Your story</label>
+  <textarea class="ds-field-input" id="story" rows="4"
+            aria-describedby="story-err" aria-invalid="true"></textarea>
+  <div class="ds-field-meta">
+    <p class="ds-field-err" id="story-err">12 characters over the limit.</p>
+    <span class="ds-field-counter" data-state="over" aria-hidden="true">1,512 of 1,500 · 12 over</span>
+  </div>
+  <p class="ds-sr-only" role="status"></p>
+</div>
+```
+
+- `ds-field-meta` is the slot under the control as one row, 4px below it: a `ds-field-err` inside takes the free width at the start with no margin of its own, and stays hidden while empty, so the counter keeps the end.
+- `ds-field-counter` is the count, `text-xs` gray-11 in tabular figures, at the end. `data-state="near"` (from 90% of the limit) takes `--warning-subtle-fg`; `data-state="over"` takes `--destructive-subtle-fg` at weight 600. Write "612 of 1,500", and over it "1,512 of 1,500 · 12 over". Recount on the form's `reset` event too, in a task after it (`setTimeout`): the browser puts the value back after the event.
+- Over the limit, set `aria-invalid="true"` on the control and write the message naming the overage into the `ds-field-err`. Leave `maxlength` off unless the store cannot take more: truncating a paste loses text without a word.
+- Keep the counter `aria-hidden` and keep one `role="status"` region mounted, empty, beside the field. Write into it only when the count crosses a threshold, about a second after the typing stops ("88 characters left", "12 characters over the limit", "Within the limit"), never on every keystroke.
 
 ## A message and a hint
 
@@ -111,7 +147,7 @@ Not included: the floating label and the select and table classes of `tokens`.
 <input class="ds-field-input" id="amount" name="amount" type="number" step="0.01"
        data-manual-invalid aria-describedby="amount-err">
 ```
-- Focus shows the ring color (`--ring`) as the outline.
+- Focus draws the house ring: a 2px `--ring` outline, 2px out from the edge, on `:focus-visible`, which a text field matches on a click as well as on Tab. In `ds-field-input-container` the container draws it when its input is focused. The `select-css` controls carry `ds-field-input`, so they draw the same ring.
 
 ## Accessibility
 
