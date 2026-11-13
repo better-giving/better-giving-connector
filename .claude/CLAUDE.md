@@ -13,17 +13,16 @@
 Load **`kru:lead`** before building, reviewing, or dispatching a seat — it carries how the
 team works.
 
-One package at the repo root; seats and versions are read from `package.json` and `pnpm-workspace.yaml`:
+One package at the repo root; seats and versions are read from `package.json`:
 
-- **api** → `kru:hono-builder` — `src/app.ts`, `src/cron.ts`, `src/mcp/` (the `/mcp` endpoint, one tool per `/connector/v1` action) and `src/deployment/` (the `/connector/v1` client) ← hono 4.13.13, `@modelcontextprotocol/server` 2.2.0; `hono-builder` leaves `hono/jsx` pages out of its lane (`ROSTER.md`)
+- **api** → `kru:hono-builder` — `src/app.ts`, `src/cron.ts`, `src/index.ts`, `src/dev.ts`, `src/env.ts`, `src/log.ts`, `src/secret.ts`, `src/format.ts`, `src/presets/`, the route modules `src/connect/index.tsx` and `src/site/index.tsx` (signed cookies, `csrf`, the login exchange), `src/mcp/` (the `/mcp` endpoint, one tool per `/connector/v1` action) and `src/deployment/` (the `/connector/v1` client) ← hono 4.13.13, `@modelcontextprotocol/server` 2.2.0
 - **auth** → `kru:better-auth-specialist` — `src/auth/`: the OAuth sign-in Claude and ChatGPT start, with dynamic client registration ← better-auth 1.7.7
 - **data** → `kru:turso-specialist` — `src/db/` and `migrations/`: the connection row, and every `@libsql/client` call ← `@libsql/client` 0.18.0, kysely 0.29.6
-- **platform** → `kru:vercel-platform-engineer` — `vercel.json`, env and secrets (the key-encryption secret among them), the `app.connect.better.giving` domain ← `vercel.json`, AGENTS.md
-- **tooling** → `kru:toolchain-engineer` — `package.json` scripts, `biome.json`, `lint/`, `tsconfig.json`, `tsconfig.widgets.json`, `scripts/` build tooling ← biome 2.5.15, typescript 7.0.2, pnpm 12.4.2, node 24, esbuild 0.28.2
-- **widgets** → no kru seat. `src/widgets/` (`hono/jsx/dom` components, the plain-CSS registry parts under `src/widgets/registry/`, `scripts/widget-html.mjs`, `pnpm widget-shots`) and the server-rendered pages in `src/connect/`, `src/site/` and `src/pages/` need a `hono/jsx` UI builder. `react-ui-builder` is React-only (no `react` dependency here), `hono-builder` excludes `hono/jsx`, and `web-components-builder` is for custom elements ← `ROSTER.md`, `package.json`
-- **skills** → `kru:vitest`, `zod` — vitest 5.0.3, zod 4.6.5 (widget unit tests run on happy-dom 21.0.4)
-- **screens** → the connect pages and the widgets are UI; they take the registry (`## Design system` above), and `pnpm design:check` is the gate that holds `src/widgets/registry/` to `bg-design.json`
-- **test** → `pnpm test` (`vitest run`), hermetic: in-memory libSQL and a fake deployment, no env and no network ← AGENTS.md → Commands
+- **platform** → `kru:vercel-platform-engineer` — `vercel.json`, `scripts/vercel-ignore-build.sh`, `.github/workflows/` (`ci.yml`, `bg-design-update.yml`), env and secrets (the key-encryption secret among them), the `app.connect.better.giving` domain ← `vercel.json`, AGENTS.md
+- **tooling** → `kru:toolchain-engineer` — `package.json` scripts, `biome.json`, `lint/`, `tsconfig.json`, `tsconfig.widgets.json`, `vitest.config.ts`, `vitest.live.config.ts`, the build and loader scripts in `scripts/` (`build.ts`, `widget-html.mjs`, `widget-hook.mjs`, `binary-hook.mjs`, `binary-register.mjs`, `design-check.sh`) ← biome 2.5.15, typescript 7.0.2, pnpm 12.4.2, node 24 (`.nvmrc`), esbuild 0.28.2
+- **widgets** → no kru seat. `src/widgets/` (`hono/jsx/dom` components, the plain-CSS registry parts under `src/widgets/registry/`), `test/widget-host/`, `test/fixtures/widget/`, `scripts/widget-shots.ts`, `scripts/surface-shots.ts`, and the server-rendered pages (`src/connect/page.tsx`, `src/connect/connect.css`, `src/site/` pages and `site.css`, `src/pages/`) need a `hono/jsx` UI builder. `react-ui-builder` is React-only (no `react` dependency here), `hono-builder` excludes `hono/jsx` pages, and `web-components-builder` is for custom elements ← `ROSTER.md`, `package.json`
+- **skills** → `kru:vitest`, `zod` — vitest 5.0.3, zod 4.6.5
+- **screens** → the site and connect pages and the widgets are UI; they take the registry (`## Design system` above)
 - **verify** → `.claude/skills/verify/`, before each commit
 - **mcp** → Vercel (claude.ai connector) for live project state; the `turso@turso` plugin (`.claude/settings.json`); context7 (`.mcp.json`)
 
