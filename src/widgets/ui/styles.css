@@ -184,7 +184,7 @@ h3 {
 	font-weight: 600;
 }
 
-/* form controls: the registry's .ds-field, .ds-label, .ds-field-input and .ds-field-help */
+/* form controls are the registry's .ds-field parts; only the textarea's resize is set here */
 
 textarea.ds-field-input {
 	resize: vertical;
