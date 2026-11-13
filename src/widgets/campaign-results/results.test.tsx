@@ -190,9 +190,7 @@ describe("campaign results type", () => {
 		// unresolved; an unapplied rule reads "", which the pattern rejects
 		const nineUnits = /\* 9\)$/;
 		expect(getComputedStyle(publish).minBlockSize).toMatch(nineUnits);
-		expect(getComputedStyle(select as Element).minBlockSize).toMatch(
-			nineUnits,
-		);
+		expect(getComputedStyle(select as Element).minBlockSize).toMatch(nineUnits);
 		expect(getComputedStyle(label as Element).fontWeight).toBe("500");
 	});
 

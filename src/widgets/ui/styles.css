@@ -190,6 +190,17 @@ textarea.ds-field-input {
 	resize: vertical;
 }
 
+/* the button fills its column, as it did when .field was a flex column; .ds-field is block */
+.photo-replace {
+	width: 100%;
+}
+
+/* a plain line under a list of controls, not a field's hint: no .ds-field-help margin on top of the stack's gap */
+.hint {
+	color: var(--gray-11);
+	font-size: var(--text-xs);
+}
+
 /* a done / not-done / failed line: the glyph and the words both say it */
 
 .checks {
