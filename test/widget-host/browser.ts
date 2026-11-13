@@ -12,6 +12,9 @@ type Message = Parameters<Transport["send"]>[0];
 type Relay = Record<string, (value: unknown) => void>;
 
 const SPINNER_CLASS = "ds-spinner";
+// the quoted class value only the bundled script holds (states.tsx); the inlined
+// stylesheet spells it `.ds-spinner`, never as a string literal
+const SPINNER_MARKUP = `"${SPINNER_CLASS}"`;
 const STAND_IN_HOST = new URL(blobImage("x")).host;
 
 /** A photo-like stand-in for every image under the fixtures' blob origin; nothing else loads. */
@@ -99,10 +102,10 @@ export async function showWidget(
 	// the result renders a task after it arrives (ui/states.tsx draws the spinner until then)
 	const frame = page.frameLocator("#widget");
 	// `detached` also passes when nothing matches, so a renamed spinner class
-	// would turn this wait into a no-op; fail while the bundle still names it
-	if (!html.includes(SPINNER_CLASS)) {
+	// would turn this wait into a no-op; fail while the script still draws it
+	if (!html.includes(SPINNER_MARKUP)) {
 		throw new Error(
-			`the widget bundle no longer draws .${SPINNER_CLASS} (ui/states.tsx); update the loading wait in test/widget-host/browser.ts`,
+			`the widget script no longer draws .${SPINNER_CLASS} (ui/states.tsx); update the loading wait in test/widget-host/browser.ts`,
 		);
 	}
 	await frame

@@ -19,7 +19,7 @@ const RESULT: CreateResult = {
 	failedStep: null,
 };
 
-async function createWith(result: CreateResult) {
+async function mountForm(result: CreateResult) {
 	const { bridge, host } = await startHost({ context: {} });
 	bridge.oncalltool = (async () => ({
 		content: [{ type: "text", text: "ok" }],
@@ -31,6 +31,11 @@ async function createWith(result: CreateResult) {
 	renderWidget(root, host, CampaignCreateData, CampaignCreate, "Loading…");
 	await bridge.sendToolResult({ content: [], structuredContent: CREATE });
 	await vi.waitFor(() => expect(root.querySelector(".presets")).not.toBeNull());
+	return root;
+}
+
+async function createWith(result: CreateResult) {
+	const root = await mountForm(result);
 	const create = [...root.querySelectorAll("button")].find(
 		(b) => b.textContent === "Create draft",
 	);
@@ -38,6 +43,15 @@ async function createWith(result: CreateResult) {
 	await vi.waitFor(() => expect(root.querySelector(".created")).not.toBeNull());
 	return root;
 }
+
+describe("the create card's header", () => {
+	it("holds the Draft badge in the card's status slot", async () => {
+		const root = await mountForm(RESULT);
+		const badge = root.querySelector(".ds-card-status > .ds-badge-warning");
+		expect(badge?.textContent).toBe("Draft");
+		expect(badge?.classList.contains("ds-badge")).toBe(true);
+	});
+});
 
 describe("the create card's outcome", () => {
 	it("says a draft was created", async () => {
