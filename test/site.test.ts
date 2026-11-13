@@ -44,6 +44,19 @@ afterEach(() => {
 const get = (path: string) => call(new Request(`${BASE}${path}`));
 
 test.each(["/privacy", "/terms", "/docs", "/support"])(
+	"%s marks itself in the registry's site nav, in the bar and the menu",
+	async (path) => {
+		const html = await (await get(path)).text();
+		const current = [...html.matchAll(/href="([^"]+)" aria-current="page"/g)];
+
+		expect(current.map((m) => m[1])).toEqual([path, path]);
+		for (const href of ["/docs", "/support", "/privacy", "/terms"])
+			expect(html).toContain(`class="ds-site-nav-link" href="${href}"`);
+		expect(html).toContain('<main id="main" tabindex="-1">');
+	},
+);
+
+test.each(["/privacy", "/terms", "/docs", "/support"])(
 	"%s is an html page",
 	async (path) => {
 		const res = await get(path);

@@ -6,6 +6,8 @@
  * script in page.tsx; without it the page stays light.
  */
 @import "../widgets/registry-ui.css";
+@import "../widgets/registry/styles/bare-icon-button-css.css";
+@import "../widgets/registry/styles/site-nav-css.css";
 
 *,
 *::before,
@@ -24,23 +26,6 @@ main {
 	max-width: 40rem;
 	margin: 0 auto;
 	padding: 2.5rem 1rem 4rem;
-}
-
-nav {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.75rem 1rem;
-	margin: 0 0 1.5rem;
-	font-size: 0.95rem;
-}
-
-nav a {
-	color: var(--link);
-	font-weight: 600;
-}
-
-nav a:hover {
-	color: var(--link-hover);
 }
 
 .meta {

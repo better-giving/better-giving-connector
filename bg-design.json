@@ -10,6 +10,13 @@
         "styles/badge-css.usage.md": "b2481ee71ee6084bf276d89843d7bc64bc5027fae8d492507419768687382060"
       }
     },
+    "bare-icon-button-css": {
+      "version": "1.0.0",
+      "files": {
+        "styles/bare-icon-button-css.css": "b0021989d952d53ac8446cb28cac7b89ba30539dec67e9ef1eee26b720907458",
+        "styles/bare-icon-button-css.usage.md": "76d4bddcb05bb690a9ea0e249f30555ccdf27743db0f68cce1efb41989d2aa99"
+      }
+    },
     "button-css": {
       "version": "1.2.1",
       "files": {
@@ -123,6 +130,13 @@
       "files": {
         "styles/select-css.css": "060c6ad8a95b32d5eeddb652bc9a8538348d8298272ba45615a21a1ad706c38e",
         "styles/select-css.usage.md": "9f0f9f6421cf3085cdf1d6bc20051f65f5c8cc1838db4571971b11cf1c0f6a1a"
+      }
+    },
+    "site-nav-css": {
+      "version": "1.2.0",
+      "files": {
+        "styles/site-nav-css.css": "95886f06d4a0137830a586df0ee9296b794a7a3d31f92946c312011ee9429775",
+        "styles/site-nav-css.usage.md": "c643dee0eebfc788fb661b3340a602ec6cf89d6125567a8acd4e1373019f897a"
       }
     },
     "spinner-css": {
