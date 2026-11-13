@@ -182,7 +182,66 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 	if (campaign.status === "draft") {
 		const done = data.readiness.filter((r) => r.done).length;
 		return (
-			<Card class="results" label="Campaign results">
+			<Card
+				class="results"
+				label="Campaign results"
+				footer={
+					<div class="ds-card-footer card-foot">
+						<div class="gifts-go">
+							<label class="ds-label" for={`${titleId}-gifts`}>
+								Gifts go to:
+							</label>
+							<div class="ds-select ds-select-inline">
+								<select
+									id={`${titleId}-gifts`}
+									class="ds-field-input"
+									value={giftsGoTo}
+									onChange={(e: Event) =>
+										setGiftsGoTo((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value={GENERAL} selected={giftsGoTo === GENERAL}>
+										General fund
+									</option>
+									{data.programs.map((p) => (
+										<option
+											key={p.id}
+											value={p.id}
+											selected={giftsGoTo === p.id}
+										>
+											{p.name}
+										</option>
+									))}
+								</select>
+								<svg
+									class="ds-select-chevron"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="m6 9 6 6 6-6" />
+								</svg>
+							</div>
+						</div>
+						<div class="foot-actions">
+							<Button variant="secondary" onClick={preview}>
+								Preview
+							</Button>
+							<Button
+								variant="primary"
+								busy={busy === "publish"}
+								onClick={publish}
+							>
+								Publish
+							</Button>
+						</div>
+					</div>
+				}
+			>
 				<Header data={data} id={titleId} />
 				<Totals data={data} />
 				<section aria-label="Ready to publish">
@@ -199,63 +258,54 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 				</section>
 				{errorLine}
 				{statusLine}
-				<div class="ds-card-footer card-foot">
-					<div class="gifts-go">
-						<label class="ds-label" for={`${titleId}-gifts`}>
-							Gifts go to:
-						</label>
-						<div class="ds-select ds-select-inline">
-							<select
-								id={`${titleId}-gifts`}
-								class="ds-field-input"
-								value={giftsGoTo}
-								onChange={(e: Event) =>
-									setGiftsGoTo((e.target as HTMLSelectElement).value)
-								}
-							>
-								<option value={GENERAL} selected={giftsGoTo === GENERAL}>
-									General fund
-								</option>
-								{data.programs.map((p) => (
-									<option key={p.id} value={p.id} selected={giftsGoTo === p.id}>
-										{p.name}
-									</option>
-								))}
-							</select>
-							<svg
-								class="ds-select-chevron"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								aria-hidden="true"
-							>
-								<path d="m6 9 6 6 6-6" />
-							</svg>
-						</div>
-					</div>
-					<div class="foot-actions">
-						<Button variant="secondary" onClick={preview}>
-							Preview
-						</Button>
-						<Button
-							variant="primary"
-							busy={busy === "publish"}
-							onClick={publish}
-						>
-							Publish
-						</Button>
-					</div>
-				</div>
 			</Card>
 		);
 	}
 
 	const ended = campaign.status === "ended";
 	return (
-		<Card class="results" label="Campaign results">
+		<Card
+			class="results"
+			label="Campaign results"
+			footer={
+				!ended && (
+					<div class="ds-card-footer card-foot">
+						<Updated />
+						<div class="foot-actions">
+							{data.pendingDraft && (
+								<Button
+									variant="primary"
+									busy={busy === "publish"}
+									onClick={publish}
+								>
+									Publish changes
+								</Button>
+							)}
+							<Button
+								id={`${titleId}-end`}
+								variant="destructive-outline"
+								onClick={() => setConfirming(true)}
+							>
+								End campaign
+							</Button>
+							{campaign.url && (
+								<Button variant="secondary" onClick={share}>
+									Share link
+								</Button>
+							)}
+							{campaign.url && (
+								<Button
+									variant="secondary"
+									onClick={() => campaign.url && openPage(campaign.url)}
+								>
+									View page
+								</Button>
+							)}
+						</div>
+					</div>
+				)
+			}
+		>
 			<Header data={data} id={titleId} />
 			<Totals data={data} />
 			<Facts data={data} />
@@ -274,42 +324,6 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 			)}
 			{errorLine}
 			{statusLine}
-			{!ended && (
-				<div class="ds-card-footer card-foot">
-					<Updated />
-					<div class="foot-actions">
-						{data.pendingDraft && (
-							<Button
-								variant="primary"
-								busy={busy === "publish"}
-								onClick={publish}
-							>
-								Publish changes
-							</Button>
-						)}
-						<Button
-							id={`${titleId}-end`}
-							variant="destructive-outline"
-							onClick={() => setConfirming(true)}
-						>
-							End campaign
-						</Button>
-						{campaign.url && (
-							<Button variant="secondary" onClick={share}>
-								Share link
-							</Button>
-						)}
-						{campaign.url && (
-							<Button
-								variant="secondary"
-								onClick={() => campaign.url && openPage(campaign.url)}
-							>
-								View page
-							</Button>
-						)}
-					</div>
-				</div>
-			)}
 			{confirmOpen && (
 				<EndConfirm
 					title={campaign.title}

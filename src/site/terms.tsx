@@ -4,6 +4,7 @@ import { Page } from "./page";
 export function TermsPage() {
 	return (
 		<Page
+			current="/terms"
 			heading="Terms of Service"
 			title="Terms of Service: Better Giving Connector"
 		>

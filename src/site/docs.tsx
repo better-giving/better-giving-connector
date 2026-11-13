@@ -191,6 +191,7 @@ const TOOL_ROWS = TOOL_CLASSES.flatMap((toolClass) => [
 export function DocsPage() {
 	return (
 		<Page
+			current="/docs"
 			heading="Documentation"
 			title="Documentation: Better Giving Connector"
 		>

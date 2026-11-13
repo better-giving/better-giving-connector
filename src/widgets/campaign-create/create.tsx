@@ -209,7 +209,33 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 		? `${preset.title} · ${money(preset.goal)} by ${date(preset.endDate)}`
 		: "";
 	return (
-		<Card class="create" label="Start a campaign">
+		<Card
+			class="create"
+			label="Start a campaign"
+			footer={
+				<div class="ds-card-footer card-foot">
+					<span class="summary">{summary}</span>
+					<div class="foot-actions">
+						<Button
+							variant="secondary"
+							busy={busy === "customize"}
+							disabled={busy !== null}
+							onClick={() => void create("edit")}
+						>
+							Customize
+						</Button>
+						<Button
+							variant="primary"
+							busy={busy === "create"}
+							disabled={busy !== null}
+							onClick={() => void create("stay")}
+						>
+							Create draft
+						</Button>
+					</div>
+				</div>
+			}
+		>
 			<div class="head">
 				<div>
 					<h2 class="title">Start a campaign</h2>
@@ -237,27 +263,6 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 			<p class="error-line" role="alert">
 				{error}
 			</p>
-			<div class="ds-card-footer card-foot">
-				<span class="summary">{summary}</span>
-				<div class="foot-actions">
-					<Button
-						variant="secondary"
-						busy={busy === "customize"}
-						disabled={busy !== null}
-						onClick={() => void create("edit")}
-					>
-						Customize
-					</Button>
-					<Button
-						variant="primary"
-						busy={busy === "create"}
-						disabled={busy !== null}
-						onClick={() => void create("stay")}
-					>
-						Create draft
-					</Button>
-				</div>
-			</div>
 		</Card>
 	);
 }

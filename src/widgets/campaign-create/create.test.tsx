@@ -53,6 +53,22 @@ describe("the create card's header", () => {
 	});
 });
 
+describe("the create card's footer", () => {
+	it("holds Customize, Create draft and the summary in a footer after the body", async () => {
+		const root = await mountForm(RESULT);
+		const footer = root.querySelector("article.card > .ds-card-footer");
+
+		expect(
+			footer?.previousElementSibling?.classList.contains("ds-card-body"),
+		).toBe(true);
+		expect(root.querySelector(".ds-card-body .ds-card-footer")).toBeNull();
+		expect(
+			[...(footer?.querySelectorAll("button") ?? [])].map((b) => b.textContent),
+		).toEqual(["Customize", "Create draft"]);
+		expect(footer?.querySelector(".summary")?.textContent).toContain(" by ");
+	});
+});
+
 describe("the create card's outcome", () => {
 	it("says a draft was created", async () => {
 		const root = await createWith(RESULT);

@@ -117,6 +117,78 @@ describe("campaign results", () => {
 	});
 });
 
+describe("campaign results card footer", () => {
+	const draft = {
+		...RESULTS_LIVE,
+		campaign: { ...RESULTS_LIVE.campaign, status: "draft" as const, url: null },
+	};
+	const ended = {
+		...RESULTS_LIVE,
+		campaign: { ...RESULTS_LIVE.campaign, status: "ended" as const },
+	};
+	const footerButtons = (root: HTMLElement) =>
+		[...root.querySelectorAll(".ds-card-footer button")].map(
+			(b) => b.textContent,
+		);
+
+	it.each([
+		["draft", draft],
+		["live", RESULTS_LIVE],
+	])(
+		"puts a %s campaign's footer under the body, not inside it",
+		async (_state, data) => {
+			const { root } = await show(data);
+			const footer = root.querySelector("article.card > .ds-card-footer");
+
+			expect(footer).not.toBeNull();
+			expect(
+				footer?.previousElementSibling?.classList.contains("ds-card-body"),
+			).toBe(true);
+			expect(root.querySelector(".ds-card-body .ds-card-footer")).toBeNull();
+		},
+	);
+
+	it("holds a live campaign's actions in the footer", async () => {
+		const { root } = await show(RESULTS_LIVE);
+
+		expect(footerButtons(root)).toEqual([
+			"End campaign",
+			"Share link",
+			"View page",
+		]);
+	});
+
+	it("adds Publish changes to the footer only when a draft is pending", async () => {
+		const pending = await show({ ...RESULTS_LIVE, pendingDraft: true });
+
+		expect(footerButtons(pending.root)).toEqual([
+			"Publish changes",
+			"End campaign",
+			"Share link",
+			"View page",
+		]);
+	});
+
+	it("holds a draft's Preview and Publish in the footer", async () => {
+		const { root } = await show(draft);
+
+		expect(footerButtons(root)).toEqual(["Preview", "Publish"]);
+	});
+
+	it("has no footer on an ended campaign, and no way to end or share it", async () => {
+		const { root } = await show(ended);
+		const buttons = [...root.querySelectorAll("button")].map(
+			(b) => b.textContent,
+		);
+
+		expect(root.querySelector(".ds-card-footer")).toBeNull();
+		expect(buttons).not.toContain("End campaign");
+		expect(buttons).not.toContain("Share link");
+		// the card still renders: the ended note is in its body
+		expect(endedNote(root)).toContain("no longer takes gifts");
+	});
+});
+
 describe("campaign results type", () => {
 	const styled = async (data: CampaignResultsData) => {
 		applyStyles("ui/styles.css", "campaign-results/results.css");

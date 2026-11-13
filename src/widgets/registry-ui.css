@@ -3,7 +3,7 @@
  * over its variables (tokens.css): button, badge, card, field, checkbox,
  * radio, progress, select, switch, spinner, state-card, prose and table, all `ds-` classes, copied by `bg-design` and never edited here.
  * What stays local is below: the type sizes the surfaces' own rules read and
- * the touch height. The card's flush footer is `.card-foot` in ui/styles.css.
+ * the touch height.
  */
 @import "./tokens.css";
 @import "./registry/styles/button-css.css";

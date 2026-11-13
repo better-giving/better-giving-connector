@@ -43,19 +43,81 @@ afterEach(() => {
 
 const get = (path: string) => call(new Request(`${BASE}${path}`));
 
-test.each(["/privacy", "/terms", "/docs", "/support"])(
-	"%s is an html page",
-	async (path) => {
-		const res = await get(path);
+const NAV_PATHS = ["/docs", "/support", "/privacy", "/terms"];
 
-		expect(res.status).toBe(200);
-		expect(res.headers.get("content-type")).toMatch(/text\/html/);
-		const html = await res.text();
-		expect(html).toContain("<!doctype html>");
-		expect(html).toContain('href="/docs"');
-		expect(html).not.toContain("://connect.better.giving");
+// The links of one nav container, in order, with whether each is marked current.
+function navLinks(html: string, open: RegExp, linkClass: string) {
+	const nav = html.match(open)?.[1] ?? "";
+	return [
+		...nav.matchAll(
+			new RegExp(
+				`<a class="${linkClass}" href="([^"]+)"( aria-current="page")?>`,
+				"g",
+			),
+		),
+	].map((m) => ({ href: m[1], current: m[2] !== undefined }));
+}
+
+const BAR_NAV = /<nav class="ds-site-nav-links"[^>]*>([\s\S]*?)<\/nav>/;
+const MENU_NAV = /<nav id="site-menu"[^>]*>([\s\S]*?)<\/nav>/;
+
+test.each(NAV_PATHS)(
+	"%s marks itself once in the bar and once in the menu, with all four links in each",
+	async (path) => {
+		const html = await (await get(path)).text();
+
+		for (const [nav, linkClass] of [
+			[BAR_NAV, "ds-site-nav-link"],
+			[MENU_NAV, "ds-site-nav-menu-link"],
+		] as const) {
+			const links = navLinks(html, nav, linkClass);
+			expect(links.map((l) => l.href)).toEqual(NAV_PATHS);
+			expect(links.filter((l) => l.current).map((l) => l.href)).toEqual([path]);
+		}
+		expect(html).toContain('<main id="main" tabindex="-1">');
 	},
 );
+
+test.each(NAV_PATHS)(
+	"%s starts with the menu closed, and a skip link to the main region",
+	async (path) => {
+		const html = await (await get(path)).text();
+		const toggle = html.match(/<button\b[^>]*ds-site-nav-toggle[^>]*>/)?.[0];
+
+		expect(toggle).toContain('aria-label="Menu"');
+		expect(toggle).toContain('aria-expanded="false"');
+		expect(toggle).toContain('aria-controls="site-menu"');
+		expect(html.match(/<nav id="site-menu"[^>]*>/)?.[0]).toMatch(/\shidden\b/);
+		expect(html).toContain('<a class="ds-site-nav-skip" href="#main">');
+		expect(html).toContain('<main id="main"');
+	},
+);
+
+test.each(NAV_PATHS)("%s is an html page", async (path) => {
+	const res = await get(path);
+
+	expect(res.status).toBe(200);
+	expect(res.headers.get("content-type")).toMatch(/text\/html/);
+	const html = await res.text();
+	expect(html).toContain("<!doctype html>");
+	expect(html).toContain("<title>");
+	expect(html).toContain('<main id="main"');
+	expect(html).not.toContain("://connect.better.giving");
+});
+
+test("pages forbid framing and set no script or default source, so the inline scripts run", async () => {
+	const res = await get("/docs");
+	const csp = res.headers.get("content-security-policy") ?? "";
+
+	expect(csp).toContain("frame-ancestors 'none'");
+	expect(csp).not.toMatch(/script-src/);
+	expect(csp).not.toMatch(/default-src/);
+	expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+	// the page carries two inline scripts: the dark class and the nav disclosure
+	expect([
+		...(await res.text()).matchAll(/<script>[\s\S]*?<\/script>/g),
+	]).toHaveLength(2);
+});
 
 test.each(["/privacy", "/terms", "/docs", "/support"])(
 	"%s is set in the registry's faces and colors, from this origin",
@@ -123,8 +185,12 @@ function runDarkScript(script: string, matches: boolean) {
 	};
 }
 
-const inlineScript = (html: string) =>
-	html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? "";
+// The dark script is the inline script that reads the scheme.
+const darkScript = (html: string) =>
+	[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].find((m) =>
+		m[1]?.includes("prefers-color-scheme"),
+	);
+const inlineScript = (html: string) => darkScript(html)?.[1] ?? "";
 
 test("the site sets the registry's dark class from the browser's scheme and follows changes", async () => {
 	const script = inlineScript(await (await get("/docs")).text());
@@ -147,13 +213,14 @@ test.each(["/privacy", "/terms", "/docs", "/support"])(
 	"%s runs the dark script before the stylesheet, so first paint has the class",
 	async (path) => {
 		const html = await (await get(path)).text();
-		const tag = html.match(/<script\b[^>]*>/)?.[0];
+		const dark = darkScript(html);
+		const at = dark?.index ?? -1;
 
 		// a blocking classic script: defer, async or type=module would run it after paint
-		expect(tag).toBe("<script>");
-		expect(html.indexOf("<script>")).toBeGreaterThan(html.indexOf("<head>"));
-		expect(html.indexOf("<script>")).toBeLessThan(html.indexOf("<style>"));
-		expect(html.indexOf("<script>")).toBeLessThan(html.indexOf("<body>"));
+		expect(dark?.[0].startsWith("<script>")).toBe(true);
+		expect(at).toBeGreaterThan(html.indexOf("<head>"));
+		expect(at).toBeLessThan(html.indexOf("<style>"));
+		expect(at).toBeLessThan(html.indexOf("<body>"));
 	},
 );
 

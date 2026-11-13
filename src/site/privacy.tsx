@@ -13,6 +13,7 @@ import { Page } from "./page";
 export function PrivacyPage() {
 	return (
 		<Page
+			current="/privacy"
 			heading="Privacy Policy"
 			title="Privacy Policy: Better Giving Connector"
 		>

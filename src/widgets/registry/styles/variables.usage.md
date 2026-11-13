@@ -41,6 +41,16 @@ A rem is the host page's root font size, so a widget embedded in a page with `ht
 
 Every `*-css` control inside then has the size it has under a 16px root, whatever the host's root. This item does not declare `--ds-rem`, and its corners (`--radius-control`, `--radius-card`) stay in rem. Media-query breakpoints are unaffected, since rem in a media query is the browser's default size; a `@container` width cannot read a custom property and stays in rem (the `field-css` note names its two). The Tailwind items keep plain rem: a Tailwind app owns its root size.
 
+### Target size, `--ds-hit-target`
+
+`--ds-hit-target` is the hit area a control drawn smaller than a tap grows to, without changing its drawn size or the layout: `1.5rem` (24px), and `2.75rem` (44px) where the pointer is coarse. It is declared once, here, on `:root` and every `[data-theme]` element, and every item that draws a control smaller than a tap reads it: the small button (`btn-sm` in `tokens`, `ds-btn-sm` in `button-css`), the text button (`text-button`, `ds-text-btn` in `text-button-css`), the bare icon button (`bare-icon-button`, `ds-icon-bare` in `bare-icon-button-css`), the avatar as a button or link (`avatar`, `ds-avatar` in `avatar-css`) and the spam-check box (`spam-check`, `ds-spam-check-hit` in `spam-check-css`). The Tailwind items get it through `index.css`, which imports this file. Set it on a container to change the area for everything inside.
+
+It is `calc(N * var(--ds-rem, 1rem))`, resolved where it is declared. An embed that sets `--ds-rem` gets the 24px and 44px back only when it sets it on a `[data-theme]` element (`<div data-theme="default" style="--ds-rem: 16px">`); on a plain element, `--ds-hit-target` keeps the value resolved above it.
+
+### Tracking, `--ds-tracking-label` and `--ds-tracking-badge`
+
+The two letter-spacing roles of the plain-CSS items, declared beside `--ds-hit-target` on `:root` and every `[data-theme]` element: `--ds-tracking-label` (0.12em), the small uppercase label's (an eyebrow, a group title; `lead-css`'s `ds-eyebrow`, `menu-css`'s `ds-menu-label` and `nav-list-css`'s `ds-nav-title` read it), and `--ds-tracking-badge` (0.08em), the badge role. No item reads `--ds-tracking-badge` yet: neither `badge` nor `badge-css` sets a letter-spacing. They equal the `tokens` item's `--tracking-label` and `--tracking-badge`, which a test holds; they are in `em`, so they follow the text they sit on.
+
 ## Themes
 
 - `data-theme="<name>"` on any element selects a theme; `default` also applies to `:root`.

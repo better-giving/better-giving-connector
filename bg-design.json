@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src/widgets/registry",
-  "registryVersion": "2.3.0",
+  "registryVersion": "2.4.0",
   "items": {
     "badge-css": {
       "version": "1.2.0",
@@ -10,18 +10,25 @@
         "styles/badge-css.usage.md": "b2481ee71ee6084bf276d89843d7bc64bc5027fae8d492507419768687382060"
       }
     },
-    "button-css": {
-      "version": "1.2.0",
+    "bare-icon-button-css": {
+      "version": "1.0.0",
       "files": {
-        "styles/button-css.css": "ba4a69d813ba126941def4500b994294d586f46615e7000151f7880eedff2084",
-        "styles/button-css.usage.md": "94a88a5c8ec6b7eef0f3911c2e0f243ecaf4ce654f777b6c39fcbf933f099f11"
+        "styles/bare-icon-button-css.css": "b0021989d952d53ac8446cb28cac7b89ba30539dec67e9ef1eee26b720907458",
+        "styles/bare-icon-button-css.usage.md": "76d4bddcb05bb690a9ea0e249f30555ccdf27743db0f68cce1efb41989d2aa99"
+      }
+    },
+    "button-css": {
+      "version": "1.2.1",
+      "files": {
+        "styles/button-css.css": "5b2b1d26472df80d57ce3d27b6043f763ffedc8db82d4dca9707befbd52b707d",
+        "styles/button-css.usage.md": "775cfc6322f8b80ed5adf9df124c2fef61ec67c3ec4c13a1a1c31acddad6afad"
       }
     },
     "card-css": {
-      "version": "1.2.0",
+      "version": "1.2.1",
       "files": {
-        "styles/card-css.css": "3a2b8fb706adec6aae2b14ae02318ff5c469c487220eaa7d4a16ea2f718845fb",
-        "styles/card-css.usage.md": "3ab90e34fb2ffbfd001829f124d7f0329e42a094b18faa48504a25dfe04d42a7"
+        "styles/card-css.css": "05edcdaee1ace7c600aa69dc621597eb88fab9870c33648b61a6d672a96d319a",
+        "styles/card-css.usage.md": "a2a2eaddf23d77dead1176d22d36004284daf31f4915cc0521a68f5fe95b37dd"
       }
     },
     "checkbox-css": {
@@ -32,10 +39,10 @@
       }
     },
     "field-css": {
-      "version": "1.2.0",
+      "version": "1.3.0",
       "files": {
-        "styles/field-css.css": "bd6a7c38e2ddcff9a6a80e0bc4784f35dc9f9154e6121dbcbef1e8c1f6885de2",
-        "styles/field-css.usage.md": "003718f4d53d8da28608a060162d70daab2436d74d9cf15be03dd5266b7e525f"
+        "styles/field-css.css": "04ba9f676d87b4f77d20110a4406b3085e201b2203eab163660c4200a651b8d5",
+        "styles/field-css.usage.md": "0206f8468701bf01c666e0e79ac17de296a8035d28516b41d5c8024ca74f06b8"
       }
     },
     "fonts": {
@@ -119,10 +126,17 @@
       }
     },
     "select-css": {
-      "version": "1.1.0",
+      "version": "1.1.1",
       "files": {
-        "styles/select-css.css": "d01f1a978d0f4544efda8533ca51411e1a19bddc64dc4fbaa4b46a06c0756a89",
-        "styles/select-css.usage.md": "373622d4892fab9e1fa8692a70b544f320d61e28508ec5e72b284af3d10780cc"
+        "styles/select-css.css": "060c6ad8a95b32d5eeddb652bc9a8538348d8298272ba45615a21a1ad706c38e",
+        "styles/select-css.usage.md": "9f0f9f6421cf3085cdf1d6bc20051f65f5c8cc1838db4571971b11cf1c0f6a1a"
+      }
+    },
+    "site-nav-css": {
+      "version": "1.2.0",
+      "files": {
+        "styles/site-nav-css.css": "95886f06d4a0137830a586df0ee9296b794a7a3d31f92946c312011ee9429775",
+        "styles/site-nav-css.usage.md": "c643dee0eebfc788fb661b3340a602ec6cf89d6125567a8acd4e1373019f897a"
       }
     },
     "spinner-css": {
@@ -154,12 +168,12 @@
       }
     },
     "variables": {
-      "version": "1.2.0",
+      "version": "1.3.0",
       "files": {
         "styles/colors.css": "092f1bd986929b2416f92cee21c3fef87323d95e129eff82bb81ebf8d9d63f7b",
         "styles/themes/default.css": "a823dc572937a1a4112eb0943ec085a1a8c83a2fd420eee60278763e1e6f17a6",
-        "styles/variables.css": "102dedf886e4d570f061a9420292c75601be39f9f67bdd11468b54f2d115eb1e",
-        "styles/variables.usage.md": "f7bdeaefc8dfc5cd43ac8e9553f5336de7334c2cf51c1bbd98fe34a6d86bd900"
+        "styles/variables.css": "ec349e1f176883e1619f305059a962ce3c92274242e2978656144ad074876f7d",
+        "styles/variables.usage.md": "11105c837eb7d1b93bbaf23b0447f5adf309bafbd03cf78cad6b2f1df8b4d03d"
       }
     }
   }
