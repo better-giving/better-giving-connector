@@ -1,7 +1,14 @@
 /** @jsxImportSource hono/jsx/dom */
 import type { Child } from "hono/jsx";
+import { useEffect, useState } from "hono/jsx/dom";
 
 export function LoadingState(props: { label: string }) {
+	// filled after mount: a live region announces a change inside it, never the
+	// text it arrived holding (state-card-css.usage.md, Accessibility)
+	const [read, setRead] = useState("");
+	useEffect(() => {
+		setRead(props.label);
+	}, [props.label]);
 	return (
 		<div
 			class="ds-state-card ds-state-card-loading"
@@ -9,7 +16,8 @@ export function LoadingState(props: { label: string }) {
 			aria-live="polite"
 		>
 			<span class="ds-spinner" aria-hidden="true" />
-			{props.label}
+			<span aria-hidden="true">{props.label}</span>
+			<span class="ds-state-card-read">{read}</span>
 		</div>
 	);
 }
