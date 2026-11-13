@@ -9,8 +9,9 @@ import siteCss from "./site.css?css";
 const DARK = `const q=matchMedia("(prefers-color-scheme: dark)");const set=()=>document.documentElement.classList.toggle("dark",q.matches);set();q.addEventListener("change",set)`;
 
 // The registry's site-nav disclosure: the stylesheet draws, this opens and
-// closes. The menu button toggles the panel; Escape, a press outside, focus
-// leaving it and widening past the fold (40rem) close it.
+// closes. The menu button toggles the panel; a link in it, a press or focus
+// outside it, Escape from the panel, the button or the page body, and
+// widening to the fold (40rem) close it.
 const MENU_GLYPH = `<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>`;
 const CLOSE_GLYPH = `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`;
 

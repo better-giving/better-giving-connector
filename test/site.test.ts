@@ -185,7 +185,7 @@ function runDarkScript(script: string, matches: boolean) {
 	};
 }
 
-// The page has two inline scripts; the dark one is the one that reads the scheme.
+// The dark script is the inline script that reads the scheme.
 const darkScript = (html: string) =>
 	[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].find((m) =>
 		m[1]?.includes("prefers-color-scheme"),
