@@ -15,13 +15,16 @@ function Text(props: {
 	value: string;
 	long?: boolean;
 	rows?: number;
+	hint?: string;
 	onInput: (value: string) => void;
 }) {
 	const id = useId();
+	const hintId = `${id}-help`;
 	const common = {
 		id,
 		class: "ds-field-input",
 		value: props.value,
+		"aria-describedby": props.hint ? hintId : undefined,
 		onInput: (e: Event) =>
 			props.onInput((e.target as HTMLInputElement | HTMLTextAreaElement).value),
 	};
@@ -34,6 +37,11 @@ function Text(props: {
 				<textarea rows={props.rows ?? 4} {...common} />
 			) : (
 				<input type="text" {...common} />
+			)}
+			{props.hint && (
+				<p class="ds-field-help" id={hintId}>
+					{props.hint}
+				</p>
 			)}
 		</div>
 	);
@@ -245,10 +253,10 @@ export function ContentFields(props: {
 						label="Story"
 						long
 						rows={8}
+						hint="Leave a blank line between paragraphs."
 						value={plainText(content.story)}
 						onInput={(story) => set({ story: storyDocument(story) })}
 					/>
-					<p class="ds-field-help">Leave a blank line between paragraphs.</p>
 				</div>
 			);
 		case "form": {
