@@ -26,8 +26,7 @@ const registryFontsPlugin = {
 	name: "registry-fonts-core",
 	setup(b) {
 		b.onResolve({ filter: /(^|\/)fonts\.css$/ }, (args) =>
-			args.path.endsWith("registry/styles/fonts.css") ||
-			args.resolveDir.endsWith("registry/styles")
+			args.path.endsWith("registry/styles/fonts.css")
 				? { path: FONTS_CORE }
 				: undefined,
 		);
