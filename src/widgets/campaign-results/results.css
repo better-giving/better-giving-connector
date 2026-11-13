@@ -102,7 +102,7 @@
 	}
 }
 
-/* the mockup's hierarchy: head, big figure, goal row, tinted tiles, footer */
+/* the mockup's hierarchy: head, big figure, goal row, tinted tiles */
 .results .card-body {
 	gap: 16px;
 }
