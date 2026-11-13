@@ -1,7 +1,21 @@
 // @vitest-environment happy-dom
+import type * as dom from "happy-dom";
 import { jsx } from "hono/jsx";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Page } from "../src/site/page";
+
+// The node project carries no DOM lib (it collides with node's CryptoKey), so
+// the browser globals this file reads are declared from happy-dom's types.
+declare const document: dom.Document;
+declare const KeyboardEvent: typeof dom.KeyboardEvent;
+declare const FocusEvent: typeof dom.FocusEvent;
+declare const MouseEvent: typeof dom.MouseEvent;
+declare const Event: typeof dom.Event;
+type HTMLElement = dom.HTMLElement;
+type HTMLInputElement = dom.HTMLInputElement;
+type KeyboardEventInit = dom.IKeyboardEventInit;
+type EventTarget = dom.EventTarget;
+type Event = dom.Event;
 
 // The page's nav script, run in a DOM against the page's own markup. The
 // markup is the Page component's output, which the routes serve unchanged.
@@ -34,9 +48,9 @@ let asked = "";
 function mount() {
 	const add = document.addEventListener.bind(document);
 	vi.spyOn(document, "addEventListener").mockImplementation(
-		(type: string, fn: EventListenerOrEventListenerObject) => {
+		(type: string, fn: unknown) => {
 			documentListeners.push([type, fn as Listener]);
-			add(type, fn);
+			add(type, fn as Listener);
 		},
 	);
 	document.body.innerHTML = `${body}<input id="outside" />`;
@@ -60,7 +74,7 @@ function mount() {
 		[...toggle.querySelectorAll("path")].map((p) => p.getAttribute("d"));
 	const open = () => toggle.click();
 	const isOpen = () => !menu.hidden;
-	const escape = (target: EventTarget, init: KeyboardEventInit = {}) =>
+	const pressEscape = (target: EventTarget, init: KeyboardEventInit = {}) =>
 		target.dispatchEvent(
 			new KeyboardEvent("keydown", {
 				key: "Escape",
@@ -87,7 +101,7 @@ function mount() {
 		glyph,
 		open,
 		isOpen,
-		escape,
+		pressEscape,
 		focusOut,
 		pointerDown,
 		widen,
@@ -137,12 +151,14 @@ describe("the site nav's menu and Escape", () => {
 		(where) => {
 			const m = mount();
 			m.open();
-			const target = { panel: m.links[0], button: m.toggle, body: document.body }[
-				where
-			] as HTMLElement;
+			const target = {
+				panel: m.links[0],
+				button: m.toggle,
+				body: document.body,
+			}[where] as HTMLElement;
 			if (where === "panel") target.focus();
 
-			m.escape(target);
+			m.pressEscape(target);
 
 			expect(m.isOpen()).toBe(false);
 			expect(m.toggle.getAttribute("aria-expanded")).toBe("false");
@@ -154,7 +170,7 @@ describe("the site nav's menu and Escape", () => {
 		const m = mount();
 		m.open();
 
-		m.escape(m.outside);
+		m.pressEscape(m.outside);
 
 		expect(m.isOpen()).toBe(true);
 	});
@@ -164,7 +180,7 @@ describe("the site nav's menu and Escape", () => {
 		m.open();
 		m.links[0]?.addEventListener("keydown", (e) => e.preventDefault());
 
-		m.escape(m.links[0] as HTMLElement);
+		m.pressEscape(m.links[0] as HTMLElement);
 
 		expect(m.isOpen()).toBe(true);
 	});

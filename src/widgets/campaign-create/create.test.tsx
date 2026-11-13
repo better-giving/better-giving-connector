@@ -58,9 +58,9 @@ describe("the create card's footer", () => {
 		const root = await mountForm(RESULT);
 		const footer = root.querySelector("article.card > .ds-card-footer");
 
-		expect(footer?.previousElementSibling?.classList.contains("ds-card-body")).toBe(
-			true,
-		);
+		expect(
+			footer?.previousElementSibling?.classList.contains("ds-card-body"),
+		).toBe(true);
 		expect(root.querySelector(".ds-card-body .ds-card-footer")).toBeNull();
 		expect(
 			[...(footer?.querySelectorAll("button") ?? [])].map((b) => b.textContent),

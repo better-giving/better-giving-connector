@@ -141,9 +141,9 @@ describe("campaign results card footer", () => {
 			const footer = root.querySelector("article.card > .ds-card-footer");
 
 			expect(footer).not.toBeNull();
-			expect(footer?.previousElementSibling?.classList.contains("ds-card-body")).toBe(
-				true,
-			);
+			expect(
+				footer?.previousElementSibling?.classList.contains("ds-card-body"),
+			).toBe(true);
 			expect(root.querySelector(".ds-card-body .ds-card-footer")).toBeNull();
 		},
 	);

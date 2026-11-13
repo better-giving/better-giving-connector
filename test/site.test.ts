@@ -114,9 +114,9 @@ test("pages forbid framing and set no script or default source, so the inline sc
 	expect(csp).not.toMatch(/default-src/);
 	expect(res.headers.get("x-content-type-options")).toBe("nosniff");
 	// the page carries two inline scripts: the dark class and the nav disclosure
-	expect(
-		[...(await res.text()).matchAll(/<script>[\s\S]*?<\/script>/g)],
-	).toHaveLength(2);
+	expect([
+		...(await res.text()).matchAll(/<script>[\s\S]*?<\/script>/g),
+	]).toHaveLength(2);
 });
 
 test.each(["/privacy", "/terms", "/docs", "/support"])(
