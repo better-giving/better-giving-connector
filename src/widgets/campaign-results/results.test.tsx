@@ -204,7 +204,9 @@ describe("campaign results type", () => {
 
 		// button-css sets the outline's fill to transparent and the secondary's to a gray step
 		const endFill = getComputedStyle(end).backgroundColor;
-		expect(endFill).toMatch(/^(transparent|rgba\(0, ?0, ?0, ?0\)|rgb\(0 0 0 \/ 0\))$/);
+		expect(endFill).toMatch(
+			/^(transparent|rgba\(0, ?0, ?0, ?0\)|rgb\(0 0 0 \/ 0\))$/,
+		);
 		expect(endFill).not.toBe(getComputedStyle(secondary).backgroundColor);
 	});
 
