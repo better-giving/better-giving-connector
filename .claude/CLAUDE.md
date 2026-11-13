@@ -7,7 +7,7 @@
 
 @../AGENTS.md
 
-<!-- kru v0.194.0 · derived 2026-11-13 · `skills/setup/SKILL.md` to re-derive -->
+<!-- kru v0.195.0 · derived 2026-11-13 · `skills/setup/SKILL.md` to re-derive -->
 ## Team
 
 Load **`kru:lead`** before building, reviewing, or dispatching a seat — it carries how the
