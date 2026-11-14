@@ -715,6 +715,30 @@ test("a client that declares no MCP Apps support is told to write text, never to
 	);
 });
 
+const WAIT_FOR_YES =
+	"Before publish_campaign, end_campaign or reset_donation_page, say what will change and wait for the operator's explicit yes in this chat.";
+
+test("a client declaring MCP Apps is told to wait for the operator's yes before every tool that changes what donors see", async () => {
+	await reconnect(null);
+
+	expect(await discoverInstructions(MCP_APPS_CLIENT)).toContain(WAIT_FOR_YES);
+});
+
+test("a client declaring no MCP Apps support is told the same wait for the operator's yes", async () => {
+	await reconnect(null);
+
+	expect(await discoverInstructions({})).toContain(WAIT_FOR_YES);
+});
+
+test("a 2025-06-18 client that declares no capabilities keeps the card instructions", async () => {
+	await reconnect(null);
+
+	const text = await instructions();
+
+	expect(text).toContain(CARD_LINE);
+	expect(text).not.toContain("shows no cards");
+});
+
 test("without MCP Apps support the data tools stop pointing at the cards", async () => {
 	await reconnect(null);
 	const description = async (capabilities: Record<string, unknown>) =>

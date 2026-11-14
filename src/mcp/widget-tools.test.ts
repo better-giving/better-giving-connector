@@ -24,12 +24,12 @@ test("each render tool links a widget resource that exists, by both the standard
 
 test("a widget resource is an MCP App with its asset origins, no connect domains and the domain it is given", () => {
 	expect(WIDGET_MIME).toBe("text/html;profile=mcp-app");
-	expect(widgetMeta(ORIGIN, ORIGIN).ui).toMatchObject({
+	expect(widgetMeta(ORIGIN, "abc.claudemcpcontent.com").ui).toMatchObject({
 		csp: {
 			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
 			connectDomains: [],
 		},
-		domain: ORIGIN,
+		domain: "abc.claudemcpcontent.com",
 	});
 	for (const widget of Object.values(WIDGETS))
 		expect(widget.html).toContain("<script");
