@@ -81,7 +81,7 @@ An agent's environment gets test-only values, which today means no env values at
 ## Never
 
 - Never deploy. No `vercel deploy`, and no change that publishes this service.
-- Never run migrations against production Turso. `pnpm db:migrate` is for a local `file:` database only.
+- Never run migrations against production Turso yourself. `pnpm db:migrate` is for a local `file:` database only. Production migrations ship through the Vercel production build, whose `buildCommand` in `vercel.json` runs `pnpm run db:migrate` before the build: a new file in `migrations/` is applied when its pull request merges to `main`, and a failing migration fails that build. Write each migration so a failure leaves the database as it was, and keep it backward compatible with the code that is still live.
 - Never commit secrets. `.env*` stays ignored except `.env.example`.
 - Never print keys or tokens. That includes a connection key, `BETTER_AUTH_SECRET`, `CONNECTION_KEY_SECRET`, `CRON_SECRET`, and `TURSO_AUTH_TOKEN`. Env failures name the variable, never the value.
 - Never add a tool that moves money. No charge, refund, or payout. `record_donation` only records a gift that was already received off the site.
