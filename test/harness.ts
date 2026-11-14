@@ -75,6 +75,7 @@ export function mcpRequest(
 	params?: Record<string, unknown>,
 	id = 1,
 	capabilities: Record<string, unknown> = MCP_APPS_CLIENT,
+	clientInfo: { name: string; version: string } = CLIENT_INFO,
 ): Request {
 	if (version === "2025-06-18") {
 		return mcpPost({ jsonrpc: "2.0", id, method, params }, authorization, {
@@ -97,7 +98,7 @@ export function mcpRequest(
 				_meta: {
 					...(params?._meta as Record<string, unknown> | undefined),
 					[PROTOCOL_VERSION_META_KEY]: version,
-					[CLIENT_INFO_META_KEY]: CLIENT_INFO,
+					[CLIENT_INFO_META_KEY]: clientInfo,
 					[CLIENT_CAPABILITIES_META_KEY]: capabilities,
 				},
 			},

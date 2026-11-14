@@ -1,6 +1,5 @@
 import {
 	bearerAuthChallengeResponse,
-	CLIENT_CAPABILITIES_META_KEY,
 	createMcpHandler,
 	getOAuthProtectedResourceMetadataUrl,
 	McpServer,
@@ -23,6 +22,7 @@ import { localeOf } from "../format";
 import { log } from "../log";
 import { RENDER_TOOLS, type WidgetName } from "../widgets/model";
 import { actionsFor, LINKS_ONLY, LIVE_EDITS_DRAFT } from "./actions";
+import { type Caller, callerOf, claudeDomain, rendersApps } from "./host";
 import { LOCAL_TOOLS } from "./local";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 import { isAppOnly, loggedName, type ToolSpec } from "./spec";
@@ -78,18 +78,25 @@ export function mcpRoute(deps: McpDeps): Hono {
 		const connection = await connectionOf(who.userId);
 		if (!connection) return signIn();
 		const session = await sessionOf(connection);
+		const caller = await callerOf(c.req.raw);
 		// Built per request, each bound to one caller's connection: the SDK's
 		// per-request channel, AuthInfo, needs a clientId and scopes that
 		// authenticateMcp doesn't return.
 		const handler = createMcpHandler(
 			() =>
-				connectionServer(session, who.readOnly, {
-					client: deps.client,
-					drafts: deps.drafts,
-					publicOrigin: deps.resource.origin,
-					fetch: deps.fetch,
-					dropConnection: deps.auth.dropConnection,
-				}),
+				connectionServer(
+					session,
+					who.readOnly,
+					{
+						client: deps.client,
+						drafts: deps.drafts,
+						publicOrigin: deps.resource.origin,
+						fetch: deps.fetch,
+						dropConnection: deps.auth.dropConnection,
+					},
+					caller,
+					deps.resource.href,
+				),
 			{ onerror: logError },
 		);
 		return handler.fetch(c.req.raw);
@@ -155,14 +162,19 @@ function connectionServer(
 	connection: ToolConnection,
 	readOnly: boolean,
 	ctx: RunToolContext,
+	caller: Caller,
+	serverUrl: string,
 ): McpServer {
-	const served = servedSpecs(connection);
+	// A client that declared no MCP Apps support gets no cards: its model
+	// writes the answer as text.
+	const cards = caller.rendersApps !== false;
+	const served = servedSpecs(connection, cards);
 	const specs = readOnly ? served.filter(isRead) : served;
 	const server = new McpServer(
 		{ name: "Better Giving", version: "1.0.0" },
 		{
 			capabilities: { tools: {}, resources: {} },
-			instructions: instructionsFor(connection.orgName, specs, readOnly),
+			instructions: instructionsFor(connection.orgName, specs, readOnly, cards),
 		},
 	);
 	for (const spec of specs) {
@@ -180,7 +192,11 @@ function connectionServer(
 		);
 	}
 	if (specs.some((spec) => "openai/outputTemplate" in spec._meta))
-		registerWidgetResources(server, ctx.publicOrigin);
+		registerWidgetResources(
+			server,
+			ctx.publicOrigin,
+			caller.host === "claude" ? claudeDomain(serverUrl) : ctx.publicOrigin,
+		);
 	if (readOnly)
 		refuseWrites(
 			server,
@@ -196,27 +212,10 @@ function connectionServer(
 	return server;
 }
 
-const MCP_APPS = "io.modelcontextprotocol/ui";
-const MCP_APP_MIME = "text/html;profile=mcp-app";
-
-// Whether the client renders MCP Apps, as a 2026-07-28 request declares in its
-// envelope; null for a 2025 request, whose capabilities came with an
-// initialize this per-request server never saw. The ext-apps helper for this
-// lives in a package only src/widgets/ may import.
-function rendersApps(envelope: object | undefined): boolean | null {
-	if (envelope === undefined || !(CLIENT_CAPABILITIES_META_KEY in envelope))
-		return null;
-	const declared = (envelope as Record<string, unknown>)[
-		CLIENT_CAPABILITIES_META_KEY
-	] as { extensions?: Record<string, { mimeTypes?: unknown }> } | undefined;
-	const mimeTypes = declared?.extensions?.[MCP_APPS]?.mimeTypes;
-	return Array.isArray(mimeTypes) && mimeTypes.includes(MCP_APP_MIME);
-}
-
 // null `actions` (a connection made before this was stored, or a hello that
 // didn't state them) keeps every tool; otherwise only the tools whose actions
 // the deployment serves, so the chat is never offered one that can only fail.
-function servedSpecs(connection: ToolConnection): ToolSpec[] {
+function servedSpecs(connection: ToolConnection, cards: boolean): ToolSpec[] {
 	const serves = (action: ActionName) =>
 		connection.actions === null || connection.actions.includes(action);
 	const specs = [
@@ -231,7 +230,7 @@ function servedSpecs(connection: ToolConnection): ToolSpec[] {
 				: { ...spec, description: spec.standaloneDescription },
 		),
 	];
-	return pointDataToolsAtCards(specs);
+	return cards ? pointDataToolsAtCards(specs) : specs;
 }
 
 // What each card is for, in the words the instructions use for when to call
@@ -377,6 +376,7 @@ function instructionsFor(
 	orgName: string,
 	specs: readonly ToolSpec[],
 	readOnly: boolean,
+	cards: boolean,
 ): string {
 	const lines = [
 		`These tools act on ${JSON.stringify(orgName)}, the operator's live Better Giving donation site: what they change, donors see.`,
@@ -386,11 +386,15 @@ function instructionsFor(
 			"This connection is read-only: it can view the site but not change anything.",
 		);
 	}
-	const cards = cardsIn(specs, readOnly);
-	if (cards.length > 0) {
+	const shown = cards ? cardsIn(specs, readOnly) : [];
+	if (shown.length > 0) {
 		lines.push(
-			`Show the operator a card, not the campaign written out as text: ${cards.join("; ")}.`,
+			`Show the operator a card, not the campaign written out as text: ${shown.join("; ")}.`,
 			"After a card, add at most one short line and don't restate what it shows.",
+		);
+	} else if (!cards) {
+		lines.push(
+			"This client shows no cards: write what the tools return out as text for the operator.",
 		);
 	}
 	if (specs.some((spec) => spec.description.includes(LIVE_EDITS_DRAFT))) {
@@ -406,7 +410,7 @@ function instructionsFor(
 			`Before ${orList(waiting)}, say what will change and wait for the operator's explicit yes in this chat.`,
 		);
 	}
-	const buttons = cardButtonsIn(specs);
+	const buttons = cards ? cardButtonsIn(specs) : [];
 	if (buttons.length > 0) {
 		lines.push(
 			`Once the operator says they pressed a card's ${orList(buttons)} button, that press already made the change: don't call the tool for it again, and don't ask.`,
