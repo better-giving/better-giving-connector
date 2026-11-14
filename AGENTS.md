@@ -74,9 +74,9 @@ A deployment is reached only through its `/connector/v1`. `better-giving-oss` ow
 - Do not hand-edit `pnpm-lock.yaml`. `allowBuilds` in `pnpm-workspace.yaml` stays off for esbuild; the install uses the prebuilt binary.
 - A new schema is a new numbered file in `migrations/`. A shipped migration is left as it was.
 
-## Cloud agents
+## Agent environments
 
-`.cursor/environment.json` runs `.cursor/install.sh`: the Node version named in `.nvmrc`, then the exact `pnpm` from `packageManager` via corepack, then `pnpm install --frozen-lockfile`. Tests need no secrets and no Turso URL. This environment gets test-only values, which today means no env values at all. No production secret, production Turso URL, or Turso token belongs in the cloud agent environment or in the repo.
+Tests need no secrets and no Turso URL. An agent's environment gets test-only values, which today means no env values at all. No production secret, production Turso URL, or Turso token belongs in an agent environment or in the repo.
 
 ## Never
 
