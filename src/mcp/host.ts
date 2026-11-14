@@ -30,7 +30,10 @@ export type Caller = {
 export const claudeDomain = (serverUrl: string): string =>
 	`${createHash("sha256").update(serverUrl).digest("hex").slice(0, 32)}.claudemcpcontent.com`;
 
-/** Whether the declared capabilities in a request's `_meta` include MCP Apps. */
+/**
+ * Whether the declared capabilities in a request's `_meta` include MCP Apps.
+ * The ext-apps helper for this lives in a package only src/widgets/ may import.
+ */
 export function rendersApps(envelope: object | undefined): boolean | null {
 	if (envelope === undefined || !(CLIENT_CAPABILITIES_META_KEY in envelope))
 		return null;
