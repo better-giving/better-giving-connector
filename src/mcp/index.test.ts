@@ -4,7 +4,7 @@ import {
 	type FakeDeployment,
 	fakeDeployment,
 } from "../../test/fake-deployment";
-import { MCP_APPS_CLIENT, mcpRequest, rpc } from "../../test/harness";
+import { MCP_APPS_CLIENT, mcpPost, mcpRequest, rpc } from "../../test/harness";
 import { memoryDrafts } from "../../test/memory-drafts";
 import { PLATFORM_HELLO, PLATFORM_TOOLS } from "../../test/platform-hello";
 import { advance, freshDb, MINUTE } from "../../test/support";
@@ -12,6 +12,7 @@ import { type Connections, connections, type Db } from "../db";
 import { type ActionName, deploymentClient } from "../deployment";
 import type { Origin } from "../deployment/origin";
 import type { Secret } from "../secret";
+import { WIDGETS } from "../widgets/html";
 import { ACTIONS } from "./actions";
 import { mcpRoute } from "./index";
 import { LOCAL_TOOLS } from "./local";
@@ -569,4 +570,161 @@ test("a Platform hello answered from another origin leaves the connection Standa
 	advance(1 * MINUTE + 1);
 	await listElsewhere();
 	expect(asked).toBe(2);
+});
+
+// The domain Claude validates `_meta.ui.domain` against: the SHA-256 of
+// https://connect.example/mcp, the URL this route is built for, as `sha256sum`
+// prints it.
+const CLAUDE_DOMAIN = "66315fbf870468b7566b50d158bb8fc0.claudemcpcontent.com";
+const ORIGIN = "https://connect.example";
+const CLAUDE = { name: "claude-ai", version: "0.1.0" };
+const CHATGPT = { name: "openai-mcp", version: "1.0.0" };
+
+const widgetUri = Object.values(WIDGETS)[0]?.uri ?? "";
+
+const asClient = (
+	client: { name: string; version: string },
+	method: string,
+	params?: Record<string, unknown>,
+	capabilities: Record<string, unknown> = MCP_APPS_CLIENT,
+) =>
+	route.request(
+		new Request(
+			"https://connect.example/",
+			mcpRequest(
+				"2026-07-28",
+				"Bearer any",
+				method,
+				params,
+				1,
+				capabilities,
+				client,
+			),
+		),
+	);
+
+const uiOf = (meta: { ui: Record<string, unknown> }) => meta.ui;
+
+test("resources/read gives Claude the domain computed from the server URL and ChatGPT the origin", async () => {
+	await reconnect(null);
+	const read = async (client: typeof CLAUDE) =>
+		(await rpc(await asClient(client, "resources/read", { uri: widgetUri })))
+			.result.contents[0]._meta;
+
+	expect(uiOf(await read(CLAUDE)).domain).toBe(CLAUDE_DOMAIN);
+	expect(uiOf(await read(CHATGPT)).domain).toBe(ORIGIN);
+	// each request is its own: the host asking second does not inherit the first's
+	expect(uiOf(await read(CLAUDE)).domain).toBe(CLAUDE_DOMAIN);
+});
+
+test("resources/list gives each host its own domain, and the rest of the sandbox is the same", async () => {
+	await reconnect(null);
+	const list = async (client: typeof CLAUDE) =>
+		(await rpc(await asClient(client, "resources/list"))).result.resources.map(
+			(r: { _meta: { ui: Record<string, unknown> } }) => r._meta.ui,
+		);
+
+	const claude = await list(CLAUDE);
+	const chatgpt = await list(CHATGPT);
+
+	expect(claude.length).toBeGreaterThan(0);
+	for (const ui of claude) expect(ui.domain).toBe(CLAUDE_DOMAIN);
+	for (const ui of chatgpt) expect(ui.domain).toBe(ORIGIN);
+	expect(
+		claude.map(({ domain: _, ...rest }: Record<string, unknown>) => rest),
+	).toEqual(
+		chatgpt.map(({ domain: _, ...rest }: Record<string, unknown>) => rest),
+	);
+});
+
+test("a 2025 request after the initialize is told apart by its User-Agent; one that says nothing keeps the origin", async () => {
+	await reconnect(null);
+	const read = async (headers: Record<string, string>) =>
+		(
+			await rpc(
+				await route.request(
+					new Request(
+						"https://connect.example/",
+						mcpPost(
+							{
+								jsonrpc: "2.0",
+								id: 1,
+								method: "resources/read",
+								params: { uri: widgetUri },
+							},
+							"Bearer any",
+							{ "mcp-protocol-version": "2025-06-18", ...headers },
+						),
+					),
+				),
+			)
+		).result.contents[0]._meta.ui.domain;
+
+	expect(await read({ "user-agent": "Claude-User" })).toBe(CLAUDE_DOMAIN);
+	expect(await read({})).toBe(ORIGIN);
+});
+
+test("a host that names itself neither Claude nor ChatGPT keeps the origin", async () => {
+	await reconnect(null);
+
+	const res = await asClient(
+		{ name: "some-agent", version: "1" },
+		"resources/read",
+		{
+			uri: widgetUri,
+		},
+	);
+
+	expect((await rpc(res)).result.contents[0]._meta.ui.domain).toBe(ORIGIN);
+});
+
+const discoverInstructions = async (capabilities?: Record<string, unknown>) =>
+	(
+		await rpc(
+			await asClient(CLAUDE, "server/discover", undefined, capabilities),
+		)
+	).result.instructions as string;
+
+const CARD_LINE =
+	"Show the operator a card, not the campaign written out as text";
+
+test("a client that declares MCP Apps support is told to show cards", async () => {
+	await reconnect(null);
+
+	const text = await discoverInstructions(MCP_APPS_CLIENT);
+
+	expect(text).toContain(CARD_LINE);
+	expect(text).toContain("show_campaign_results for");
+	expect(text).toContain("pressed a card's");
+	expect(text).not.toContain("shows no cards");
+});
+
+test("a client that declares no MCP Apps support is told to write text, never to call a card tool, and still waits for the operator's yes", async () => {
+	await reconnect(null);
+
+	const text = await discoverInstructions({});
+
+	expect(text).toContain(
+		"This client shows no cards: write what the tools return out as text",
+	);
+	expect(text).not.toContain(CARD_LINE);
+	expect(text).not.toContain("show_campaign_results");
+	expect(text).not.toContain("pressed a card's");
+	expect(text).toMatch(
+		/Before .*publish_campaign.*end_campaign.*explicit yes in this chat/,
+	);
+});
+
+test("without MCP Apps support the data tools stop pointing at the cards", async () => {
+	await reconnect(null);
+	const description = async (capabilities: Record<string, unknown>) =>
+		(
+			await rpc(await asClient(CLAUDE, "tools/list", {}, capabilities))
+		).result.tools.find((t: { name: string }) => t.name === "get_campaign")
+			.description as string;
+
+	expect(await description(MCP_APPS_CLIENT)).toContain(
+		"call show_campaign_results instead",
+	);
+	expect(await description({})).not.toContain("show_campaign_results");
 });
