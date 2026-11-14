@@ -45,6 +45,32 @@ const isClaude = (name: unknown) =>
 	typeof name === "string" && /claude/i.test(name);
 
 /**
+ * The body of a clone of the request as text, or undefined when it has none or
+ * runs past `MAX_SNIFFED_BYTES`, counted as it streams: a chunked body declares
+ * no length.
+ */
+async function sniffedText(request: Request): Promise<string | undefined> {
+	const body = request.clone().body;
+	if (body === null) return undefined;
+	const reader = body.getReader();
+	const decoder = new TextDecoder();
+	let bytes = 0;
+	let text = "";
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) return text + decoder.decode();
+		bytes += value.byteLength;
+		if (bytes > MAX_SNIFFED_BYTES) {
+			// not awaited: a tee branch's cancel settles only once the other
+			// branch cancels too or reads to the end, and the original is the SDK's
+			reader.cancel().catch(() => undefined);
+			return undefined;
+		}
+		text += decoder.decode(value, { stream: true });
+	}
+}
+
+/**
  * Who sent a request. The name the client gives itself wins: a 2026-07-28
  * request carries `clientInfo` in its `_meta`, a 2025 initialize in its
  * params. A 2025 request after the initialize carries neither (the server
@@ -58,7 +84,8 @@ export async function callerOf(request: Request): Promise<Caller> {
 	try {
 		const length = Number(request.headers.get("content-length") ?? 0);
 		if (length <= MAX_SNIFFED_BYTES) {
-			message = JSON.parse(await request.clone().text());
+			const text = await sniffedText(request);
+			if (text !== undefined) message = JSON.parse(text);
 		}
 	} catch {
 		message = undefined;

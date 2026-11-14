@@ -52,6 +52,72 @@ test("a request that names no client is told apart by its User-Agent, and one th
 	expect((await callerOf(post("not json"))).host).toBe("other");
 });
 
+// A chunked body, as a client streaming its POST sends it: no content-length.
+const streamed = (body: string, headers: Record<string, string> = {}) => {
+	const bytes = new TextEncoder().encode(body);
+	const chunk = 64 * 1024;
+	let offset = 0;
+	return new Request("https://connect.example/mcp", {
+		method: "POST",
+		headers: { "content-type": "application/json", ...headers },
+		duplex: "half",
+		body: new ReadableStream<Uint8Array>({
+			pull(controller) {
+				if (offset >= bytes.byteLength) {
+					controller.close();
+					return;
+				}
+				controller.enqueue(bytes.slice(offset, offset + chunk));
+				offset += chunk;
+			},
+		}),
+	});
+};
+
+const TWO_MIB = 2 * 1024 * 1024;
+const head = JSON.stringify({
+	method: "initialize",
+	params: { clientInfo: { name: "claude-ai" } },
+	pad: "",
+}).slice(0, -2);
+const oversized = `${head}${"x".repeat(TWO_MIB - head.length - 2)}"}`;
+
+test("a streamed body past the cap is not read for the client's name", async () => {
+	const request = streamed(oversized, { "user-agent": "openai-mcp/1.0" });
+
+	expect(request.headers.get("content-length")).toBeNull();
+	expect((await callerOf(request)).host).toBe("other");
+});
+
+test("the original body still reads in full after a streamed body past the cap", async () => {
+	const request = streamed(oversized, { "user-agent": "openai-mcp/1.0" });
+	await callerOf(request);
+
+	const text = await request.text();
+	expect(text.length).toBe(2_097_152);
+	expect(text).toBe(oversized);
+});
+
+test("a streamed body under the cap is read for the client's name", async () => {
+	const caller = await callerOf(
+		streamed(
+			JSON.stringify({
+				method: "initialize",
+				params: { clientInfo: { name: "claude-ai" } },
+			}),
+			{ "user-agent": "openai-mcp/1.0" },
+		),
+	);
+
+	expect(caller.host).toBe("claude");
+});
+
+test("a body that is not JSON falls back to the User-Agent", async () => {
+	expect(
+		(await callerOf(post("not json", { "user-agent": "Claude-User" }))).host,
+	).toBe("claude");
+});
+
 test("the client's own name beats the User-Agent", async () => {
 	const caller = await callerOf(
 		post(
