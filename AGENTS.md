@@ -76,7 +76,7 @@ A deployment is reached only through its `/connector/v1`. `better-giving-oss` ow
 
 ## Agent environments
 
-Tests need no secrets and no Turso URL. An agent's environment gets test-only values, which today means no env values at all. No production secret, production Turso URL, or Turso token belongs in an agent environment or in the repo.
+An agent's environment gets test-only values, which today means no env values at all. No production secret, production Turso URL, or Turso token belongs in an agent environment or in the repo.
 
 ## Never
 
