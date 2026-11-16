@@ -3,8 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/server";
 /**
  * A prompt a chat app lists for the operator to pick (Claude shows them as
  * slash commands). `text` is the message it sends, worded as the operator
- * would ask, and `needs` the tools it names: a prompt is registered only
- * where every one of them is.
+ * would ask, and `needs` the tools its task takes: a prompt is registered only
+ * where every one of them is. The text names a tool only where the task
+ * depends on it, so the server's instructions still choose between a card
+ * and its tools.
  */
 export type PromptSpec = {
 	name: string;
@@ -19,7 +21,7 @@ export const PROMPTS: readonly PromptSpec[] = [
 		name: "start-campaign",
 		title: "Start a campaign",
 		description: "Set up a new campaign from recommended settings.",
-		text: "Start a new campaign for our nonprofit. Recommend its goal, suggested amounts, run length and theme with recommend_campaign_presets, then create it with create_campaign.",
+		text: "Start a new campaign for our nonprofit, with its goal, suggested amounts, run length and theme recommended from our past campaigns.",
 		needs: ["recommend_campaign_presets", "create_campaign"],
 	},
 	{

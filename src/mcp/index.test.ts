@@ -797,7 +797,7 @@ const PROMPT_TEXTS = [
 		name: "start-campaign",
 		title: "Start a campaign",
 		description: "Set up a new campaign from recommended settings.",
-		text: "Start a new campaign for our nonprofit. Recommend its goal, suggested amounts, run length and theme with recommend_campaign_presets, then create it with create_campaign.",
+		text: "Start a new campaign for our nonprofit, with its goal, suggested amounts, run length and theme recommended from our past campaigns.",
 	},
 	{
 		name: "campaign-results",
