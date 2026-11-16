@@ -9,11 +9,11 @@
    loop is tailwind's animate-spin on ds-spin, held to the React glyph's by the
    same test. */
 .ds-icon-bare {
-  --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ds-icon: calc(1.25 * var(--ds-rem, 1rem));
   position: relative;
   display: inline-grid;
-  place-items: center;
+  place-items: safe center;
   flex-shrink: 0;
   box-sizing: border-box;
   inline-size: var(--ds-icon);
@@ -31,7 +31,7 @@
     color, background-color, border-color, outline-color, text-decoration-color,
     fill, stroke;
   transition-duration: var(--duration-fast);
-  transition-timing-function: var(--ds-ease-in-out);
+  transition-timing-function: var(--ds-ease-out);
 }
 .ds-icon-bare-sm {
   --ds-icon: calc(1 * var(--ds-rem, 1rem));
@@ -51,7 +51,7 @@
 
 /* hover and press: gray-12, the press 1px down. off, busy and done take
    neither; held open and a pressed toggle keep their accent ink */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .ds-icon-bare:hover:not(
     :disabled,
     [aria-disabled="true"],
