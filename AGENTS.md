@@ -6,8 +6,6 @@ Production origin: `https://app.connect.better.giving` (Vercel, fluid, region `i
 
 The repo is public. Secrets live only in Vercel environment variables or ignored `.env.*` files. `.gitignore` is what keeps them out of git; `.env.example` holds names only.
 
-**Doop workspace:** Kh7Aj6wrqb
-
 ## Stack
 
 Node 24 (`.nvmrc`, `engines` `24.x`), pnpm 12.4.2 (`packageManager`; use no other package manager), TypeScript 7 (`tsc --noEmit`), Hono 4 with hono/jsx, `@modelcontextprotocol/server` 2, better-auth 1.7 (`oauth-provider` and `mcp`), Kysely and `@libsql/client` (Turso), zod 4, Biome 2 with GritQL plugins in `lint/`, Vitest 5, esbuild, `@modelcontextprotocol/ext-apps` (the widgets' MCP Apps client), happy-dom (widget unit tests), playwright-core (widget screenshots only). Exact versions are pinned in `package.json` (`savePrefix: ""` in `pnpm-workspace.yaml`).
