@@ -43,30 +43,30 @@
 /* 16px between blocks; 40/32/24px above an h2/h3/h4; 12px under any of them,
    a heading straight after a heading included */
 .ds-prose > * + * {
-  margin-top: calc(var(--ds-spacing) * 4);
+  margin-block-start: calc(var(--ds-spacing) * 4);
 }
 .ds-prose > h2 {
-  margin-top: calc(var(--ds-spacing) * 10);
+  margin-block-start: calc(var(--ds-spacing) * 10);
 }
 .ds-prose > h3 {
-  margin-top: calc(var(--ds-spacing) * 8);
+  margin-block-start: calc(var(--ds-spacing) * 8);
 }
 .ds-prose > h4 {
-  margin-top: calc(var(--ds-spacing) * 6);
+  margin-block-start: calc(var(--ds-spacing) * 6);
 }
 .ds-prose > :is(h2, h3, h4) + * {
-  margin-top: calc(var(--ds-spacing) * 3);
+  margin-block-start: calc(var(--ds-spacing) * 3);
 }
 .ds-prose > :is(h2, h3, h4) + :is(h2, h3, h4) {
-  margin-top: calc(var(--ds-spacing) * 3);
+  margin-block-start: calc(var(--ds-spacing) * 3);
 }
 /* nothing collapses out of the column: these outrank the heading and rule
    margins */
 .ds-prose > :first-child {
-  margin-top: 0;
+  margin-block-start: 0;
 }
 .ds-prose > :last-child {
-  margin-bottom: 0;
+  margin-block-end: 0;
 }
 
 .ds-prose :is(h1, h2, h3, h4, h5, h6) {
@@ -139,8 +139,10 @@
   text-decoration-line: underline;
   text-underline-offset: 2px;
 }
-.ds-prose a:not(.ds-btn):hover {
-  color: var(--link-hover);
+@media (hover: hover) and (pointer: fine) {
+  .ds-prose a:not(.ds-btn):hover {
+    color: var(--link-hover);
+  }
 }
 .ds-prose a:not(.ds-btn):focus-visible {
   outline: 2px solid var(--ring);
@@ -161,7 +163,7 @@
 }
 .ds-prose li + li,
 .ds-prose li > :is(ul, ol) {
-  margin-top: var(--ds-spacing);
+  margin-block-start: var(--ds-spacing);
 }
 .ds-prose li::marker {
   color: var(--gray-11);
@@ -186,7 +188,7 @@
 .ds-prose hr {
   block-size: 0;
   border: 0 solid var(--hairline);
-  border-top-width: 1px;
+  border-block-start-width: 1px;
   color: inherit;
 }
 .ds-prose > hr {

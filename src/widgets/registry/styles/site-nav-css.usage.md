@@ -36,7 +36,7 @@ Import `styles/variables.css`, `styles/button-css.css`, `styles/bare-icon-button
 ```
 
 - `ds-site-nav-skip` is the skip link: hidden until focused, then a chip 12px in from the top start corner (top left in a left-to-right page) with the `--popover` fill, `--shadow-floating`, the control corner, 8px by 16px and 14px semibold text.
-- `ds-site-nav` is the header: sticky at the top, z 30, the `--background` fill, a `--hairline` bottom edge. It resets its lists' bullets and spacing.
+- `ds-site-nav` is the header: sticky at the top, z 30, the `--background` fill, a `--hairline` bottom edge. It resets its lists' bullets and spacing. A page holding it gets `--ds-bar-h` on `:root` as the header's height (4rem and the 1px edge), so a `page-state-css` under it centers in what is left of the viewport; with an announcement band, run the script in the announcement section so the band's height counts too.
 - `ds-site-nav-bar` is the page shape inside it: 64px high, a 20px gutter, 40px from 48rem, capped at 80rem from 80rem wide and 96rem from 96rem.
 - `ds-site-nav-brand` is the home link: the full bar height, the display face at 20px bold with tight tracking, its 8px inset taken back by a margin.
 - `ds-site-nav-links` is the `<nav>` of the bar, hidden under 40rem; `ds-site-nav-link` each link: the full height, 16px side padding, 4px apart, 14px semibold gray-11, gray-12 on hover where the pointer can hover. `aria-current="page"` draws a 2px `--primary` underline and `--accent-11` ink.
@@ -82,7 +82,33 @@ Import `styles/variables.css`, `styles/button-css.css`, `styles/bare-icon-button
 </header>
 ```
 
-- `ds-site-nav-announce` is the band above the header: the `--primary` fill and `--primary-fg` ink at full strength; inside it `--ring` is `--primary-ring` and `--border` is `--primary-border`. Render it only until the reader dismisses it; your app stores that and leaves the band out after.
+- `ds-site-nav-announce` is the band above the header: the `--primary` fill and `--primary-fg` ink at full strength; inside it `--ring` is `--primary-ring` and `--border` is `--primary-border`. Render it only until the reader dismisses it; your app stores that and leaves the band out after. The stylesheet's own `--ds-bar-h` counts the band as one line, which paints at once; a page state under the header centers in what is left of the viewport only if it counts the band's real height. This script keeps `--ds-bar-h` equal to the header's height plus the band's (and to the header's alone once the band leaves), and `--ds-header-h`, the header alone, for what pins under it, such as `settings-layout-css`'s nav. It does nothing on a page with no `ds-site-nav`, and follows a band added or removed later. Load it with `defer`, so it runs after the header is parsed and before the first paint, as `<script defer src="site-nav-bar.js"></script>` at the end of the page's head:
+
+```js
+const root = document.documentElement;
+const header = document.querySelector(".ds-site-nav");
+if (header) {
+  const band = () => document.querySelector(".ds-site-nav-announce");
+  const sizes = new ResizeObserver(() => measure());
+  let watched = null;
+  function measure() {
+    const now = band();
+    if (now !== watched) {
+      if (watched) sizes.unobserve(watched);
+      watched = now;
+      if (now) sizes.observe(now);
+    }
+    root.style.setProperty("--ds-header-h", `${header.offsetHeight}px`);
+    root.style.setProperty(
+      "--ds-bar-h",
+      `${header.offsetHeight + (now?.offsetHeight ?? 0)}px`
+    );
+  }
+  sizes.observe(header);
+  new MutationObserver(measure).observe(header.parentNode, { childList: true });
+  measure();
+}
+```
 - `ds-site-nav-announce-row` is its page shape (the bar's gutter and caps), 8px top and bottom, 12px text at line height 1.5. Its `<p>` takes the free width with balanced lines; its link is bold in the band's ink, underlined on hover where the pointer can hover, with lucide's `chevron-right` at 12px. The dismiss is a `ds-icon-bare ds-icon-bare-sm` (16px, lucide's `x`), held in the band's ink when hovered and pressed. The link and the dismiss draw a 2px `--primary-ring` outline 2px outside on the control corner.
 - `ds-site-nav-end` is the end of the bar, 16px after the links, which it pushes to meet it: the actions, the account control and the menu button, 8px apart. The account control (an `avatar-css` `<button class="ds-avatar">` with `aria-haspopup="menu"`, signed in, beside a "My dashboard" action) goes straight inside it, after `ds-site-nav-actions`, and shows at every width.
 - `ds-site-nav-actions` holds the buttons or links, 8px apart; it is hidden under the fold.
