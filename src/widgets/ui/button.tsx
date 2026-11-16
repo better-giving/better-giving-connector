@@ -13,6 +13,7 @@ export function Button(props: {
 	onClick: () => void;
 	children: Child;
 	busy?: boolean;
+	full?: boolean;
 	disabled?: boolean;
 	label?: string;
 	class?: string;
@@ -24,7 +25,7 @@ export function Button(props: {
 		<button
 			type="button"
 			id={props.id}
-			class={`ds-btn ds-btn-${props.variant}${props.class ? ` ${props.class}` : ""}`}
+			class={`ds-btn ds-btn-${props.variant}${props.full ? " ds-btn-full" : ""}${props.class ? ` ${props.class}` : ""}`}
 			aria-label={props.label}
 			aria-describedby={props.describedBy}
 			aria-busy={busy ? "true" : undefined}
