@@ -22,8 +22,9 @@ import { localeOf } from "../format";
 import { log } from "../log";
 import { RENDER_TOOLS, type WidgetName } from "../widgets/model";
 import { actionsFor, LINKS_ONLY, LIVE_EDITS_DRAFT } from "./actions";
-import { type Caller, callerOf, claudeDomain, rendersApps } from "./host";
+import { type Caller, callerOf, claudeDomain } from "./host";
 import { LOCAL_TOOLS } from "./local";
+import { registerPrompts } from "./prompts";
 import { type RunToolContext, runTool, type ToolConnection } from "./run-tool";
 import { isAppOnly, loggedName, type ToolSpec } from "./spec";
 import { registerWidgetResources } from "./widget-resources";
@@ -173,7 +174,7 @@ function connectionServer(
 	const server = new McpServer(
 		{ name: "Better Giving", version: "1.0.0" },
 		{
-			capabilities: { tools: {}, resources: {} },
+			capabilities: { tools: {}, resources: {}, prompts: {} },
 			instructions: instructionsFor(connection.orgName, specs, readOnly, cards),
 		},
 	);
@@ -191,22 +192,26 @@ function connectionServer(
 				runTool(spec, connection, input, ctx, localeOf(request.mcpReq._meta)),
 		);
 	}
-	if (specs.some((spec) => "openai/outputTemplate" in spec._meta))
+	registerPrompts(server, new Set(specs.map((spec) => spec.tool)));
+	if (specs.some(rendersCard))
 		registerWidgetResources(
 			server,
 			ctx.publicOrigin,
 			caller.host === "claude" ? claudeDomain(serverUrl) : ctx.publicOrigin,
+			caller.host === "claude",
 		);
 	if (readOnly)
 		refuseWrites(
 			server,
 			served.filter((s) => !isRead(s)),
 		);
-	server.server.setRequestHandler("tools/list", (_request, ctx) => {
-		const shown =
-			rendersApps(ctx.mcpReq.envelope) === false
-				? specs.filter((spec) => !isAppOnly(spec))
-				: specs;
+	server.server.setRequestHandler("tools/list", () => {
+		// the same `cards` the instructions use: a client that declared no MCP
+		// Apps support is listed no render tool and no button's tool, which stay
+		// registered, so a call to one still works
+		const shown = cards
+			? specs
+			: specs.filter((spec) => !isAppOnly(spec) && !rendersCard(spec));
 		return { tools: shown.map(listed) };
 	});
 	return server;
@@ -288,6 +293,10 @@ function beforeLinksOnly(spec: ToolSpec, sentence: string): string {
 		throw new Error(`${spec.tool}'s description must end with LINKS_ONLY`);
 	return `${spec.description.slice(0, -LINKS_ONLY.length)}${sentence} ${LINKS_ONLY}`;
 }
+
+// A render tool: the tool whose result a widget shows, its resource linked
+// from its `_meta`.
+const rendersCard = (spec: ToolSpec) => "openai/outputTemplate" in spec._meta;
 
 const isRead = (spec: ToolSpec) => spec.annotations.readOnlyHint;
 

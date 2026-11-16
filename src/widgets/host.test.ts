@@ -400,3 +400,20 @@ describe("file uploads", () => {
 		expect(getFileDownloadUrl).toHaveBeenCalledWith({ fileId: "file_1" });
 	});
 });
+
+describe("display modes", () => {
+	it("states inline and fullscreen to a host that is not ChatGPT", async () => {
+		const { bridge } = await freshStart();
+
+		expect(bridge.getAppCapabilities()?.availableDisplayModes).toEqual([
+			"inline",
+			"fullscreen",
+		]);
+	});
+
+	it("states no list to ChatGPT's host", async () => {
+		const { bridge } = await freshStart({ openai: { theme: "light" } });
+
+		expect(bridge.getAppCapabilities()?.availableDisplayModes).toBeUndefined();
+	});
+});
