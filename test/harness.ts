@@ -83,7 +83,7 @@ export function mcpRequest(
 		});
 	}
 	const name =
-		method === "tools/call"
+		method === "tools/call" || method === "prompts/get"
 			? params?.name
 			: method === "resources/read"
 				? params?.uri

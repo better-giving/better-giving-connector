@@ -17,6 +17,21 @@ export const widgetMeta = (publicOrigin: string, domain: string) => ({
 });
 
 /**
+ * The editor opens in Claude's side panel without a click: `_meta.ui` on the
+ * content item of `resources/read`, which claude.com/docs/connectors/building/
+ * mcp-apps/display-modes.md says Claude reads and other hosts don't. A Claude
+ * without the side panel keeps it inline.
+ */
+const readMeta = (
+	name: string,
+	base: ReturnType<typeof widgetMeta>,
+	claude: boolean,
+) =>
+	claude && name === "campaign-editor"
+		? { ui: { ...base.ui, preferredDisplayMode: "fullscreen" } }
+		: base;
+
+/**
  * Registers every widget as an MCP Apps resource, each the HTML its render tool
  * links to. `domain` is the sandbox origin the asking host expects, so the
  * resources are registered per request and never shared between hosts.
@@ -25,6 +40,7 @@ export function registerWidgetResources(
 	server: McpServer,
 	publicOrigin: string,
 	domain: string,
+	claude: boolean,
 ): void {
 	for (const [name, widget] of Object.entries(WIDGETS)) {
 		server.registerResource(
@@ -37,7 +53,7 @@ export function registerWidgetResources(
 						uri: widget.uri,
 						mimeType: WIDGET_MIME,
 						text: widget.html,
-						_meta: widgetMeta(publicOrigin, domain),
+						_meta: readMeta(name, widgetMeta(publicOrigin, domain), claude),
 					},
 				],
 			}),

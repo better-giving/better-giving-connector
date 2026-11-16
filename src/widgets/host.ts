@@ -135,7 +135,13 @@ export async function connectHost(
 	} = {},
 ): Promise<Host> {
 	const openai = options.openai ?? currentOpenAi();
-	const app = new App({ name: "better-giving-widget", version: "1.0.0" });
+	// Claude treats a view with no list as supporting both modes; the list is
+	// stated for it and left out for ChatGPT, whose host reads the bridge as it
+	// did before.
+	const app = new App(
+		{ name: "better-giving-widget", version: "1.0.0" },
+		openai ? {} : { availableDisplayModes: ["inline", "fullscreen"] },
+	);
 	const listeners = new Set<() => void>();
 	const notify = () => {
 		for (const listener of listeners) listener();

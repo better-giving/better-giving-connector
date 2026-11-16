@@ -215,14 +215,15 @@ const listedTo = async (
 	return (await rpc(res)).result.tools.map((t: { name: string }) => t.name);
 };
 
-test("a client that declares no MCP Apps support is not offered the cards' button tools", async () => {
+test("a client that declares no MCP Apps support is not offered the cards' button tools or render tools", async () => {
 	await reconnect(null);
 
 	const names = await listedTo("2026-07-28", {});
 
 	expect(APP_ONLY).toContain("app_end_campaign");
 	for (const tool of APP_ONLY) expect(names).not.toContain(tool);
-	expect(names).toContain("show_campaign_results");
+	expect(names).not.toContain("show_campaign_results");
+	expect(names).toContain("get_campaign");
 	expect(names).toContain("end_campaign");
 });
 
@@ -751,4 +752,123 @@ test("without MCP Apps support the data tools stop pointing at the cards", async
 		"call show_campaign_results instead",
 	);
 	expect(await description({})).not.toContain("show_campaign_results");
+});
+
+const RENDER_TOOLS = [
+	"show_campaigns",
+	"show_campaign_results",
+	"open_campaign_editor",
+	"show_campaign_create",
+	"show_photo",
+];
+
+const APP_ONLY_TOOLS = [
+	"app_create_campaign",
+	"app_publish_campaign",
+	"app_end_campaign",
+	"app_get_campaign_editor",
+	"app_save_campaign_edit",
+	"app_set_campaign_photo",
+	"app_photo_upload_link",
+];
+
+test("a client that declares no MCP Apps support is offered no render tool and no button tool, and a client that does, or a 2025 one, is offered all", async () => {
+	await reconnect(null);
+
+	const none = await listedTo("2026-07-28", {});
+	const cards = await listedTo("2026-07-28", MCP_APPS_CLIENT);
+	const y2025 = await listedTo("2025-06-18");
+
+	for (const tool of [...RENDER_TOOLS, ...APP_ONLY_TOOLS]) {
+		expect(none, tool).not.toContain(tool);
+		expect(cards, tool).toContain(tool);
+		expect(y2025, tool).toContain(tool);
+	}
+	for (const tool of ["list_campaigns", "get_campaign", "publish_campaign"])
+		expect(none, tool).toContain(tool);
+	expect(none).toHaveLength(
+		cards.length - RENDER_TOOLS.length - APP_ONLY_TOOLS.length,
+	);
+	expect([...y2025].sort()).toEqual([...cards].sort());
+});
+
+const PROMPT_TEXTS = [
+	{
+		name: "start-campaign",
+		title: "Start a campaign",
+		description: "Set up a new campaign from recommended settings.",
+		text: "Start a new campaign for our nonprofit. Recommend its goal, suggested amounts, run length and theme with recommend_campaign_presets, then create it with create_campaign.",
+	},
+	{
+		name: "campaign-results",
+		title: "How is my campaign doing",
+		description: "Show a campaign's status, progress and results.",
+		text: "How is my campaign doing? Show me its status, its progress toward the goal and its results.",
+	},
+	{
+		name: "publish-draft",
+		title: "Publish my draft",
+		description: "Send a campaign's draft changes live.",
+		text: "Publish my campaign draft. Say what will change and wait for my explicit yes in this chat before calling publish_campaign.",
+	},
+];
+
+test("prompts/list offers the three prompts, and prompts/get answers each with its one user message", async () => {
+	await reconnect(null);
+
+	const listed = (await rpc(await asClient(CLAUDE, "prompts/list"))).result
+		.prompts;
+
+	expect(
+		listed.map((p: Record<string, unknown>) => ({
+			name: p.name,
+			title: p.title,
+			description: p.description,
+		})),
+	).toEqual(PROMPT_TEXTS.map(({ text: _, ...rest }) => rest));
+	for (const { name, text } of PROMPT_TEXTS) {
+		const got = (await rpc(await asClient(CLAUDE, "prompts/get", { name })))
+			.result.messages;
+		expect(got).toEqual([{ role: "user", content: { type: "text", text } }]);
+	}
+});
+
+test("a prompt is offered only where the tools it names are", async () => {
+	await reconnect(null);
+	readOnly = true;
+
+	const names = (
+		await rpc(await asClient(CLAUDE, "prompts/list"))
+	).result.prompts.map((p: { name: string }) => p.name);
+
+	expect(names).toEqual(["campaign-results"]);
+});
+
+test("only Claude's editor resource asks for the side panel, and no other widget does", async () => {
+	await reconnect(null);
+	const editorUri = WIDGETS["campaign-editor"].uri;
+	const read = async (client: typeof CLAUDE, uri: string) =>
+		(await rpc(await asClient(client, "resources/read", { uri }))).result
+			.contents[0]._meta.ui;
+
+	expect(await read(CLAUDE, editorUri)).toEqual({
+		csp: {
+			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
+			connectDomains: [],
+		},
+		domain: CLAUDE_DOMAIN,
+		prefersBorder: true,
+		preferredDisplayMode: "fullscreen",
+	});
+	expect(await read(CHATGPT, editorUri)).toEqual({
+		csp: {
+			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
+			connectDomains: [],
+		},
+		domain: ORIGIN,
+		prefersBorder: true,
+	});
+	expect(await read(CLAUDE, WIDGETS.photo.uri)).not.toHaveProperty(
+		"preferredDisplayMode",
+	);
 });
