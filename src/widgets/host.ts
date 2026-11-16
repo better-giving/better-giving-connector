@@ -135,9 +135,10 @@ export async function connectHost(
 	} = {},
 ): Promise<Host> {
 	const openai = options.openai ?? currentOpenAi();
-	// Claude treats a view with no list as supporting both modes; the list is
-	// stated for it and left out for ChatGPT, whose host reads the bridge as it
-	// did before.
+	// MCP Apps has a view declare the display modes it supports, and a host
+	// keeps it out of the others. Every host but ChatGPT gets the list (Claude,
+	// given none, assumes both); ChatGPT's host reads the bridge as it did
+	// before.
 	const app = new App(
 		{ name: "better-giving-widget", version: "1.0.0" },
 		openai ? {} : { availableDisplayModes: ["inline", "fullscreen"] },

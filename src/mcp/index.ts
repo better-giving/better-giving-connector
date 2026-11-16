@@ -207,7 +207,8 @@ function connectionServer(
 		);
 	server.server.setRequestHandler("tools/list", () => {
 		// the same `cards` the instructions use: a client that declared no MCP
-		// Apps support is listed neither the render tools nor the buttons' tools
+		// Apps support is listed no render tool and no button's tool, which stay
+		// registered, so a call to one still works
 		const shown = cards
 			? specs
 			: specs.filter((spec) => !isAppOnly(spec) && !rendersCard(spec));
