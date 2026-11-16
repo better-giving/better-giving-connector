@@ -508,7 +508,7 @@ test("a connect page with a way back renders its action as a registry button in 
 	const html = shown(await page.text());
 
 	expect(html).toMatch(
-		/<button[^>]*class="ds-btn ds-btn-primary"[^>]*>Back to your AI assistant<\/button>/,
+		/<button[^>]*class="ds-btn ds-btn-primary ds-btn-full"[^>]*>Back to your AI assistant<\/button>/,
 	);
 	expect(html).toMatch(/<div class="[^"]*\bds-card\b[^"]*">/);
 });

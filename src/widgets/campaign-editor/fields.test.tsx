@@ -64,6 +64,17 @@ describe("BlockFields' more-settings line", () => {
 		);
 	});
 
+	it("sets the line in the registry's block note", () => {
+		const root = mount(
+			<BlockFields
+				campaignId="c-1"
+				block={{ type: "story", title: "Hi", items: [1] }}
+				onChange={() => {}}
+			/>,
+		);
+		expect(root.querySelector("p.ds-block-note")).not.toBeNull();
+	});
+
 	it("counts the settings when several are not editable here", () => {
 		expect(
 			moreLine({ type: "story", title: "Hi", items: [1], style: { a: 1 } }),

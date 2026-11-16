@@ -62,7 +62,6 @@ form {
 }
 
 form .ds-btn {
-	width: 100%;
 	min-block-size: var(--control-height);
 }
 

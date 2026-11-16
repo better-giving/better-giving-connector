@@ -268,9 +268,9 @@ describe("campaign editor Replace photo", () => {
 			"Opens a one-time upload page. Reopen the editor afterwards to see the new photo.",
 		);
 		expect(help?.closest(".ds-field")).toBe(replace.closest(".ds-field"));
-		// the full width of its column
+		// the registry's full-width button, filling its column
 		expect(replace.parentElement?.classList.contains("ds-field")).toBe(true);
-		expect(getComputedStyle(replace).width).toBe("100%");
+		expect(replace.classList.contains("ds-btn-full")).toBe(true);
 
 		const save = [...root.querySelectorAll("button")].find(
 			(b) => b.textContent === "Save",

@@ -99,7 +99,7 @@ export function PhotoReplace(props: { campaignId: string }) {
 		<div class="ds-field">
 			<Button
 				variant="secondary"
-				class="photo-replace"
+				full
 				describedBy={hintId}
 				onClick={() => void open()}
 			>
@@ -180,7 +180,7 @@ export function BlockFields(props: {
 				<p class="muted">This block has no settings to edit here.</p>
 			)}
 			{more > 0 && (
-				<p class="hint">
+				<p class="ds-block-note">
 					{more === 1 ? "One more setting" : `${more} more settings`} can be
 					changed by asking in the chat.
 				</p>
