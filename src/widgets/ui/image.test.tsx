@@ -28,31 +28,14 @@ describe("isAllowedImage", () => {
 			"https://public.blob.vercel-storage.com/a.png",
 			"https://x.public.blob.vercel-storage.com.evil.io/a.png",
 			"http://app.connect.better.giving/a.png",
+			"http://x.public.blob.vercel-storage.com/a.png",
+			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
+			"https://res.cloudinary.com/demo/image/upload/a.jpg",
 			"https://app.connect.better.giving:8443/a.png",
 			"not a url",
 		]) {
 			expect(isAllowedImage(url, ORIGINS), url).toBe(false);
 		}
-	});
-});
-
-describe("isAllowedImage scheme", () => {
-	it("refuses http even on a wildcard host whose suffix matches", () => {
-		expect(
-			isAllowedImage("http://x.public.blob.vercel-storage.com/a.png", ORIGINS),
-		).toBe(false);
-		expect(
-			isAllowedImage("https://x.public.blob.vercel-storage.com/a.png", ORIGINS),
-		).toBe(true);
-	});
-
-	it("refuses a third-party logo host and a value with no scheme", () => {
-		for (const url of [
-			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
-			"https://res.cloudinary.com/demo/image/upload/a.jpg",
-			"endow-profiles.s3.amazonaws.com/a.png",
-		])
-			expect(isAllowedImage(url, ORIGINS), url).toBe(false);
 	});
 });
 

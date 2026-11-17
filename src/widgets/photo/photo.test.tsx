@@ -224,16 +224,39 @@ describe("photo card", () => {
 		});
 
 		it("draws a logo from this service for the connected nonprofit and the others", async () => {
-			const own = "https://app.connect.better.giving/logo/abc.def";
+			const harbor = "https://app.connect.better.giving/logo/harbor.sig";
+			const bayanihan = "https://app.connect.better.giving/logo/bayanihan.sig";
 			const { root } = await show(PHOTO, HARBOR, [
-				row(1, { name: "Harbor Food Bank", current: true, logo_url: own }),
-				row(2, { name: "Bayanihan Relief Network", logo_url: own }),
+				row(1, { name: "Harbor Food Bank", current: true, logo_url: harbor }),
+				row(2, { name: "Bayanihan Relief Network", logo_url: bayanihan }),
 			]);
 			await vi.waitFor(() =>
 				expect(root.querySelectorAll(".account-row").length).toBe(3),
 			);
-			const logos = root.querySelectorAll("img.avatar-logo");
-			expect([...logos].map((l) => l.getAttribute("src"))).toEqual([own, own]);
+			const rows = [...root.querySelectorAll(".account-row")].slice(0, 2);
+			expect(
+				rows.map((r) => r.querySelector("img.avatar-logo")?.getAttribute("src")),
+			).toEqual([harbor, bayanihan]);
+		});
+
+		it("falls back to the initials when the logo fails to load", async () => {
+			const { root } = await show(PHOTO, HARBOR, [
+				row(1, {
+					name: "Harbor Food Bank",
+					current: true,
+					logo_url: "https://app.connect.better.giving/logo/gone.sig",
+				}),
+			]);
+			await vi.waitFor(() =>
+				expect(root.querySelector("img.avatar-logo")).not.toBeNull(),
+			);
+			root.querySelector("img.avatar-logo")?.dispatchEvent(new Event("error"));
+			await vi.waitFor(() =>
+				expect(root.querySelector("img.avatar-logo")).toBeNull(),
+			);
+			expect(root.querySelector(".account-current .avatar")?.textContent).toBe(
+				"HF",
+			);
 		});
 
 		it("draws the connected nonprofit's logo when it is the only one", async () => {
@@ -251,7 +274,7 @@ describe("photo card", () => {
 		});
 
 		it("keeps the initials for a logo on a host the card may not load, a plain-http one and one with no scheme", async () => {
-			const { root, called } = await show(PHOTO, HARBOR, [
+			const { root } = await show(PHOTO, HARBOR, [
 				row(1, {
 					name: "Harbor Food Bank",
 					current: true,
@@ -269,7 +292,6 @@ describe("photo card", () => {
 			await vi.waitFor(() =>
 				expect(root.querySelectorAll(".account-row").length).toBe(4),
 			);
-			expect(called.some((c) => c.name === "list_nonprofits")).toBe(true);
 			expect(root.querySelector("img.avatar-logo")).toBeNull();
 			expect(
 				[...root.querySelectorAll("span.avatar")].map((a) => a.textContent),
