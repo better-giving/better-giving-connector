@@ -8,10 +8,11 @@ import { Hono } from "hono";
 // deployment: the route never fetches a URL a caller chose.
 
 /**
- * Cloudinary is shared by every customer, so only the one account older logos
- * live under is fetched; the other bucket's host is ours alone.
+ * Cloudinary is shared by every customer, so only the one account's uploaded
+ * images older logos live under are fetched (not its `fetch`, which pulls any
+ * URL, or its other asset types); the other bucket's host is ours alone.
  */
-const CLOUDINARY_ACCOUNT_PREFIX = "/everydotorg/";
+const CLOUDINARY_ACCOUNT_PREFIX = "/everydotorg/image/upload/";
 
 /** The exact hosts a logo is fetched from, each with the path prefix it is limited to. */
 const LOGO_HOSTS: ReadonlyMap<string, string> = new Map([

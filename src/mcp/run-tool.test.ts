@@ -320,7 +320,7 @@ test("list_nonprofits draws a logo on a logo host from this service's /logo rout
 	});
 	const rows = [
 		row("1", "https://endow-profiles.s3.amazonaws.com/a.png"),
-		row("2", "https://res.cloudinary.com/everydotorg/b.jpg"),
+		row("2", "https://res.cloudinary.com/everydotorg/image/upload/b.jpg"),
 		row("3", "https://x1.public.blob.vercel-storage.com/c.png"),
 		row("4", "https://endow-profiles.s3.amazonaws.com.evil.io/d.png"),
 		row("5", "http://res.cloudinary.com/e.png"),
@@ -328,6 +328,7 @@ test("list_nonprofits draws a logo on a logo host from this service's /logo rout
 		row("7", null),
 		row("8"),
 		row("9", "https://res.cloudinary.com/other/g.png"),
+		row("10", "https://res.cloudinary.com/everydotorg/image/fetch/h.png"),
 	];
 
 	const result = await runTool(

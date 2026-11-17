@@ -68,6 +68,13 @@ const refusedPaths = [
 	"/EveryDotOrg/a.png",
 	"/other/a.png",
 	"/everydotorg",
+	"/everydotorg/",
+	"/everydotorg/a.png",
+	"/everydotorg/image/fetch/https://x.example/a.png",
+	"/everydotorg/raw/upload/a.png",
+	"/everydotorg/image/upload",
+	"/everydotorg/image/upload/../fetch/a.png",
+	"/everydotorg/image/uploaded/a.png",
 ];
 
 /** A ref with a valid signature over any URL, made as src/logo.ts signs: HMAC-SHA256 of the base64url payload. */
@@ -79,7 +86,7 @@ const signedRef = (url: string) => {
 	return `/logo/${payload}.${signature}`;
 };
 
-test("Cloudinary is limited to the /everydotorg/ account path, parsed as a browser would", async () => {
+test("Cloudinary is limited to the /everydotorg/image/upload/ path, parsed as a browser would", async () => {
 	for (const path of refusedPaths) {
 		const url = `https://res.cloudinary.com${path}`;
 		expect(isLogoUrl(url), url).toBe(false);

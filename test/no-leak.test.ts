@@ -859,7 +859,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		world.db.close();
 		world = await startWorld(true);
 		const bearer = await world.signIn();
-		const logoUrl = `https://res.cloudinary.com/everydotorg/${plant("result:np-logo-host", "leak-np-logo-host-5b3c", true)}/l.png`;
+		const logoUrl = `https://res.cloudinary.com/everydotorg/image/upload/${plant("result:np-logo-host", "leak-np-logo-host-5b3c", true)}/l.png`;
 		world.dep.setMemberships([
 			{ id: "1", name: ORG, role: "admin", can_manage: true, current: true },
 			{
