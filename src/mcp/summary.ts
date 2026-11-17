@@ -105,6 +105,17 @@ const recurring = z.looseObject({
 	next_date: z.string().nullable().optional(),
 });
 
+// Platform's memberships row. `id` arrives as a string or an integer, and the
+// body is passed through as it came.
+const nonprofit = z.looseObject({
+	id: z.union([z.string(), z.number()]),
+	name: z.string(),
+	role: z.string().optional(),
+	can_manage: z.boolean().optional(),
+	current: z.boolean(),
+	logo_url: z.string().nullable().optional(),
+});
+
 const count = (n: number, locale: string, one: string, many: string) =>
 	`${new Intl.NumberFormat(locale).format(n)} ${n === 1 ? one : many}`;
 const shown = (m: z.output<typeof money>, locale: string) =>
@@ -242,6 +253,20 @@ export const OUTPUTS = {
 		const what = `${shown(gift.amount, locale)} received ${formatDate(gift.date, locale)}`;
 		return replayed ? `Already recorded: ${what}` : `Recorded ${what}`;
 	}),
+	list_nonprofits: output(
+		z.looseObject({
+			data: z.array(nonprofit),
+			next_cursor: z.string().nullable().optional(),
+		}),
+		({ data }, { locale }) => {
+			if (data.length === 0) return "No nonprofits";
+			const total = count(data.length, locale, "nonprofit", "nonprofits");
+			const current = data.find((n) => n.current);
+			return current
+				? `${total}, this connection is for ${current.name}`
+				: total;
+		},
+	),
 	create_photo_upload_link: output(
 		z.looseObject({ url: z.string(), expires_at: z.string() }),
 		(link, { locale }) =>

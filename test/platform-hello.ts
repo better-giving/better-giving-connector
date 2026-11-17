@@ -28,6 +28,7 @@ export const PLATFORM_HELLO = {
 		"get_donor",
 		"list_recurring_gifts",
 		"create_photo_upload_link",
+		"list_nonprofits",
 	],
 };
 
@@ -52,6 +53,7 @@ export const PLATFORM_TOOLS = [
 	"get_donor",
 	"list_recurring_gifts",
 	"create_photo_upload_link",
+	"list_nonprofits",
 	"recommend_campaign_presets",
 	// the connector's own, offered whatever the hello lists
 	"get_profile",
@@ -93,4 +95,5 @@ export const PLATFORM_ACTION_OF: Record<string, string> = {
 	get_donor: "donors.get",
 	list_recurring_gifts: "recurring.list",
 	create_photo_upload_link: "photos.upload_link",
+	list_nonprofits: "memberships.list",
 };

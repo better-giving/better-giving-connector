@@ -302,6 +302,25 @@ export const PHOTO: PhotoData = {
 	imageOrigins: IMAGE_ORIGINS,
 };
 
+const nonprofit = (
+	id: string,
+	name: string,
+	over: { current?: boolean; logo_url?: string; can_manage?: boolean } = {},
+) => ({ id, name, role: "admin", can_manage: true, current: false, ...over });
+
+/** The photo card with no dropped file, and the nonprofits list_nonprofits answers. */
+const accountWith = (rows: ReturnType<typeof nonprofit>[]): Fixture => ({
+	result: { structuredContent: { ...PHOTO, file: null, canUpload: false } },
+	calls: {
+		get_profile: () => ({
+			structuredContent: { id: "u1", name: "Bayanihan Relief Network" },
+		}),
+		list_nonprofits: () => ({
+			structuredContent: { data: rows, next_cursor: null },
+		}),
+	},
+});
+
 export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 	campaigns: {
 		five: { result: { structuredContent: CAMPAIGNS }, column: 1040 },
@@ -362,6 +381,31 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 				}),
 			},
 		},
+		"account-three": accountWith([
+			nonprofit("101", "Bayanihan Relief Network", {
+				current: true,
+				logo_url: blobImage("bayanihan-logo"),
+			}),
+			nonprofit("102", "Harbor Food Bank"),
+			nonprofit("103", "Casa de Esperanza"),
+		]),
+		"account-long": accountWith([
+			nonprofit("101", "Bayanihan Relief Network", { current: true }),
+			...[
+				"Casa de Esperanza",
+				"Harbor Food Bank",
+				"Lakeshore Animal Rescue",
+				"Maple Street Pantry",
+				"Northside Youth Choir",
+				"Open Door Clinic",
+				"Riverbend Library Friends",
+				"Sunrise Senior Center",
+				"Tri-County Literacy",
+			].map((name, n) => nonprofit(String(102 + n), name)),
+		]),
+		"account-single": accountWith([
+			nonprofit("101", "Bayanihan Relief Network", { current: true }),
+		]),
 		none: {
 			result: {
 				structuredContent: { ...PHOTO, file: null, canUpload: false },

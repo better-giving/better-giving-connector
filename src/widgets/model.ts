@@ -236,7 +236,7 @@ export const PhotoData = z.object({
 export type PhotoData = z.infer<typeof PhotoData>;
 
 // The tools the widgets' buttons call. Every app_ tool is app-only
-// (`_meta.ui.visibility: ["app"]`); get_profile is model-visible.
+// (`_meta.ui.visibility: ["app"]`); get_profile and list_nonprofits are model-visible.
 
 // strict, as every other tool's input is: a key the server doesn't read is refused, not dropped
 const CampaignId = z.strictObject({ id: z.string() });
@@ -283,6 +283,22 @@ export const APP_TOOLS = {
 	get_profile: {
 		args: z.strictObject({}),
 		result: z.object({ id: z.string(), name: z.string() }),
+	},
+	list_nonprofits: {
+		args: z.strictObject({}),
+		result: z.object({
+			data: z.array(
+				z.object({
+					// an integer or a string on the wire, a string here
+					id: z.union([z.string(), z.number()]).transform(String),
+					name: z.string(),
+					// absent reads as true: the row is a nonprofit the person administers
+					can_manage: z.boolean().optional(),
+					current: z.boolean(),
+					logo_url: z.string().nullable().optional(),
+				}),
+			),
+		}),
 	},
 } as const;
 export type AppToolName = keyof typeof APP_TOOLS;

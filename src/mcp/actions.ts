@@ -592,6 +592,19 @@ export const ACTIONS = toolSpecs([
 		annotations: ADD,
 		_meta: statusLines("Making a photo upload link…", "Upload link ready"),
 	},
+	{
+		tool: "list_nonprofits",
+		action: "memberships.list",
+		title: "List your nonprofits",
+		description:
+			"Lists the nonprofits this person is an admin of on Better Giving, with each one's id, name and logo, and which one this connection is for (current is true on that row). Takes no arguments.",
+		input: z.strictObject({}),
+		output: OUTPUTS.list_nonprofits,
+		annotations: READ,
+		_meta: statusLines("Listing your nonprofits…", "Nonprofits listed"),
+		// a Standalone row with null actions would otherwise be offered it
+		platformOnly: true,
+	},
 ]);
 
 /** Every tool name the connector can register. */
@@ -675,6 +688,10 @@ const PLATFORM_ACTIONS: readonly ActionSpec[] = ACTIONS.map((spec) => ({
 	...PLATFORM_CHANGES[spec.tool],
 }));
 
-/** The specs for a connection: Standalone's as above, or Platform's with its changes. */
+const STANDALONE_ACTIONS: readonly ActionSpec[] = ACTIONS.filter(
+	(spec) => spec.platformOnly !== true,
+);
+
+/** The specs for a connection: Standalone's as above but the Platform-only ones, or Platform's with its changes. */
 export const actionsFor = (platform: boolean): readonly ActionSpec[] =>
-	platform ? PLATFORM_ACTIONS : ACTIONS;
+	platform ? PLATFORM_ACTIONS : STANDALONE_ACTIONS;

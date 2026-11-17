@@ -1,7 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { deploymentClient } from "../../src/deployment";
-import type { ActionName } from "../../src/deployment/contract";
+import {
+	type ActionName,
+	BASE_PATH,
+	problemOf,
+} from "../../src/deployment/contract";
 import { parseOrigin } from "../../src/deployment/origin";
 import { DEFAULT_LOCALE } from "../../src/format";
 import { ACTIONS, type ActionSpec, actionsFor } from "../../src/mcp/actions";
@@ -19,6 +23,9 @@ const UNKNOWN = "can't do this through the connector yet";
 const REFUSED = "no longer accepts this connection";
 
 const MVP = new Set<string>(MVP_ACTIONS);
+// Platform's own, run once right after the exchange where hello lists it; on
+// Standalone it is not served, so it is neither an other tool nor a minimum one.
+const MEMBERSHIPS: ActionName = "memberships.list";
 
 /** The largest `limit` a list tool's input takes (`page` in src/mcp/actions.ts). */
 const MAX_LIMIT = 100;
@@ -51,7 +58,8 @@ export type LiveHarnessOptions = {
 };
 
 /**
- * Hello, exchange, the 13 minimum tools (create_campaign twice, and
+ * Hello, exchange, list_nonprofits where hello lists it (checked, and refused
+ * without a key), the 13 minimum tools (create_campaign twice, and
  * record_donation twice where served), each of the other 12 the deployment
  * does not serve, then disconnect and one refused call. An other tool the
  * deployment serves is skipped, not called: most of them write, publish or
@@ -95,11 +103,27 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 		const ids = { campaign: "", form: "", donor: "" };
 
 		const mvp = ACTIONS.filter((spec) => MVP.has(spec.action));
-		const rest = ACTIONS.filter((spec) => !MVP.has(spec.action));
+		const rest = ACTIONS.filter(
+			(spec) => !MVP.has(spec.action) && spec.action !== MEMBERSHIPS,
+		);
 		if (mvp.length !== 13 || rest.length !== 12) {
 			throw new Error(
 				"the connector does not list 13 minimum tools and 12 others",
 			);
+		}
+
+		if (hello.actions?.includes(MEMBERSHIPS)) {
+			const listed = await runResult(
+				rows,
+				ctx,
+				connection,
+				"list_nonprofits",
+				{},
+			);
+			expectOutcome(rows.at(-1), "list_nonprofits", "ok");
+			// The exchange answers the nonprofit's name, not its id.
+			checkMemberships(listed, exchanged.orgName || hello.orgName);
+			await expectRefusedWithoutKey(opts.fetch, hello.origin);
 		}
 
 		const created = await run(rows, ctx, connection, "create_campaign", {
@@ -244,6 +268,73 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 	}
 }
 
+/**
+ * Every row has the types the connector reads, the answer is one page, the
+ * connector's own output schema took it (a body it refuses is answered as text
+ * alone, which the photo card can't read), and exactly one row is `current`:
+ * the nonprofit the exchange named.
+ */
+function checkMemberships(result: ToolResult, connectedName: string): void {
+	const body = lastJson(textOf(result), "list_nonprofits");
+	const data = body.data;
+	if (!Array.isArray(data)) {
+		throw new Error("list_nonprofits returned no data array");
+	}
+	if (!data.every(rowShapeOk)) {
+		throw new Error("list_nonprofits listed a row of the wrong shape");
+	}
+	if (body.next_cursor !== null) {
+		throw new Error("list_nonprofits returned a next_cursor, expected null");
+	}
+	if (result.structuredContent === undefined) {
+		throw new Error("list_nonprofits returned no structured result");
+	}
+	const current = (data as Record<string, unknown>[]).filter(
+		(row) => row.current === true,
+	);
+	if (current.length !== 1) {
+		throw new Error("list_nonprofits did not flag exactly one current row");
+	}
+	if (connectedName !== "" && current[0]?.name !== connectedName) {
+		throw new Error("list_nonprofits' current row is not the connected one");
+	}
+}
+
+function rowShapeOk(value: unknown): boolean {
+	if (typeof value !== "object" || value === null) return false;
+	const row = value as Record<string, unknown>;
+	const idOk =
+		(typeof row.id === "string" && row.id !== "") || typeof row.id === "number";
+	const logoOk =
+		row.logo_url === undefined ||
+		row.logo_url === null ||
+		typeof row.logo_url === "string";
+	return (
+		idOk &&
+		logoOk &&
+		typeof row.name === "string" &&
+		typeof row.role === "string" &&
+		typeof row.can_manage === "boolean" &&
+		typeof row.current === "boolean"
+	);
+}
+
+/** The action refuses a request that sends no key: 401 `key_refused`. */
+async function expectRefusedWithoutKey(
+	fetchWith: typeof fetch,
+	origin: string,
+): Promise<void> {
+	const res = await fetchWith(`${origin}${BASE_PATH}/memberships`, {
+		headers: { accept: "application/json" },
+	});
+	const body: unknown = await res.json().catch(() => null);
+	if (res.status !== 401 || problemOf(body)?.code !== "key_refused") {
+		throw new Error(
+			`list_nonprofits without a key answered ${res.status}, expected 401 key_refused`,
+		);
+	}
+}
+
 function gift(stamp: string, day: string): Record<string, unknown> {
 	return {
 		amount: { amount: "1.00", currency: "USD" },
@@ -296,6 +387,14 @@ function otherArgs(
 	}
 }
 
+type ToolResult = Awaited<ReturnType<typeof runTool>>;
+
+// the text answer; a success's summary line follows it
+const textOf = (result: ToolResult): string => {
+	const first = result.content[0];
+	return first?.type === "text" ? first.text : "";
+};
+
 async function run(
 	rows: LiveRow[],
 	ctx: RunToolContext,
@@ -303,19 +402,27 @@ async function run(
 	tool: string,
 	args: Record<string, unknown>,
 ): Promise<string> {
+	return textOf(await runResult(rows, ctx, connection, tool, args));
+}
+
+async function runResult(
+	rows: LiveRow[],
+	ctx: RunToolContext,
+	connection: ToolConnection,
+	tool: string,
+	args: Record<string, unknown>,
+): Promise<ToolResult> {
 	const spec = specNamed(tool, connection.platform);
 	const started = performance.now();
 	const result = await runTool(spec, connection, args, ctx, DEFAULT_LOCALE);
-	// the text answer; a success's summary line follows it
-	const first = result.content[0];
-	const text = first?.type === "text" ? first.text : "";
+	const text = textOf(result);
 	rows.push({
 		tool: spec.tool,
 		outcome: outcomeOf(text, result.isError),
 		ms: Math.round(performance.now() - started),
 		bytes: Buffer.byteLength(text),
 	});
-	return text;
+	return result;
 }
 
 // The specs the connector serves on this connection, as `servedSpecs` in src/mcp/index.ts picks them.

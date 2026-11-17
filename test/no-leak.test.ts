@@ -55,6 +55,11 @@ function plant(label: string, value: string, inBodies: boolean): string {
 	return value;
 }
 
+// Standalone's hello never lists list_nonprofits: it is Platform's.
+const STANDALONE_ACTIONS = ACTIONS.filter(
+	(a) => a.action !== "memberships.list",
+);
+
 const arg = (name: string) =>
 	plant(`arg:${name}`, `leak-arg-${name}-4f2a`, true);
 const RESULT = plant("result", "leak-result-9b1c", true);
@@ -440,9 +445,10 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		const tools = await rpc(await world.sendAs(bearer, "tools/list"));
 
 		expect(init.result.instructions).toContain(ORG);
-		// the draft tool is a Platform connection's alone
+		// the draft tool and list_nonprofits are a Platform connection's alone
 		expect(tools.result.tools).toHaveLength(
-			ACTIONS.length + LOCAL_TOOLS.filter((t) => !t.platformOnly).length,
+			STANDALONE_ACTIONS.length +
+				LOCAL_TOOLS.filter((t) => !t.platformOnly).length,
 		);
 		expect(world.dep.issuedKeys).toHaveLength(1);
 		expectCleanScenario();
@@ -741,9 +747,10 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		).toEqual(names(listed));
 		expect(
 			names(
-				[...ACTIONS, ...LOCAL_TOOLS.filter((t) => !t.platformOnly)].map(
-					(a) => ({ name: a.tool }),
-				),
+				[
+					...STANDALONE_ACTIONS,
+					...LOCAL_TOOLS.filter((t) => !t.platformOnly),
+				].map((a) => ({ name: a.tool })),
 			),
 		).toEqual(names(listed));
 	});
@@ -790,6 +797,42 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		}
 		expect(ids.campaign).not.toBe("");
 		expect(ids.donor).not.toBe("");
+		expectCleanScenario();
+	});
+
+	test("list_nonprofits answers the person's nonprofits and keeps their names and ids out of every log line", async () => {
+		world.db.close();
+		world = await startWorld(true);
+		const bearer = await world.signIn();
+		world.dep.setMemberships([
+			{
+				id: plant("result:np-id", "leak-np-id-6e21", true),
+				name: ORG,
+				role: "admin",
+				can_manage: true,
+				current: true,
+			},
+			{
+				id: 7,
+				name: plant("result:np-name", "leak-np-name-1d9f", true),
+				role: "admin",
+				can_manage: true,
+				current: false,
+				logo_url: plant(
+					"result:np-logo",
+					"https://leak-np-logo-2c7a.example/l.png",
+					true,
+				),
+			},
+		]);
+
+		const result = await callTool(bearer, "list_nonprofits", {});
+
+		expect(result.isError).toBeUndefined();
+		expect(JSON.stringify(result.structuredContent)).toContain(
+			"leak-np-name-1d9f",
+		);
+		expect(JSON.stringify(result)).not.toContain(world.dep.host);
 		expectCleanScenario();
 	});
 

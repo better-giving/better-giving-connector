@@ -148,19 +148,23 @@ test("the sign-in challenge names offline_access as the scope to request", async
 });
 
 const STANDALONE_LOCAL = LOCAL_TOOLS.filter((s) => s.platformOnly !== true);
+// list_nonprofits is Platform's alone
+const STANDALONE_ACTIONS = ACTIONS.filter((s) => s.tool !== "list_nonprofits");
 
 const toolNames = async (): Promise<string[]> =>
 	(await rpc(await send("tools/list"))).result.tools.map(
 		(t: { name: string }) => t.name,
 	);
 
-test("a connection with no stated actions offers every tool", async () => {
+test("a Standalone connection with no stated actions offers every Standalone tool, and not list_nonprofits", async () => {
 	await reconnect(null);
 
 	const names = await toolNames();
 
-	expect(names).toHaveLength(ACTIONS.length + STANDALONE_LOCAL.length);
-	expect(names).toContain("get_profile");
+	expect(names).not.toContain("list_nonprofits");
+	expect(names.sort()).toEqual(
+		[...STANDALONE_ACTIONS, ...STANDALONE_LOCAL].map((s) => s.tool).sort(),
+	);
 });
 
 test("tools/list offers only the tools whose action the deployment serves", async () => {
@@ -248,7 +252,7 @@ test("a 2025 client, whose capabilities this request doesn't carry, is offered t
 	}
 });
 
-const READ_TOOLS: string[] = [...ACTIONS, ...LOCAL_TOOLS]
+const READ_TOOLS: string[] = [...STANDALONE_ACTIONS, ...LOCAL_TOOLS]
 	.filter((s) => s.annotations.readOnlyHint)
 	.map((s) => s.tool);
 
@@ -326,7 +330,9 @@ test("every Standalone tool carries its title in its annotations", async () => {
 
 	const { tools } = (await rpc(await send("tools/list"))).result;
 
-	expect(tools).toHaveLength(ACTIONS.length + STANDALONE_LOCAL.length);
+	expect(tools).toHaveLength(
+		STANDALONE_ACTIONS.length + STANDALONE_LOCAL.length,
+	);
 	for (const t of tools as ListedTool[]) {
 		expect(t.title).toMatch(/\S/);
 		expect(t.annotations.title).toBe(t.title);
