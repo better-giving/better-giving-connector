@@ -74,7 +74,12 @@ const refusedPaths = [
 	"/everydotorg/raw/upload/a.png",
 	"/everydotorg/image/upload",
 	"/everydotorg/image/upload/../fetch/a.png",
+	"/everydotorg/image/upload/%2e%2e/fetch/a.png",
+	"/everydotorg/image/upload/.%2E/fetch/a.png",
+	"/everydotorg/image/upload\\..\\fetch/a.png",
 	"/everydotorg/image/uploaded/a.png",
+	"/other?/everydotorg/image/upload/a.png",
+	"/other#/everydotorg/image/upload/a.png",
 ];
 
 /** A ref with a valid signature over any URL, made as src/logo.ts signs: HMAC-SHA256 of the base64url payload. */
@@ -94,6 +99,11 @@ test("Cloudinary is limited to the /everydotorg/image/upload/ path, parsed as a 
 	}
 	const ok = "https://res.cloudinary.com/everydotorg/image/upload/a.jpg";
 	expect(isLogoUrl(ok)).toBe(true);
+	expect(
+		isLogoUrl(
+			"https://res.cloudinary.com/everydotorg/image/upload/w_100,h_100/v1/dir/a.jpg",
+		),
+	).toBe(true);
 	expect(
 		isLogoUrl("https://endow-profiles.s3.amazonaws.com/any/path.png"),
 	).toBe(true);
