@@ -188,6 +188,8 @@ const loggedLines = (from = 0) =>
 // --- the service under test ----------------------------------------------
 
 const ORG = "Hope Shelter";
+const LOGO_HOST = "res.cloudinary.com";
+const LOGO_IMAGE = new Uint8Array([137, 80, 78, 71]);
 
 // The deployment's answers with sentinels in them: JSON successes gain a
 // field, problems a hidden field and a detail.
@@ -227,7 +229,20 @@ async function startWorld(platform = false) {
 	const dep = fakeDeployment({ name: ORG, platform });
 	movedTo = fakeDeployment({ host: "moved.example.org", name: ORG });
 	deployments.push(dep, movedTo);
-	const net = sentinelled(fakeNetwork(dep, movedTo));
+	// The logo host answers an image once a scenario opens it; until then the
+	// fake network refuses it, like a DNS miss.
+	const logoHost = { open: false, fetched: [] as string[] };
+	const network = fakeNetwork(dep, movedTo);
+	const net = sentinelled(async (input, init) => {
+		const url = input instanceof Request ? input.url : String(input);
+		if (!logoHost.open || new URL(url).hostname !== LOGO_HOST) {
+			return network(input, init);
+		}
+		logoHost.fetched.push(url);
+		return new Response(LOGO_IMAGE, {
+			headers: { "content-type": "image/png" },
+		});
+	});
 	const flaky = failingDb(db);
 
 	// Records every response header and body this service answers with.
@@ -263,6 +278,7 @@ async function startWorld(platform = false) {
 	return {
 		db,
 		dep,
+		logoHost,
 		call,
 		flow,
 		sendAs,
@@ -878,26 +894,12 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 
 	test("a drawn logo that is served keeps the logo URL out of every log line and header", async () => {
 		const { drawn, logoUrl } = await drawnLogo();
-		const fetched: string[] = [];
-		const logos = createApp({
-			env,
-			db: world.db,
-			fetch: async (input) => {
-				fetched.push(String(input));
-				return new Response(new Uint8Array([137, 80, 78, 71]), {
-					headers: { "content-type": "image/png" },
-				});
-			},
-			platformOrigin: world.dep.origin,
-		});
+		world.logoHost.open = true;
 
-		const res = await logos.request(new Request(drawn));
-		for (const [name, value] of res.headers)
-			record("header", `${name}: ${value}`);
-		record("body", await res.clone().text());
+		const res = await world.call(new Request(drawn));
 
 		expect(res.status).toBe(200);
-		expect(fetched).toEqual([logoUrl]);
+		expect(world.logoHost.fetched).toEqual([logoUrl]);
 		expectCleanScenario();
 	});
 
@@ -1553,9 +1555,7 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 		expect(outcomes("connect", "outcome")).toContain(outcome);
 	}
 	expect(errorSites).toEqual(
-		// "auth": the served-logo scenario starts a second app on the same
-		// database, whose auth seeding logs a level-only line
-		new Set(["mcp", "connect", "auth", "app", "disconnect", "sweep"]),
+		new Set(["mcp", "connect", "app", "disconnect", "sweep"]),
 	);
 	expect(new Set(trace.map((e) => e.sink))).toEqual(
 		new Set(["output", "header", "body"]),
