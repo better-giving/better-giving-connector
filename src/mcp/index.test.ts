@@ -149,9 +149,7 @@ test("the sign-in challenge names offline_access as the scope to request", async
 
 const STANDALONE_LOCAL = LOCAL_TOOLS.filter((s) => s.platformOnly !== true);
 // list_nonprofits is Platform's alone
-const STANDALONE_ACTIONS = ACTIONS.filter(
-	(s) => s.tool !== "list_nonprofits",
-);
+const STANDALONE_ACTIONS = ACTIONS.filter((s) => s.tool !== "list_nonprofits");
 
 const toolNames = async (): Promise<string[]> =>
 	(await rpc(await send("tools/list"))).result.tools.map(

@@ -304,8 +304,7 @@ function rowShapeOk(value: unknown): boolean {
 	if (typeof value !== "object" || value === null) return false;
 	const row = value as Record<string, unknown>;
 	const idOk =
-		(typeof row.id === "string" && row.id !== "") ||
-		typeof row.id === "number";
+		(typeof row.id === "string" && row.id !== "") || typeof row.id === "number";
 	const logoOk =
 		row.logo_url === undefined ||
 		row.logo_url === null ||
