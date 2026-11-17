@@ -168,7 +168,7 @@ function ContentPreview(props: {
 	);
 }
 
-/** The donor page as it will look: Quicksand, 4px corners, on a light surface whatever the host's theme. */
+/** The donor page as it will look: the registry's Red Hat, 4px corners, on a light surface whatever the host's theme. */
 export function PagePreview(props: {
 	data: CampaignEditorData;
 	page: CampaignEditorData["page"];
