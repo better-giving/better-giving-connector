@@ -193,17 +193,19 @@ describe("the campaign editor and the draft revision", () => {
 });
 
 describe("campaign editor preview", () => {
-	it("sets its headings in the donor page's face, not the widget's", async () => {
-		applyStyles("ui/styles.css", "campaign-editor/editor.css");
+	it("sets the preview in the registry's Red Hat, headings in the display face", async () => {
+		applyStyles("tokens.css", "ui/styles.css", "campaign-editor/editor.css");
 		const root = await show(EDITOR);
 		const preview = root.querySelector(".preview");
 		const face = getComputedStyle(preview as Element).fontFamily;
 		const headings = [...(preview?.querySelectorAll("h1, h2, h3") ?? [])].map(
 			(h) => getComputedStyle(h).fontFamily,
 		);
-		expect(face).toMatch(/^Quicksand/);
+		expect(face).toMatch(/^"?Red Hat Round Text/);
 		expect(headings.length).toBeGreaterThan(0);
-		expect(new Set(headings)).toEqual(new Set([face]));
+		expect(new Set(headings)).toEqual(
+			new Set([expect.stringMatching(/^"?Red Hat Round Display/)]),
+		);
 	});
 });
 
