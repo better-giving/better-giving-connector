@@ -69,7 +69,7 @@ describe("knownActions", () => {
 	});
 });
 
-test("Platform's hello serves its nineteen actions, writes included", () => {
+test("Platform's hello serves its twenty actions, writes included", () => {
 	expect(helloBody.parse(PLATFORM_HELLO).actions).toEqual([
 		"campaigns.list",
 		"campaigns.get",
@@ -90,5 +90,6 @@ test("Platform's hello serves its nineteen actions, writes included", () => {
 		"donors.get",
 		"recurring.list",
 		"photos.upload_link",
+		"memberships.list",
 	]);
 });

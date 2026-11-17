@@ -1,9 +1,9 @@
 /** @jsxImportSource hono/jsx/dom */
 import { useEffect, useId, useState } from "hono/jsx/dom";
-import type { PhotoData } from "../model";
+import type { AppToolResult, PhotoData } from "../model";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
-import { ImageWithPlaceholder } from "../ui/image";
+import { ImageWithPlaceholder, isAllowedImage } from "../ui/image";
 import { callTool } from "../ui/tools";
 import { useLocale, useSession } from "../ui/widget";
 import "./photo.css";
@@ -21,22 +21,62 @@ const initials = (name: string) =>
 		.map((w) => [...w][0]?.toUpperCase() ?? "")
 		.join("");
 
+type Nonprofit = AppToolResult<"list_nonprofits">["data"][number];
+
+/** The most nonprofits the panel lists, the connected one first; the rest are a count. */
+const MAX_LISTED = 8;
+
+function Avatar(props: {
+	name: string;
+	logo: string | null | undefined;
+	origins: readonly string[];
+}) {
+	const [failed, setFailed] = useState(false);
+	const { logo } = props;
+	return logo && !failed && isAllowedImage(logo, props.origins) ? (
+		<img
+			class="avatar avatar-logo"
+			src={logo}
+			alt=""
+			aria-hidden="true"
+			onError={() => setFailed(true)}
+		/>
+	) : (
+		<span class="avatar" aria-hidden="true">
+			{initials(props.name)}
+		</span>
+	);
+}
+
 /**
- * The connected account. The service knows one nonprofit per connection and
- * no list of the person's others, so switching asks the chat to start the
- * host's own connect flow, where the next nonprofit is picked.
+ * The connected account, and the person's other nonprofits when the service
+ * lists them (list_nonprofits; Standalone and a failed call list none). A
+ * switch asks the chat to start the host's own connect flow, where the next
+ * nonprofit is picked.
  */
-function Account() {
+function Account(props: { origins: readonly string[] }) {
 	const { host } = useSession();
 	const [name, setName] = useState<string | null>(null);
 	const [settled, setSettled] = useState(false);
+	const [others, setOthers] = useState<Nonprofit[]>([]);
+	const [logo, setLogo] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	useEffect(() => {
-		void callTool(host, "get_profile", {}).then((res) => {
-			if (res.ok) setName(res.data.name.trim() ? res.data.name : null);
+		void (async () => {
+			const profile = await callTool(host, "get_profile", {});
+			if (profile.ok)
+				setName(profile.data.name.trim() ? profile.data.name : null);
 			setSettled(true);
-		});
+			const listed = await callTool(host, "list_nonprofits", {});
+			if (!listed.ok) return;
+			const current = listed.data.data.find((n) => n.current);
+			const rest = listed.data.data.filter((n) => !n.current);
+			if (!current || rest.length === 0) return;
+			setLogo(current.logo_url ?? null);
+			setOthers(rest);
+		})();
 	}, [host]);
+	const shown = others.slice(0, MAX_LISTED - 1);
 	const ask = (prompt: string) => {
 		setError(null);
 		host
@@ -48,9 +88,7 @@ function Account() {
 	return (
 		<section class="account" aria-label="Account">
 			<div class="account-row account-current">
-				<span class="avatar" aria-hidden="true">
-					{name ? initials(name) : ""}
-				</span>
+				<Avatar name={name ?? ""} logo={logo} origins={props.origins} />
 				<div class="account-who">
 					<p class="account-name">
 						{name ?? (settled ? "Your nonprofit" : "…")}
@@ -59,24 +97,58 @@ function Account() {
 				</div>
 				<span class="ds-badge ds-badge-success">Connected</span>
 			</div>
-			<div class="account-row">
-				<div class="account-who">
-					<p class="account-name">Another nonprofit?</p>
-					<p class="account-label">
-						Connect a different one; you pick it when you sign in.
-					</p>
+			{others.length > 0 ? (
+				<>
+					{shown.map((n) => (
+						<div class="account-row" key={n.id}>
+							<Avatar name={n.name} logo={n.logo_url} origins={props.origins} />
+							<div class="account-who">
+								<p class="account-name">{n.name}</p>
+								<p class="account-label">
+									{n.can_manage === false ? "View-only" : "Admin"}
+								</p>
+							</div>
+							<Button
+								variant="secondary"
+								label={`Switch to ${n.name}`}
+								onClick={() =>
+									ask(
+										`I want to connect ${n.name} to this chat. Walk me through switching.`,
+									)
+								}
+							>
+								Switch
+							</Button>
+						</div>
+					))}
+					{others.length > shown.length && (
+						<div class="account-row account-more">
+							<span class="account-label">
+								…and {others.length - shown.length} more
+							</span>
+						</div>
+					)}
+				</>
+			) : (
+				<div class="account-row">
+					<div class="account-who">
+						<p class="account-name">Another nonprofit?</p>
+						<p class="account-label">
+							Connect a different one; you pick it when you sign in.
+						</p>
+					</div>
+					<Button
+						variant="secondary"
+						onClick={() =>
+							ask(
+								"I want to connect a different Better Giving nonprofit. Walk me through switching.",
+							)
+						}
+					>
+						Switch nonprofit
+					</Button>
 				</div>
-				<Button
-					variant="secondary"
-					onClick={() =>
-						ask(
-							"I want to connect a different Better Giving nonprofit. Walk me through switching.",
-						)
-					}
-				>
-					Switch nonprofit
-				</Button>
-			</div>
+			)}
 			<div class="account-row account-foot">
 				<span class="account-label">
 					Disconnecting removes this nonprofit from the chat.
@@ -226,7 +298,7 @@ export function PhotoCard(props: { data: PhotoData }) {
 				{done ?? ""}
 			</p>
 			{done && <p class="done">{done}</p>}
-			<Account />
+			<Account origins={data.imageOrigins} />
 		</Card>
 	);
 }

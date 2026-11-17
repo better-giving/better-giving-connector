@@ -90,15 +90,15 @@ const MVP = new Set<string>(MVP_ACTIONS);
 // The routes of the 12 tools beyond the minimum 13, each as a method and a
 // path pattern: a write, publish or reset the harness must never send when the
 // deployment serves it.
-const OTHER_ROUTES = ACTIONS.filter((spec) => !MVP.has(spec.action)).map(
-	(spec) => ({
-		action: spec.action,
-		method: ROUTES[spec.action].method,
-		path: new RegExp(
-			`${ROUTES[spec.action].path.replace(/:[^/]+/g, "[^/]+")}$`,
-		),
-	}),
+// list_nonprofits is Platform's own and checked on its own: it is neither.
+const OTHER_ACTIONS = ACTIONS.filter(
+	(spec) => !MVP.has(spec.action) && spec.action !== "memberships.list",
 );
+const OTHER_ROUTES = OTHER_ACTIONS.map((spec) => ({
+	action: spec.action,
+	method: ROUTES[spec.action].method,
+	path: new RegExp(`${ROUTES[spec.action].path.replace(/:[^/]+/g, "[^/]+")}$`),
+}));
 
 function reachedOther(
 	dep: ReturnType<typeof fakeDeployment>,
@@ -232,7 +232,7 @@ test("on Platform the harness skips the other tools it serves and calls only the
 
 	const rows = await runHarness(dep);
 
-	const otherTools = ACTIONS.filter((spec) => !MVP.has(spec.action));
+	const otherTools = OTHER_ACTIONS;
 	// create_form is served and still called, to make the form the run reads
 	const servedOthers = otherTools
 		.filter((spec) => PLATFORM_SERVES.includes(spec.action))
@@ -568,4 +568,128 @@ test("on Platform the harness fails when list_forms does not list the form creat
 		.map((line) => (JSON.parse(line) as { tool: string }).tool);
 	expect(tools).toContain("create_form");
 	expect(tools).not.toContain("get_form");
+});
+
+test("on Platform serving memberships.list, list_nonprofits is called once with a key and refused without one", async () => {
+	const dep = fakeDeployment({
+		name: "Hope Shelter",
+		platform: true,
+		defaultForm: false,
+	});
+	dep.setActions(PLATFORM_SERVES);
+
+	const rows = await runHarness(dep);
+
+	expect(rows.filter((row) => row.tool === "list_nonprofits")).toEqual([
+		{
+			tool: "list_nonprofits",
+			outcome: "ok",
+			ms: expect.any(Number),
+			bytes: expect.any(Number),
+		},
+	]);
+	const sent = dep.calls.filter((call) => call.path.endsWith("/memberships"));
+	expect(sent.map((call) => call.authorization === null)).toEqual([
+		false,
+		true,
+	]);
+});
+
+test("on Standalone, which does not list memberships.list, list_nonprofits is never called", async () => {
+	const dep = fakeDeployment({ name: "Hope Shelter" });
+	dep.setActions(MVP_ACTIONS);
+
+	const rows = await runHarness(dep);
+
+	expect(rows.map((row) => row.tool)).not.toContain("list_nonprofits");
+	expect(dep.calls.some((call) => call.path.endsWith("/memberships"))).toBe(
+		false,
+	);
+});
+
+test.each([
+	[
+		"no row is current",
+		[
+			{
+				id: "1",
+				name: "Hope Shelter",
+				role: "admin",
+				can_manage: true,
+				current: false,
+			},
+		],
+		"did not flag exactly one current row",
+	],
+	[
+		"the current row is not the connected nonprofit",
+		[
+			{
+				id: "1",
+				name: "Elsewhere",
+				role: "admin",
+				can_manage: true,
+				current: true,
+			},
+		],
+		"current row is not the connected one",
+	],
+	[
+		"a row's can_manage is not a boolean",
+		[
+			{
+				id: "1",
+				name: "Hope Shelter",
+				role: "admin",
+				can_manage: "yes",
+				current: true,
+			},
+		],
+		"a row of the wrong shape",
+	],
+])("on Platform the harness fails when %s", async (_, rows, message) => {
+	const dep = fakeDeployment({
+		name: "Hope Shelter",
+		platform: true,
+		defaultForm: false,
+	});
+	dep.setActions(PLATFORM_SERVES);
+	dep.setMemberships(rows);
+	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
+
+	await expect(
+		runLiveHarness({
+			origin: dep.origin,
+			code: dep.mintCode(),
+			fetch: dep.fetch,
+			resultsPath: join(dir, "results.ndjson"),
+			now: new Date("2026-10-17T15:04:05.000Z"),
+		}),
+	).rejects.toThrow(message);
+});
+
+test("on Platform the harness fails when a call without a key is not refused", async () => {
+	const dep = fakeDeployment({
+		name: "Hope Shelter",
+		platform: true,
+		defaultForm: false,
+	});
+	dep.setActions(PLATFORM_SERVES);
+	dep.intercept((req) =>
+		req.headers.get("authorization") === null &&
+		new URL(req.url).pathname.endsWith("/memberships")
+			? Response.json({ data: [], next_cursor: null })
+			: undefined,
+	);
+	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
+
+	await expect(
+		runLiveHarness({
+			origin: dep.origin,
+			code: dep.mintCode(),
+			fetch: dep.fetch,
+			resultsPath: join(dir, "results.ndjson"),
+			now: new Date("2026-10-17T15:04:05.000Z"),
+		}),
+	).rejects.toThrow("without a key answered 200, expected 401 key_refused");
 });

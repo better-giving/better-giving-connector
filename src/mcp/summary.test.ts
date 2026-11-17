@@ -137,6 +137,33 @@ const CASES: [keyof typeof OUTPUTS, unknown, SummaryContext, string][] = [
 		cx(),
 		"1 monthly gift",
 	],
+	[
+		"list_nonprofits",
+		list([
+			{ id: 101, name: "Hope Shelter", current: true, logo_url: null },
+			{ id: "102", name: "Harbor Food Bank", current: false, extra: 1 },
+			{ id: "103", name: "Zion Kitchen", current: false },
+		]),
+		cx(),
+		"3 nonprofits, this connection is for Hope Shelter",
+	],
+	[
+		// no current row, and the current one not first: both still list
+		"list_nonprofits",
+		list([
+			{ id: "1", name: "A", current: false },
+			{ id: "2", name: "B", current: true },
+		]),
+		cx(),
+		"2 nonprofits, this connection is for B",
+	],
+	[
+		"list_nonprofits",
+		list([{ id: "1", name: "A", current: false, can_manage: false }]),
+		cx(),
+		"1 nonprofit",
+	],
+	["list_nonprofits", list([]), cx(), "No nonprofits"],
 	["record_donation", gift, cx(), "Recorded $100.00 received Oct 1, 2026"],
 	[
 		"record_donation",

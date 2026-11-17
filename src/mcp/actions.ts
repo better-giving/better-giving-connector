@@ -592,6 +592,17 @@ export const ACTIONS = toolSpecs([
 		annotations: ADD,
 		_meta: statusLines("Making a photo upload link…", "Upload link ready"),
 	},
+	{
+		tool: "list_nonprofits",
+		action: "memberships.list",
+		title: "List your nonprofits",
+		description:
+			"Lists the nonprofits this person is an admin of on Better Giving, with each one's id, name and logo, and which one this connection is for (current is true on that row). Takes no arguments.",
+		input: z.strictObject({}),
+		output: OUTPUTS.list_nonprofits,
+		annotations: READ,
+		_meta: statusLines("Listing your nonprofits…", "Nonprofits listed"),
+	},
 ]);
 
 /** Every tool name the connector can register. */

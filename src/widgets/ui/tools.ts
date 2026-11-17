@@ -14,7 +14,7 @@ const UNREADABLE =
 	"Better Giving answered, but the answer wasn't one this card can read. Check the campaign before trying again.";
 
 /**
- * Calls an app-only (or get_profile) tool through the host and parses its
+ * Calls an app-only (or model-visible get_profile or list_nonprofits) tool through the host and parses its
  * answer with the contract's schema. A failure is the tool's own sentence.
  */
 export async function callTool<N extends AppToolName>(

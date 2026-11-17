@@ -56,6 +56,11 @@
 	font-weight: 700;
 }
 
+.avatar-logo {
+	object-fit: cover;
+	background: var(--band);
+}
+
 .account-name {
 	font-weight: 700;
 }

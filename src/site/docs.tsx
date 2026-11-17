@@ -120,6 +120,7 @@ const TOOL_DOCS: Record<ToolName, ToolDoc> = {
 			"Makes a short-lived, single-use link to add a photo. Nothing changes until you upload a photo there. The photo then becomes the cover, goes beside it, or replaces one, and on a live campaign donors see it right away.",
 		errors: [ENDED],
 	},
+	list_nonprofits: { class: "Read", effects: "None." },
 };
 
 const CARD = "Opens a card in the chat. Changes nothing.";
@@ -287,6 +288,10 @@ export function DocsPage() {
 				<li>
 					Make a short-lived, single-use link so you can add a campaign's cover
 					photo from your phone. The connector does not upload the file itself.
+				</li>
+				<li>
+					List the nonprofits you are an admin of, and see which one this
+					connection is for.
 				</li>
 				<li>
 					Read the main donation page, donation forms, donors, gifts, monthly

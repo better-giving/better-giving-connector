@@ -884,3 +884,88 @@ test("every Platform tool's success is also a structured result with a summary l
 		await structured(name, args);
 	}
 });
+
+describe("list_nonprofits", () => {
+	type Row = { id: string | number; name: string; current: boolean };
+	const rowsOf = (result: Result) => json(result).data as Row[];
+
+	test("lists the nonprofits with the connected one first and flagged current", async () => {
+		const result = await tool("list_nonprofits");
+
+		expect(result.isError).toBeUndefined();
+		expect(rowsOf(result).map((r) => [r.name, r.current])).toEqual([
+			["Hope Shelter", true],
+			["Bayanihan Relief Network", false],
+			["harbor Food Bank", false],
+		]);
+		expect(result.content.map((c) => c.text).join("\n")).toContain(
+			"3 nonprofits, this connection is for Hope Shelter",
+		);
+	});
+
+	test("takes an integer id, a null or missing logo and a field it doesn't know", async () => {
+		deployment.setMemberships([
+			{ id: 7, name: "Hope Shelter", current: true, logo_url: null, tier: "x" },
+			{ id: "8", name: "Other", current: false },
+		]);
+
+		const result = await tool("list_nonprofits");
+
+		expect(result.isError).toBeUndefined();
+		expect(rowsOf(result).map((r) => r.id)).toEqual([7, "8"]);
+	});
+
+	test("lists a person whose current nonprofit is not first, or who has none flagged", async () => {
+		deployment.setMemberships([
+			{ id: "1", name: "A", current: false },
+			{ id: "2", name: "Hope Shelter", current: true },
+		]);
+		expect(rowsOf(await tool("list_nonprofits")).map((r) => r.id)).toEqual([
+			"1",
+			"2",
+		]);
+
+		deployment.setMemberships([{ id: "1", name: "A", current: false }]);
+		expect((await tool("list_nonprofits")).isError).toBeUndefined();
+	});
+
+	test("takes no argument, so none reaches the deployment's query", async () => {
+		await tool("list_nonprofits");
+
+		const sent = deployment.calls.filter((c) =>
+			c.path.endsWith("/memberships"),
+		);
+		expect(sent.map((c) => c.query)).toEqual([{}]);
+	});
+
+	test("is not offered when the deployment doesn't serve it, and a call meeting 404 says so", async () => {
+		const listed = async () =>
+			(
+				(await rpc(await send("tools/list"))).result.tools as {
+					name: string;
+				}[]
+			).map((t) => t.name);
+		expect(await listed()).toContain("list_nonprofits");
+
+		deployment.intercept((req) =>
+			new URL(req.url).pathname.endsWith("/memberships")
+				? new Response(
+						JSON.stringify({
+							code: "unknown_action",
+							title: "Unknown action",
+						}),
+						{
+							status: 404,
+							headers: { "content-type": "application/problem+json" },
+						},
+					)
+				: undefined,
+		);
+		const refused = await tool("list_nonprofits");
+
+		expect(refused.isError).toBe(true);
+		expect(textOf(refused)).toContain(
+			"can't do this through the connector yet",
+		);
+	});
+});

@@ -54,6 +54,7 @@ export const ROUTES = {
 	"recurring.list": { method: "GET", path: "/recurring" },
 	"donations.record": { method: "POST", path: "/donations" },
 	"photos.upload_link": { method: "POST", path: "/photos/upload-link" },
+	"memberships.list": { method: "GET", path: "/memberships" },
 } as const satisfies Record<
 	string,
 	{ method: "GET" | "POST" | "PATCH"; path: string }
@@ -107,6 +108,7 @@ export const TOOL_ACTIONS = {
 	list_recurring_gifts: "recurring.list",
 	record_donation: "donations.record",
 	create_photo_upload_link: "photos.upload_link",
+	list_nonprofits: "memberships.list",
 } as const satisfies Record<string, ActionName>;
 
 const actionOf = (name: string): ActionName | null =>

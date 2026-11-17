@@ -138,9 +138,10 @@ export function PrivacyPage() {
 				results (for example campaigns, forms, donation records, and donor
 				names, email addresses and donation amounts) travel between your AI
 				assistant and <strong>your Better Giving account</strong>. The Connector
-				relays this data to complete the request. Tool requests and results are
-				held in memory only while a request runs. They are not written to our
-				database or logs.
+				relays this data to complete the request. When your AI assistant lists
+				your nonprofits, the names and ids of the nonprofits you are an admin of
+				travel the same way. Tool requests and results are held in memory only
+				while a request runs. They are not written to our database or logs.
 			</p>
 
 			<h3>2.3 Logs</h3>

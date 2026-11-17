@@ -125,6 +125,11 @@ export type FakeDeployment = {
 	setActions(actions: readonly string[]): void;
 	/** The name `/exchange` returns. `/hello` keeps the name from construction. */
 	setExchangeName(name: string): void;
+	/**
+	 * Platform: the nonprofits `/memberships` lists, the connected one flagged
+	 * `current` and first. Fields a row leaves out are left out of the answer.
+	 */
+	setMemberships(rows: readonly Record<string, unknown>[]): void;
 	/** What pressing Allow mints: a single-use code for `/exchange`. */
 	mintCode(): string;
 	/** Answers ahead of the deployment while set; `undefined` falls through. */
@@ -289,6 +294,9 @@ export function fakeDeployment(
 		setActions: (actions) => {
 			state.actions = new Set(actions);
 		},
+		setMemberships: (rows) => {
+			state.memberships = rows.map((row) => ({ ...row }));
+		},
 		setExchangeName: (name) => {
 			state.exchangeName = name;
 		},
@@ -403,6 +411,32 @@ function newState(host: string, name: string, platform: boolean) {
 			platform ? Object.values(PLATFORM_ACTION_OF) : ALL_ACTIONS,
 		),
 		keys: new Set<string>(),
+		// Platform's memberships answer: three nonprofits, the connected one first
+		memberships: [
+			{
+				id: 101,
+				name,
+				role: "admin",
+				can_manage: true,
+				current: true,
+				logo_url: null,
+			},
+			{
+				id: "102",
+				name: "Bayanihan Relief Network",
+				role: "admin",
+				can_manage: true,
+				current: false,
+				logo_url: "https://give.example.org/logos/bayanihan.png",
+			},
+			{
+				id: "103",
+				name: "harbor Food Bank",
+				role: "admin",
+				can_manage: true,
+				current: false,
+			},
+		] as Record<string, unknown>[],
 		issued: [] as string[],
 		// Allow codes not yet redeemed, with when each lapses
 		codes: new Map<string, number>(),
@@ -1531,6 +1565,16 @@ function deploymentApp(state: State) {
 			},
 		});
 	});
+	// Standalone's state serves no `memberships.list`, so there it answers
+	// 404 `unknown_action` as any action the release lacks.
+	v1.get("/memberships", action("memberships.list"), (c) => {
+		// Platform takes no query parameter: one answers 422
+		if ([...new URL(c.req.url).searchParams].length > 0) {
+			return problem(c, 422, "invalid_request", "This action takes no query.");
+		}
+		return c.json({ data: state.memberships, next_cursor: null });
+	});
+
 	v1.get("/recurring", action("recurring.list"), (c) =>
 		page(c, state.recurring),
 	);

@@ -23,6 +23,8 @@ import {
 	Unreachable,
 } from "./index";
 
+type StandaloneAction = Exclude<ActionName, "memberships.list">;
+
 afterEach(() => {
 	vi.useRealTimers();
 });
@@ -953,7 +955,8 @@ test("every action the fake deployment lists answers through call", async () => 
 	const { donor_id } = (await client.call(conn, "donations.record", gift))
 		.body as { donor_id: string };
 	const blocks = [{ type: "text", body: "Warm hands." }];
-	const inputs: Record<ActionName, Record<string, unknown>> = {
+	// Standalone's actions: memberships.list is Platform's, tested below
+	const inputs: Record<StandaloneAction, Record<string, unknown>> = {
 		"campaigns.list": { status: "draft" },
 		"campaigns.get": { id },
 		"campaigns.create": { title: "Second" },
@@ -987,7 +990,7 @@ test("every action the fake deployment lists answers through call", async () => 
 
 	const project = { id: expect.any(String), title: "Coats", status: "draft" };
 	const url = (path: string) => `https://give.example.org${path}`;
-	const answers: Record<ActionName, unknown> = {
+	const answers: Record<StandaloneAction, unknown> = {
 		"campaigns.list": {
 			data: [{ ...project, id }],
 			next_cursor: null,

@@ -72,7 +72,11 @@ const readTools = (platform: boolean) =>
 const expected = (platform: boolean) =>
 	platform
 		? [...PLATFORM_TOOLS].sort()
-		: [...actionsFor(false), ...LOCAL_TOOLS.filter((s) => !s.platformOnly)]
+		: [
+				// list_nonprofits is Platform's: Standalone's hello never lists it
+				...actionsFor(false).filter((s) => s.action !== "memberships.list"),
+				...LOCAL_TOOLS.filter((s) => !s.platformOnly),
+			]
 				.map((s) => s.tool)
 				.sort();
 

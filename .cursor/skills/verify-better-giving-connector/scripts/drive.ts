@@ -286,6 +286,7 @@ function remoteFake(dir: string, origin: string): FakeDeployment {
 		refuseKeys() {},
 		setRelease() {},
 		setActions() {},
+		setMemberships() {},
 		setExchangeName() {},
 		mintCode() {
 			return "";
