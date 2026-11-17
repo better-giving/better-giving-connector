@@ -65,10 +65,34 @@ describe("isAllowedImage logo hosts", () => {
 	});
 });
 
+describe("isAllowedImage scheme", () => {
+	it("refuses http even on a wildcard host whose suffix matches", () => {
+		expect(
+			isAllowedImage("http://x.public.blob.vercel-storage.com/a.png", ORIGINS),
+		).toBe(false);
+		expect(
+			isAllowedImage("https://x.public.blob.vercel-storage.com/a.png", ORIGINS),
+		).toBe(true);
+	});
+});
+
 describe("ImageWithPlaceholder", () => {
 	const img = (root: HTMLElement) => root.querySelector("img");
 	const placeholder = (root: HTMLElement) =>
 		root.querySelector('.image-placeholder[role="img"]');
+
+	it("draws an image on each logo host, with that src", () => {
+		for (const src of [
+			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
+			"https://res.cloudinary.com/demo/image/upload/a.jpg",
+		]) {
+			const root = mount(
+				<ImageWithPlaceholder src={src} alt="Logo" origins={ORIGINS} />,
+			);
+			expect(img(root)?.getAttribute("src"), src).toBe(src);
+			expect(placeholder(root), src).toBeNull();
+		}
+	});
 
 	it("shows an allowed image with its alt text", () => {
 		const root = mount(

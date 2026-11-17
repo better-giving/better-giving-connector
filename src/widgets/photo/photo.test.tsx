@@ -223,6 +223,49 @@ describe("photo card", () => {
 			);
 		});
 
+		it("draws a logo on an allowed host as the avatar, for the connected nonprofit and the others", async () => {
+			const connected = "https://res.cloudinary.com/demo/image/upload/harbor.jpg";
+			const other = "https://endow-profiles.s3.amazonaws.com/logos/bayanihan.png";
+			const { root } = await show(PHOTO, HARBOR, [
+				row(1, {
+					name: "Harbor Food Bank",
+					current: true,
+					logo_url: connected,
+				}),
+				row(2, { name: "Bayanihan Relief Network", logo_url: other }),
+			]);
+			await vi.waitFor(() =>
+				expect(root.querySelectorAll(".account-row").length).toBe(3),
+			);
+			const rows = [...root.querySelectorAll(".account-row")];
+			const logo = (r: Element | undefined) =>
+				r?.querySelector("img.avatar-logo");
+			expect(logo(rows[0])?.getAttribute("src")).toBe(connected);
+			expect(logo(rows[1])?.getAttribute("src")).toBe(other);
+			expect(rows[0]?.querySelector("span.avatar")).toBeNull();
+		});
+
+		it("keeps the initials when a nonprofit's logo is on a host the widget may not load", async () => {
+			const { root } = await show(PHOTO, HARBOR, [
+				row(1, {
+					name: "Harbor Food Bank",
+					current: true,
+					logo_url: "https://evil.example.com/harbor.png",
+				}),
+				row(2, {
+					name: "Bayanihan Relief Network",
+					logo_url: "http://res.cloudinary.com/demo/image/upload/b.jpg",
+				}),
+			]);
+			await vi.waitFor(() =>
+				expect(root.querySelectorAll(".account-row").length).toBe(3),
+			);
+			expect(root.querySelector("img.avatar-logo")).toBeNull();
+			expect(
+				[...root.querySelectorAll("span.avatar")].map((a) => a.textContent),
+			).toEqual(["HF", "BR"]);
+		});
+
 		it("labels a nonprofit the person can't manage View-only", async () => {
 			const { root } = await show(PHOTO, HARBOR, [
 				row(1, { name: "Harbor Food Bank", current: true }),

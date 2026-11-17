@@ -3,7 +3,12 @@ import type { ActionName } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
 import { Secret } from "../secret";
 import type { LocalCall } from "./spec";
-import { editorData, resultsData } from "./widget-data";
+import {
+	campaignsData,
+	editorData,
+	photoData,
+	resultsData,
+} from "./widget-data";
 
 const origin = parseOrigin("https://give.example.org");
 if (!origin) throw new Error("bad origin");
@@ -173,4 +178,24 @@ test("a campaign whose gifts all fit in the read shows their median", async () =
 	const data = await resultsData(call, "cmp_1");
 
 	expect(data.medianGift).toEqual(usd("20.00"));
+});
+
+test("every widget payload that draws images carries the service's image origins, the same four its CSP allows", async () => {
+	const { call } = scripted({
+		"campaigns.list": () => ({ data: [] }),
+		"campaigns.get": () => ({ id: "cmp_1", title: "Coats", status: "draft" }),
+	});
+	const expected = [
+		"https://app.connect.better.giving",
+		"https://*.public.blob.vercel-storage.com",
+		"https://endow-profiles.s3.amazonaws.com",
+		"https://res.cloudinary.com",
+	];
+
+	for (const [name, data] of [
+		["show_campaigns", await campaignsData(call)],
+		["open_campaign_editor", await editorData(call, "cmp_1")],
+		["show_photo", await photoData(call, "cmp_1", null)],
+	] as const)
+		expect(data.imageOrigins, name).toEqual(expected);
 });
