@@ -9,15 +9,17 @@ import { Hono } from "hono";
 
 /**
  * Cloudinary is shared by every customer, so only the one account's uploaded
- * images older logos live under are fetched (not its `fetch`, which pulls any
- * URL, or its other asset types); the other bucket's host is ours alone.
+ * images, where older logos live, are fetched. That shuts out its `fetch`
+ * delivery, which pulls any URL. Transformations inside the path still run (an
+ * `l_fetch:` overlay, an `f_` format), so the type and size checks on the
+ * response bound what is served. The other bucket's host is ours alone.
  */
-const CLOUDINARY_ACCOUNT_PREFIX = "/everydotorg/image/upload/";
+const CLOUDINARY_IMAGE_UPLOAD_PREFIX = "/everydotorg/image/upload/";
 
 /** The exact hosts a logo is fetched from, each with the path prefix it is limited to. */
 const LOGO_HOSTS: ReadonlyMap<string, string> = new Map([
 	["endow-profiles.s3.amazonaws.com", "/"],
-	["res.cloudinary.com", CLOUDINARY_ACCOUNT_PREFIX],
+	["res.cloudinary.com", CLOUDINARY_IMAGE_UPLOAD_PREFIX],
 ]);
 const IMAGE_TYPES: ReadonlySet<string> = new Set([
 	"image/png",
