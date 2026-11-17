@@ -10,8 +10,10 @@ test("the contract's tool names are exactly the tools' names and actions", () =>
 	);
 });
 
-test("Standalone gets the specs as they are; Platform changes nine, and only their wording and inputs", () => {
-	expect(actionsFor(false)).toBe(ACTIONS);
+test("Standalone gets the specs as they are but Platform's list_nonprofits; Platform keeps every spec and changes nine, and only their wording and inputs", () => {
+	expect(actionsFor(false)).toEqual(
+		ACTIONS.filter((s) => s.tool !== "list_nonprofits"),
+	);
 	const platform = actionsFor(true);
 	expect(platform.map((s) => [s.tool, s.action, s.annotations])).toEqual(
 		ACTIONS.map((s) => [s.tool, s.action, s.annotations]),

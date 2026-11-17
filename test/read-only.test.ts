@@ -73,7 +73,7 @@ const expected = (platform: boolean) =>
 	platform
 		? [...PLATFORM_TOOLS].sort()
 		: [
-				// list_nonprofits is Platform's: Standalone's hello never lists it
+				// list_nonprofits is Platform's alone
 				...actionsFor(false).filter((s) => s.action !== "memberships.list"),
 				...LOCAL_TOOLS.filter((s) => !s.platformOnly),
 			]

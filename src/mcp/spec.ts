@@ -47,6 +47,8 @@ type Common = {
 	output: ToolOutput;
 	annotations: Hints;
 	_meta: ToolMeta;
+	/** Offered on Platform connections alone. */
+	platformOnly?: true;
 };
 
 /** A tool that runs one `/connector/v1` action. */
@@ -105,8 +107,6 @@ export class ToolRefusal extends Error {
 export type LocalSpec = Common & {
 	tool: LocalToolName;
 	needs: readonly ActionName[];
-	/** Offered on Platform connections alone. */
-	platformOnly?: true;
 	/** The description a Standalone connection lists, where the tool behaves otherwise there. */
 	standaloneDescription?: string;
 	checkWith?: string;

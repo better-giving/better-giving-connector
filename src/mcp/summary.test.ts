@@ -148,7 +148,7 @@ const CASES: [keyof typeof OUTPUTS, unknown, SummaryContext, string][] = [
 		"3 nonprofits, this connection is for Hope Shelter",
 	],
 	[
-		// no current row, and the current one not first: both still list
+		// the current one not first: it is still the one named
 		"list_nonprofits",
 		list([
 			{ id: "1", name: "A", current: false },
@@ -158,6 +158,7 @@ const CASES: [keyof typeof OUTPUTS, unknown, SummaryContext, string][] = [
 		"2 nonprofits, this connection is for B",
 	],
 	[
+		// no current row: the count alone
 		"list_nonprofits",
 		list([{ id: "1", name: "A", current: false, can_manage: false }]),
 		cx(),

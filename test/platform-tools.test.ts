@@ -10,7 +10,7 @@ import {
 import { BASE, env, MCP_VERSIONS, mcpRequest, rpc, warmUp } from "./harness";
 import type { Call } from "./oauth";
 import { connectFlow } from "./operator";
-import { PLATFORM_TOOLS } from "./platform-hello";
+import { PLATFORM_ACTION_OF, PLATFORM_TOOLS } from "./platform-hello";
 import { freshDb } from "./support";
 
 // The Platform writes through the connector, end to end: a chat app's tool
@@ -22,13 +22,17 @@ let call: Call;
 let bearer: string;
 let rpcId = 0;
 
-async function serve(opts: { nonprofitSlug?: boolean } = {}) {
+async function serve(
+	opts: { nonprofitSlug?: boolean; actions?: readonly string[] } = {},
+) {
+	const { actions, ...deploymentOpts } = opts;
 	db = await freshDb();
 	deployment = fakeDeployment({
 		name: "Hope Shelter",
 		platform: true,
-		...opts,
+		...deploymentOpts,
 	});
+	if (actions) deployment.setActions(actions);
 	const app = createApp({
 		env,
 		db,
@@ -966,6 +970,16 @@ describe("list_nonprofits", () => {
 		expect(refused.isError).toBe(true);
 		expect(textOf(refused)).toContain(
 			"can't do this through the connector yet",
+		);
+
+		db.close();
+		await serve({
+			actions: Object.values(PLATFORM_ACTION_OF).filter(
+				(action) => action !== "memberships.list",
+			),
+		});
+		expect((await listed()).sort()).toEqual(
+			PLATFORM_TOOLS.filter((name) => name !== "list_nonprofits").sort(),
 		);
 	});
 });

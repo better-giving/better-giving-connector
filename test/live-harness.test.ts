@@ -607,10 +607,16 @@ test("on Standalone, which does not list memberships.list, list_nonprofits is ne
 	);
 });
 
+// Platform's memberships answer: one page, so next_cursor null
+const page = (
+	rows: Record<string, unknown>[],
+	next_cursor: string | null = null,
+) => ({ data: rows, next_cursor });
+
 test.each([
 	[
 		"no row is current",
-		[
+		page([
 			{
 				id: "1",
 				name: "Hope Shelter",
@@ -618,12 +624,12 @@ test.each([
 				can_manage: true,
 				current: false,
 			},
-		],
+		]),
 		"did not flag exactly one current row",
 	],
 	[
 		"the current row is not the connected nonprofit",
-		[
+		page([
 			{
 				id: "1",
 				name: "Elsewhere",
@@ -631,12 +637,12 @@ test.each([
 				can_manage: true,
 				current: true,
 			},
-		],
+		]),
 		"current row is not the connected one",
 	],
 	[
 		"a row's can_manage is not a boolean",
-		[
+		page([
 			{
 				id: "1",
 				name: "Hope Shelter",
@@ -644,17 +650,52 @@ test.each([
 				can_manage: "yes",
 				current: true,
 			},
-		],
+		]),
 		"a row of the wrong shape",
 	],
-])("on Platform the harness fails when %s", async (_, rows, message) => {
+	[
+		"a row's logo_url is neither a string nor null",
+		page([
+			{
+				id: "1",
+				name: "Hope Shelter",
+				role: "admin",
+				can_manage: true,
+				current: true,
+				logo_url: 5,
+			},
+		]),
+		"a row of the wrong shape",
+	],
+	[
+		"next_cursor is not null",
+		page(
+			[
+				{
+					id: "1",
+					name: "Hope Shelter",
+					role: "admin",
+					can_manage: true,
+					current: true,
+				},
+			],
+			"page_2",
+		),
+		"returned a next_cursor, expected null",
+	],
+])("on Platform the harness fails when %s", async (_, answer, message) => {
 	const dep = fakeDeployment({
 		name: "Hope Shelter",
 		platform: true,
 		defaultForm: false,
 	});
 	dep.setActions(PLATFORM_SERVES);
-	dep.setMemberships(rows);
+	dep.intercept((req) =>
+		req.headers.get("authorization") !== null &&
+		new URL(req.url).pathname.endsWith("/memberships")
+			? Response.json(answer)
+			: undefined,
+	);
 	const dir = mkdtempSync(join(tmpdir(), "live-results-"));
 
 	await expect(
