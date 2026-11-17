@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { expect, test, vi } from "vitest";
 import { isLogoUrl, logoPath, logoRoutes } from "./logo";
 
@@ -9,9 +10,9 @@ const PNG = new Uint8Array([137, 80, 78, 71]);
 const image = (type = "image/png", headers: Record<string, string> = {}) =>
 	new Response(PNG, { headers: { "content-type": type, ...headers } });
 
-function serve(upstream: () => Promise<Response> | Response) {
-	const fetcher = vi.fn(async (_url: unknown, _init?: RequestInit) =>
-		upstream(),
+function serve(upstream: (init?: RequestInit) => Promise<Response> | Response) {
+	const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) =>
+		upstream(init),
 	);
 	const app = logoRoutes({ secret: SECRET, fetch: fetcher as typeof fetch });
 	return { fetcher, get: (path: string) => app.request(path) };
@@ -60,15 +61,26 @@ test("every image type but SVG is passed on, with its parameters dropped", async
 	}
 });
 
+const refusedPaths = [
+	"/everydotorg/../other/a.png",
+	"/everydotorg%2f..%2fother/a.png",
+	"/everydotorg.evil/a.png",
+	"/EveryDotOrg/a.png",
+	"/other/a.png",
+	"/everydotorg",
+];
+
+/** A ref with a valid signature over any URL, made as src/logo.ts signs: HMAC-SHA256 of the base64url payload. */
+const signedRef = (url: string) => {
+	const payload = Buffer.from(url).toString("base64url");
+	const signature = createHmac("sha256", SECRET)
+		.update(payload)
+		.digest("base64url");
+	return `/logo/${payload}.${signature}`;
+};
+
 test("Cloudinary is limited to the /everydotorg/ account path, parsed as a browser would", async () => {
-	for (const path of [
-		"/everydotorg/../other/a.png",
-		"/everydotorg%2f..%2fother/a.png",
-		"/everydotorg.evil/a.png",
-		"/EveryDotOrg/a.png",
-		"/other/a.png",
-		"/everydotorg",
-	]) {
+	for (const path of refusedPaths) {
 		const url = `https://res.cloudinary.com${path}`;
 		expect(isLogoUrl(url), url).toBe(false);
 		expect(logoPath(SECRET, url), url).toBeNull();
@@ -81,12 +93,16 @@ test("Cloudinary is limited to the /everydotorg/ account path, parsed as a brows
 
 	// a ref signed before the limit, over a URL outside it, is refused when served
 	const { fetcher, get } = serve(() => image());
-	const stale = Buffer.from("https://res.cloudinary.com/other/a.png").toString(
-		"base64url",
-	);
-	const [, signature] = refOf(CLOUDINARY).slice("/logo/".length).split(".");
-	expect((await get(`/logo/${stale}.${signature}`)).status).toBe(404);
+	for (const path of refusedPaths) {
+		const url = `https://res.cloudinary.com${path}`;
+		expect((await get(signedRef(url))).status, url).toBe(404);
+	}
 	expect(fetcher).not.toHaveBeenCalled();
+
+	// the same forging on a URL inside the limit is served, so the 404s above
+	// come from the URL check and not from a signature this test got wrong
+	expect((await get(signedRef(CLOUDINARY))).status).toBe(200);
+	expect(fetcher.mock.calls[0]?.[0]).toBe(CLOUDINARY);
 });
 
 test("a URL that is not an exact https logo host gets no ref", () => {
@@ -234,28 +250,74 @@ test("a body that fails partway through, for a reason other than the time limit,
 	expect(await res.json()).toEqual({ error: "logo_unavailable" });
 });
 
-test("a fetch that outlasts the time limit answers 504", async () => {
-	const res = await serve(() => {
-		throw new DOMException("timed out", "TimeoutError");
-	}).get(refOf(S3));
+const TIME_LIMIT_MS = 5000;
+
+/**
+ * Serves one logo on a fake clock and reports whether it had answered one
+ * millisecond before the limit. `AbortSignal.timeout` runs on the platform's
+ * own timer, so it is replaced by one that fires from the fake `setTimeout`
+ * with the same `TimeoutError` reason; the upstream reacts to that signal.
+ */
+async function serveOnFakeClock(
+	upstream: (signal: AbortSignal) => Promise<Response> | Response,
+) {
+	vi.useFakeTimers({ toFake: ["setTimeout"] });
+	vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+		const controller = new AbortController();
+		setTimeout(
+			() => controller.abort(new DOMException("timed out", "TimeoutError")),
+			ms,
+		);
+		return controller.signal;
+	});
+	try {
+		const { get } = serve((init) => upstream(init?.signal as AbortSignal));
+		let answered = false;
+		const pending = Promise.resolve(get(refOf(S3)));
+		const watched = pending.then(() => {
+			answered = true;
+		});
+		await vi.advanceTimersByTimeAsync(TIME_LIMIT_MS - 1);
+		const answeredEarly = answered;
+		await vi.advanceTimersByTimeAsync(1);
+		await watched;
+		return { answeredEarly, res: await pending };
+	} finally {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	}
+}
+
+test("a fetch still pending at 5 seconds answers 504, and not before", async () => {
+	const { answeredEarly, res } = await serveOnFakeClock(
+		(signal) =>
+			new Promise<Response>((_, reject) =>
+				signal.addEventListener("abort", () => reject(signal.reason)),
+			),
+	);
+
+	expect(answeredEarly).toBe(false);
 	expect(res.status).toBe(504);
+	expect(await res.json()).toEqual({ error: "logo_timeout" });
 });
 
-test("a time limit that runs out partway through the body answers 504", async () => {
-	let pulls = 0;
-	const body = new ReadableStream<Uint8Array>({
-		pull(controller) {
-			pulls += 1;
-			if (pulls === 1) controller.enqueue(PNG);
-			else controller.error(new DOMException("timed out", "TimeoutError"));
-		},
-	});
+test("a body still streaming at 5 seconds answers 504, and not before", async () => {
+	const { answeredEarly, res } = await serveOnFakeClock(
+		(signal) =>
+			new Response(
+				new ReadableStream<Uint8Array>({
+					start(controller) {
+						controller.enqueue(PNG);
+						signal.addEventListener("abort", () =>
+							controller.error(signal.reason),
+						);
+					},
+				}),
+				{ headers: { "content-type": "image/png" } },
+			),
+	);
 
-	const res = await serve(
-		() => new Response(body, { headers: { "content-type": "image/png" } }),
-	).get(refOf(S3));
-
-	expect(pulls).toBe(2);
+	expect(answeredEarly).toBe(false);
 	expect(res.status).toBe(504);
 	expect(await res.json()).toEqual({ error: "logo_timeout" });
 });
