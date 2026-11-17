@@ -33,7 +33,9 @@ test("a ref for each logo host fetches that URL and returns the image with its h
 		expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG);
 		expect(res.headers.get("content-type")).toBe("image/png");
 		expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-		expect(res.headers.get("cache-control")).toBe("public, max-age=21600");
+		expect(res.headers.get("cache-control")).toBe(
+			"public, max-age=21600, s-maxage=21600, stale-while-revalidate=86400",
+		);
 		expect(fetcher).toHaveBeenCalledTimes(1);
 		const [fetched, init] = fetcher.mock.calls[0] ?? [];
 		expect(fetched).toBe(url);
@@ -145,4 +147,23 @@ test("a fetch that outlasts the time limit answers 504", async () => {
 		throw new DOMException("timed out", "TimeoutError");
 	}).get(refOf(S3));
 	expect(res.status).toBe(504);
+});
+
+test("a time limit that runs out partway through the body answers 504", async () => {
+	let pulls = 0;
+	const body = new ReadableStream<Uint8Array>({
+		pull(controller) {
+			pulls += 1;
+			if (pulls === 1) controller.enqueue(PNG);
+			else controller.error(new DOMException("timed out", "TimeoutError"));
+		},
+	});
+
+	const res = await serve(
+		() => new Response(body, { headers: { "content-type": "image/png" } }),
+	).get(refOf(S3));
+
+	expect(pulls).toBe(2);
+	expect(res.status).toBe(504);
+	expect(await res.json()).toEqual({ error: "logo_timeout" });
 });

@@ -22,6 +22,8 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 5000;
 /** Six hours: a logo changes rarely, and a card draws it on every open. */
 const CACHE_SECONDS = 6 * 60 * 60;
+/** A day: a stale logo beats initials while the edge refetches it. */
+const STALE_SECONDS = 24 * 60 * 60;
 
 /** `url` is https on a logo host, with no userinfo and no port. */
 export function isLogoUrl(url: string): boolean {
@@ -71,6 +73,12 @@ const refused = (status: 404 | 502 | 504, error: string) =>
 		},
 	});
 
+/** The fetch's timeout signal errors the body stream too, so both phases map here. */
+const fetchFailed = (error: unknown) =>
+	error instanceof Error && error.name === "TimeoutError"
+		? refused(504, "logo_timeout")
+		: refused(502, "logo_unavailable");
+
 /** Reads at most MAX_BYTES; null when the body is longer. */
 async function readCapped(body: ReadableStream<Uint8Array>) {
 	const chunks: Uint8Array[] = [];
@@ -80,7 +88,13 @@ async function readCapped(body: ReadableStream<Uint8Array>) {
 		if (size > MAX_BYTES) return null;
 		chunks.push(chunk);
 	}
-	return Buffer.concat(chunks);
+	const bytes = new Uint8Array(size);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return bytes;
 }
 
 export function logoRoutes(deps: {
@@ -100,10 +114,7 @@ export function logoRoutes(deps: {
 				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 			});
 		} catch (error) {
-			const timedOut = error instanceof Error && error.name === "TimeoutError";
-			return timedOut
-				? refused(504, "logo_timeout")
-				: refused(502, "logo_unavailable");
+			return fetchFailed(error);
 		}
 		const type = upstream.headers
 			.get("content-type")
@@ -121,18 +132,20 @@ export function logoRoutes(deps: {
 			await upstream.body?.cancel().catch(() => undefined);
 			return refused(502, "logo_unavailable");
 		}
-		let bytes: Buffer | null;
+		let bytes: Uint8Array<ArrayBuffer> | null;
 		try {
 			bytes = await readCapped(upstream.body);
-		} catch {
-			return refused(502, "logo_unavailable");
+		} catch (error) {
+			return fetchFailed(error);
 		}
 		if (!bytes) return refused(502, "logo_unavailable");
-		return new Response(new Uint8Array(bytes), {
+		return new Response(bytes, {
 			headers: {
 				"content-type": type,
 				"x-content-type-options": "nosniff",
-				"cache-control": `public, max-age=${CACHE_SECONDS}`,
+				// Vercel's CDN caches a function response only with s-maxage. Not
+				// immutable: a ref names a URL, and the image behind it can change.
+				"cache-control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${STALE_SECONDS}`,
 				"content-security-policy": "default-src 'none'",
 			},
 		});
