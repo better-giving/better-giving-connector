@@ -144,7 +144,7 @@
 	color: var(--primary-fg);
 }
 
-/* The donor page: the registry's Red Hat, 4px corners, light whatever the host's theme. */
+/* The donor page: 4px corners, light whatever the host's theme; its Red Hat faces are inherited from the widget's own. */
 .preview-scroll {
 	flex: 1;
 	overflow: auto;
