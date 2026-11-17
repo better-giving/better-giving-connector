@@ -7,6 +7,8 @@ import { ImageWithPlaceholder, isAllowedImage } from "./image";
 const ORIGINS = [
 	"https://app.connect.better.giving",
 	"https://*.public.blob.vercel-storage.com",
+	"https://endow-profiles.s3.amazonaws.com",
+	"https://res.cloudinary.com",
 ];
 
 describe("isAllowedImage", () => {
@@ -33,6 +35,33 @@ describe("isAllowedImage", () => {
 		]) {
 			expect(isAllowedImage(url, ORIGINS), url).toBe(false);
 		}
+	});
+});
+
+describe("isAllowedImage logo hosts", () => {
+	it("takes the two exact logo hosts", () => {
+		for (const url of [
+			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
+			"https://res.cloudinary.com/demo/image/upload/a.jpg",
+		])
+			expect(isAllowedImage(url, ORIGINS), url).toBe(true);
+	});
+
+	it("refuses look-alikes, other subdomains, http, userinfo tricks and a value with no scheme", () => {
+		for (const url of [
+			"https://endow-profiles.s3.amazonaws.com.evil.io/a.png",
+			"https://evil.res.cloudinary.com/a.png",
+			"https://other.s3.amazonaws.com/a.png",
+			"https://s3.amazonaws.com/a.png",
+			"http://endow-profiles.s3.amazonaws.com/a.png",
+			"http://res.cloudinary.com/a.png",
+			"https://endow-profiles.s3.amazonaws.com@evil.io/a.png",
+			"https://res.cloudinary.com:8443/a.png",
+			"endow-profiles.s3.amazonaws.com/a.png",
+			"res.cloudinary.com/a.png",
+			"//res.cloudinary.com/a.png",
+		])
+			expect(isAllowedImage(url, ORIGINS), url).toBe(false);
 	});
 });
 

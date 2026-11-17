@@ -859,7 +859,12 @@ test("only Claude's editor resource asks for the side panel, and no other widget
 
 	expect(await read(CLAUDE, editorUri)).toEqual({
 		csp: {
-			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
+			resourceDomains: [
+				ORIGIN,
+				"https://*.public.blob.vercel-storage.com",
+				"https://endow-profiles.s3.amazonaws.com",
+				"https://res.cloudinary.com",
+			],
 			connectDomains: [],
 		},
 		domain: CLAUDE_DOMAIN,
@@ -868,7 +873,12 @@ test("only Claude's editor resource asks for the side panel, and no other widget
 	});
 	expect(await read(CHATGPT, editorUri)).toEqual({
 		csp: {
-			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
+			resourceDomains: [
+				ORIGIN,
+				"https://*.public.blob.vercel-storage.com",
+				"https://endow-profiles.s3.amazonaws.com",
+				"https://res.cloudinary.com",
+			],
 			connectDomains: [],
 		},
 		domain: ORIGIN,

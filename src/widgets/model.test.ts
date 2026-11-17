@@ -24,7 +24,11 @@ const card = (id: string) => ({
 
 const campaigns = (n: number) => ({
 	currency: "USD",
-	imageOrigins: ["https://*.public.blob.vercel-storage.com"],
+	imageOrigins: [
+		"https://*.public.blob.vercel-storage.com",
+		"https://endow-profiles.s3.amazonaws.com",
+		"https://res.cloudinary.com",
+	],
 	campaigns: Array.from({ length: n }, (_, i) => card(`c${i}`)),
 });
 

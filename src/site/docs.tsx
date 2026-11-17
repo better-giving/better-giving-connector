@@ -398,8 +398,9 @@ export function DocsPage() {
 				campaign, your campaigns with progress, a campaign's results, an editor
 				with a live preview of the donor page, and a photo card. The cards are
 				served from <code>https://app.connect.better.giving</code> and load
-				images only from there and from Better Giving's photo storage. They
-				reach your account only through the tools above, and publishing or
+				images only from there, from Better Giving's photo storage, and from the
+				two hosts older nonprofit logos are kept on (Amazon S3 and Cloudinary).
+				They reach your account only through the tools above, and publishing or
 				ending a campaign from a card asks you to confirm first.
 			</p>
 

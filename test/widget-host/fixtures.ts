@@ -33,6 +33,8 @@ export type Fixture = {
 export const IMAGE_ORIGINS = [
 	"https://app.connect.better.giving",
 	"https://*.public.blob.vercel-storage.com",
+	"https://endow-profiles.s3.amazonaws.com",
+	"https://res.cloudinary.com",
 ];
 
 /** An image the screenshot host serves (any path under this origin draws a photo stand-in). */
