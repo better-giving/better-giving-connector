@@ -22,21 +22,11 @@ import type { LocalCall } from "./spec";
 const DAY_MS = 86_400_000;
 const DEFAULT_CURRENCY = "USD";
 
+/** Where a widget's `<img>` may load from: this service, and Vercel Blob. */
 export const blobOrigin = "https://*.public.blob.vercel-storage.com";
-/** The two exact hosts older nonprofits' logos live on. */
-export const logoHostOrigins = [
-	"https://endow-profiles.s3.amazonaws.com",
-	"https://res.cloudinary.com",
-];
-/**
- * Where a widget's images may load from (`isAllowedImage`): this service, Vercel
- * Blob, and the logo hosts. Also the widget CSP's resourceDomains, which the MCP
- * Apps spec applies to scripts, stylesheets, fonts and media as well as images.
- */
 export const imageOrigins = (call: Pick<LocalCall, "publicOrigin">) => [
 	call.publicOrigin,
 	blobOrigin,
-	...logoHostOrigins,
 ];
 
 const str = (value: unknown): string | null =>

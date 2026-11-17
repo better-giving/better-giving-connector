@@ -26,12 +26,7 @@ test("a widget resource is an MCP App with its asset origins, no connect domains
 	expect(WIDGET_MIME).toBe("text/html;profile=mcp-app");
 	expect(widgetMeta(ORIGIN, "abc.claudemcpcontent.com").ui).toMatchObject({
 		csp: {
-			resourceDomains: [
-				ORIGIN,
-				"https://*.public.blob.vercel-storage.com",
-				"https://endow-profiles.s3.amazonaws.com",
-				"https://res.cloudinary.com",
-			],
+			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
 			connectDomains: [],
 		},
 		domain: "abc.claudemcpcontent.com",

@@ -530,12 +530,9 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			const read = raw.result.contents[0];
 			expect(read.mimeType).toBe("text/html;profile=mcp-app");
 			expect(read.text).toContain("<script");
-			expect(read._meta.ui.csp.resourceDomains).toEqual([
-				expect.stringMatching(/^https?:\/\//),
+			expect(read._meta.ui.csp.resourceDomains).toContain(
 				"https://*.public.blob.vercel-storage.com",
-				"https://endow-profiles.s3.amazonaws.com",
-				"https://res.cloudinary.com",
-			]);
+			);
 			expect(read._meta.ui.csp.connectDomains).toEqual([]);
 			expect(read._meta.ui.domain).toMatch(/^https?:\/\//);
 		}

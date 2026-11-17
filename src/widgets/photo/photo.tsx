@@ -79,9 +79,9 @@ function Account(props: { origins: readonly string[] }) {
 			if (!listed.ok) return;
 			const current = listed.data.data.find((n) => n.current);
 			const rest = listed.data.data.filter((n) => !n.current);
-			if (!current || rest.length === 0) return;
+			if (!current) return;
 			setLogo(current.logo_url ?? null);
-			setOthers(rest);
+			if (rest.length > 0) setOthers(rest);
 		})();
 	}, [host]);
 	const shown = others.slice(0, MAX_LISTED - 1);

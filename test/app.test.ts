@@ -214,3 +214,10 @@ test("a thrown error logs one line naming only the error", async () => {
 		[JSON.stringify({ kind: "error", where: "app", errorName: "StoreDown" })],
 	]);
 });
+
+test("serves the logo route: a ref it did not sign is a 404 with no fetch", async () => {
+	const res = await call(new Request(`${BASE}/logo/garbage`));
+
+	expect(res.status).toBe(404);
+	expect(await res.json()).toEqual({ error: "not_found" });
+});

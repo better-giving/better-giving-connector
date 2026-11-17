@@ -7,8 +7,6 @@ import { ImageWithPlaceholder, isAllowedImage } from "./image";
 const ORIGINS = [
 	"https://app.connect.better.giving",
 	"https://*.public.blob.vercel-storage.com",
-	"https://endow-profiles.s3.amazonaws.com",
-	"https://res.cloudinary.com",
 ];
 
 describe("isAllowedImage", () => {
@@ -38,33 +36,6 @@ describe("isAllowedImage", () => {
 	});
 });
 
-describe("isAllowedImage logo hosts", () => {
-	it("takes the two exact logo hosts", () => {
-		for (const url of [
-			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
-			"https://res.cloudinary.com/demo/image/upload/a.jpg",
-		])
-			expect(isAllowedImage(url, ORIGINS), url).toBe(true);
-	});
-
-	it("refuses look-alikes, other subdomains, http, userinfo tricks and a value with no scheme", () => {
-		for (const url of [
-			"https://endow-profiles.s3.amazonaws.com.evil.io/a.png",
-			"https://evil.res.cloudinary.com/a.png",
-			"https://other.s3.amazonaws.com/a.png",
-			"https://s3.amazonaws.com/a.png",
-			"http://endow-profiles.s3.amazonaws.com/a.png",
-			"http://res.cloudinary.com/a.png",
-			"https://endow-profiles.s3.amazonaws.com@evil.io/a.png",
-			"https://res.cloudinary.com:8443/a.png",
-			"endow-profiles.s3.amazonaws.com/a.png",
-			"res.cloudinary.com/a.png",
-			"//res.cloudinary.com/a.png",
-		])
-			expect(isAllowedImage(url, ORIGINS), url).toBe(false);
-	});
-});
-
 describe("isAllowedImage scheme", () => {
 	it("refuses http even on a wildcard host whose suffix matches", () => {
 		expect(
@@ -74,25 +45,21 @@ describe("isAllowedImage scheme", () => {
 			isAllowedImage("https://x.public.blob.vercel-storage.com/a.png", ORIGINS),
 		).toBe(true);
 	});
+
+	it("refuses a third-party logo host and a value with no scheme", () => {
+		for (const url of [
+			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
+			"https://res.cloudinary.com/demo/image/upload/a.jpg",
+			"endow-profiles.s3.amazonaws.com/a.png",
+		])
+			expect(isAllowedImage(url, ORIGINS), url).toBe(false);
+	});
 });
 
 describe("ImageWithPlaceholder", () => {
 	const img = (root: HTMLElement) => root.querySelector("img");
 	const placeholder = (root: HTMLElement) =>
 		root.querySelector('.image-placeholder[role="img"]');
-
-	it("draws an image on each logo host, with that src", () => {
-		for (const src of [
-			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
-			"https://res.cloudinary.com/demo/image/upload/a.jpg",
-		]) {
-			const root = mount(
-				<ImageWithPlaceholder src={src} alt="Logo" origins={ORIGINS} />,
-			);
-			expect(img(root)?.getAttribute("src"), src).toBe(src);
-			expect(placeholder(root), src).toBeNull();
-		}
-	});
 
 	it("shows an allowed image with its alt text", () => {
 		const root = mount(

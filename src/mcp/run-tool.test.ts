@@ -39,6 +39,7 @@ const answering = (answer: CallAnswer | Error) => ({
 	},
 	drafts: memoryDrafts(),
 	publicOrigin: "https://app.connect.better.giving",
+	logoSecret: "test-logo-secret",
 	fetch,
 	dropConnection: async () => {},
 });
@@ -210,6 +211,7 @@ test("get_profile answers with the connection's user id and org name, as structu
 			client: { call },
 			drafts: memoryDrafts(),
 			publicOrigin: "https://app.connect.better.giving",
+			logoSecret: "test-logo-secret",
 			fetch,
 			dropConnection: async () => {},
 		},
@@ -306,4 +308,39 @@ test("a refusal with nothing to word says the site refused, and a model tool sti
 		{ type: "text", text: "Give's Better Giving refused this request." },
 	]);
 	expect(forModel).toEqual([{ type: "text", text: '{"code":"forbidden"}' }]);
+});
+
+test("list_nonprofits draws a logo on a logo host from this service's /logo route, and leaves every other logo as it came", async () => {
+	const row = (id: string, logo_url?: string | null) => ({
+		id,
+		name: `Nonprofit ${id}`,
+		current: id === "1",
+		...(logo_url === undefined ? {} : { logo_url }),
+	});
+	const rows = [
+		row("1", "https://endow-profiles.s3.amazonaws.com/a.png"),
+		row("2", "https://res.cloudinary.com/demo/b.jpg"),
+		row("3", "https://x1.public.blob.vercel-storage.com/c.png"),
+		row("4", "https://endow-profiles.s3.amazonaws.com.evil.io/d.png"),
+		row("5", "http://res.cloudinary.com/e.png"),
+		row("6", "res.cloudinary.com/f.png"),
+		row("7", null),
+		row("8"),
+	];
+
+	const result = await runTool(
+		specOf("list_nonprofits"),
+		connection(),
+		{},
+		answering({ status: 200, body: { data: rows, next_cursor: null } }),
+		"en-US",
+	);
+
+	const data = (
+		result.structuredContent as { data: { logo_url?: string | null }[] }
+	).data;
+	const own = "https://app.connect.better.giving/logo/";
+	expect(data[0]?.logo_url?.startsWith(own)).toBe(true);
+	expect(data[1]?.logo_url?.startsWith(own)).toBe(true);
+	expect(data.slice(2)).toEqual(rows.slice(2));
 });

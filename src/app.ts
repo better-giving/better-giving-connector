@@ -9,6 +9,7 @@ import { deploymentClient } from "./deployment";
 import type { Origin } from "./deployment/origin";
 import type { Env } from "./env";
 import { log } from "./log";
+import { logoRoutes } from "./logo";
 import { mcpRoute } from "./mcp";
 import { fontRoutes } from "./pages/fonts";
 import { siteRoutes } from "./site";
@@ -61,6 +62,12 @@ export function createApp(deps: AppDeps): Hono {
 			secret: deps.env.CRON_SECRET,
 		}),
 	);
+	// Signs the refs the cards draw logos from; the logo route fetches only a
+	// URL a ref signed here names.
+	const logoSecret = createHmac("sha256", deps.env.BETTER_AUTH_SECRET)
+		.update("logo reference")
+		.digest("base64url");
+	app.route("/", logoRoutes({ secret: logoSecret, fetch: deps.fetch }));
 	app.route("/", fontRoutes());
 	app.route("/", siteRoutes({ challenge: deps.env.OPENAI_APPS_CHALLENGE }));
 	app.route(
@@ -71,6 +78,7 @@ export function createApp(deps: AppDeps): Hono {
 			client,
 			drafts,
 			fetch: deps.fetch,
+			logoSecret,
 			resource: new URL("/mcp", deps.env.PUBLIC_URL),
 		}),
 	);

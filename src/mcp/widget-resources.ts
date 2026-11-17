@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { WIDGETS } from "../widgets/html";
-import { imageOrigins } from "./widget-data";
+import { blobOrigin } from "./widget-data";
 
 /** The MIME type MCP Apps hosts render as a widget. */
 export const WIDGET_MIME = "text/html;profile=mcp-app";
@@ -8,12 +8,9 @@ export const WIDGET_MIME = "text/html;profile=mcp-app";
 /** What a widget's resource tells the host about the sandbox it runs in. */
 export const widgetMeta = (publicOrigin: string, domain: string) => ({
 	ui: {
-		// Images and assets only from the image origins; a widget reaches data
-		// through tool calls alone, so there are no connect domains.
-		csp: {
-			resourceDomains: imageOrigins({ publicOrigin }),
-			connectDomains: [],
-		},
+		// Images and assets only from this service and Vercel Blob; a widget reaches
+		// data through tool calls alone, so there are no connect domains.
+		csp: { resourceDomains: [publicOrigin, blobOrigin], connectDomains: [] },
 		domain,
 		prefersBorder: true,
 	},

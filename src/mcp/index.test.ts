@@ -73,6 +73,7 @@ beforeEach(async () => {
 		drafts: memoryDrafts(),
 		client,
 		fetch,
+		logoSecret: "test-logo-secret",
 		resource: new URL("https://connect.example/mcp"),
 	});
 	return () => db.close();
@@ -550,6 +551,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 			},
 		},
 		fetch,
+		logoSecret: "test-logo-secret",
 		resource: new URL("https://connect.example/mcp"),
 	});
 
@@ -859,12 +861,7 @@ test("only Claude's editor resource asks for the side panel, and no other widget
 
 	expect(await read(CLAUDE, editorUri)).toEqual({
 		csp: {
-			resourceDomains: [
-				ORIGIN,
-				"https://*.public.blob.vercel-storage.com",
-				"https://endow-profiles.s3.amazonaws.com",
-				"https://res.cloudinary.com",
-			],
+			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
 			connectDomains: [],
 		},
 		domain: CLAUDE_DOMAIN,
@@ -873,12 +870,7 @@ test("only Claude's editor resource asks for the side panel, and no other widget
 	});
 	expect(await read(CHATGPT, editorUri)).toEqual({
 		csp: {
-			resourceDomains: [
-				ORIGIN,
-				"https://*.public.blob.vercel-storage.com",
-				"https://endow-profiles.s3.amazonaws.com",
-				"https://res.cloudinary.com",
-			],
+			resourceDomains: [ORIGIN, "https://*.public.blob.vercel-storage.com"],
 			connectDomains: [],
 		},
 		domain: ORIGIN,

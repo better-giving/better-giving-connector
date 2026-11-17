@@ -223,47 +223,57 @@ describe("photo card", () => {
 			);
 		});
 
-		it("draws a logo on an allowed host as the avatar, for the connected nonprofit and the others", async () => {
-			const connected = "https://res.cloudinary.com/demo/image/upload/harbor.jpg";
-			const other = "https://endow-profiles.s3.amazonaws.com/logos/bayanihan.png";
+		it("draws a logo from this service for the connected nonprofit and the others", async () => {
+			const own = "https://app.connect.better.giving/logo/abc.def";
 			const { root } = await show(PHOTO, HARBOR, [
-				row(1, {
-					name: "Harbor Food Bank",
-					current: true,
-					logo_url: connected,
-				}),
-				row(2, { name: "Bayanihan Relief Network", logo_url: other }),
+				row(1, { name: "Harbor Food Bank", current: true, logo_url: own }),
+				row(2, { name: "Bayanihan Relief Network", logo_url: own }),
 			]);
 			await vi.waitFor(() =>
 				expect(root.querySelectorAll(".account-row").length).toBe(3),
 			);
-			const rows = [...root.querySelectorAll(".account-row")];
-			const logo = (r: Element | undefined) =>
-				r?.querySelector("img.avatar-logo");
-			expect(logo(rows[0])?.getAttribute("src")).toBe(connected);
-			expect(logo(rows[1])?.getAttribute("src")).toBe(other);
-			expect(rows[0]?.querySelector("span.avatar")).toBeNull();
+			const logos = root.querySelectorAll("img.avatar-logo");
+			expect([...logos].map((l) => l.getAttribute("src"))).toEqual([own, own]);
 		});
 
-		it("keeps the initials when a nonprofit's logo is on a host the widget may not load", async () => {
+		it("draws the connected nonprofit's logo when it is the only one", async () => {
+			const own = "https://app.connect.better.giving/logo/abc.def";
 			const { root } = await show(PHOTO, HARBOR, [
+				row(1, { name: "Harbor Food Bank", current: true, logo_url: own }),
+			]);
+			await vi.waitFor(() =>
+				expect(root.querySelector("img.avatar-logo")).not.toBeNull(),
+			);
+			expect(root.querySelector("img.avatar-logo")?.getAttribute("src")).toBe(
+				own,
+			);
+			expect(root.querySelector('button[aria-label^="Switch to"]')).toBeNull();
+		});
+
+		it("keeps the initials for a logo on a host the card may not load, a plain-http one and one with no scheme", async () => {
+			const { root, called } = await show(PHOTO, HARBOR, [
 				row(1, {
 					name: "Harbor Food Bank",
 					current: true,
-					logo_url: "https://evil.example.com/harbor.png",
+					logo_url: "https://res.cloudinary.com/demo/harbor.png",
 				}),
 				row(2, {
 					name: "Bayanihan Relief Network",
-					logo_url: "http://res.cloudinary.com/demo/image/upload/b.jpg",
+					logo_url: "http://app.connect.better.giving/logo/x.y",
+				}),
+				row(3, {
+					name: "Casa de Esperanza",
+					logo_url: "app.connect.better.giving/logo/x.y",
 				}),
 			]);
 			await vi.waitFor(() =>
-				expect(root.querySelectorAll(".account-row").length).toBe(3),
+				expect(root.querySelectorAll(".account-row").length).toBe(4),
 			);
+			expect(called.some((c) => c.name === "list_nonprofits")).toBe(true);
 			expect(root.querySelector("img.avatar-logo")).toBeNull();
 			expect(
 				[...root.querySelectorAll("span.avatar")].map((a) => a.textContent),
-			).toEqual(["HF", "BR"]);
+			).toEqual(["HF", "BR", "CD"]);
 		});
 
 		it("labels a nonprofit the person can't manage View-only", async () => {

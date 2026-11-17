@@ -35,6 +35,8 @@ export type McpDeps = {
 	client: DeploymentClient;
 	drafts: CampaignDrafts;
 	fetch: typeof fetch;
+	/** Signs the `/logo` refs a card draws a logo from. */
+	logoSecret: string;
 	/** This endpoint's own URL, the resource its tokens are issued for. */
 	resource: URL;
 };
@@ -92,6 +94,7 @@ export function mcpRoute(deps: McpDeps): Hono {
 						client: deps.client,
 						drafts: deps.drafts,
 						publicOrigin: deps.resource.origin,
+						logoSecret: deps.logoSecret,
 						fetch: deps.fetch,
 						dropConnection: deps.auth.dropConnection,
 					},

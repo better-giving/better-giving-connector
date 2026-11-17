@@ -1,0 +1,141 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { Hono } from "hono";
+
+// Older nonprofits keep their logo on one of two image hosts. A widget's CSP
+// may not name either (its resourceDomains also cover scripts and styles), so
+// the card draws `/logo/<ref>` from this origin and this route fetches the
+// image. The ref is signed by this service over a URL it read from the
+// deployment: the route never fetches a URL a caller chose.
+
+/** The exact hosts a logo is fetched from. */
+const LOGO_HOSTS: ReadonlySet<string> = new Set([
+	"endow-profiles.s3.amazonaws.com",
+	"res.cloudinary.com",
+]);
+const IMAGE_TYPES: ReadonlySet<string> = new Set([
+	"image/png",
+	"image/jpeg",
+	"image/gif",
+	"image/webp",
+]);
+const MAX_BYTES = 2 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 5000;
+/** Six hours: a logo changes rarely, and a card draws it on every open. */
+const CACHE_SECONDS = 6 * 60 * 60;
+
+/** `url` is https on a logo host, with no userinfo and no port. */
+export function isLogoUrl(url: string): boolean {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return false;
+	}
+	return (
+		parsed.protocol === "https:" &&
+		parsed.username === "" &&
+		parsed.password === "" &&
+		parsed.port === "" &&
+		LOGO_HOSTS.has(parsed.hostname)
+	);
+}
+
+const sign = (secret: string, payload: string) =>
+	createHmac("sha256", secret).update(payload).digest("base64url");
+
+/** The path a card draws a logo from, or null when `url` is not on a logo host. */
+export function logoPath(secret: string, url: string): string | null {
+	if (!isLogoUrl(url)) return null;
+	const payload = Buffer.from(url).toString("base64url");
+	return `/logo/${payload}.${sign(secret, payload)}`;
+}
+
+/** The URL a ref was signed over, or null for a ref this service didn't sign. */
+function urlOfRef(secret: string, ref: string): string | null {
+	const [payload, signature, ...extra] = ref.split(".");
+	if (!payload || !signature || extra.length > 0) return null;
+	const expected = Buffer.from(sign(secret, payload));
+	const given = Buffer.from(signature);
+	if (given.length !== expected.length || !timingSafeEqual(given, expected))
+		return null;
+	const url = Buffer.from(payload, "base64url").toString();
+	return isLogoUrl(url) ? url : null;
+}
+
+const refused = (status: 404 | 502 | 504, error: string) =>
+	new Response(JSON.stringify({ error }), {
+		status,
+		headers: {
+			"content-type": "application/json",
+			"cache-control": "no-store",
+		},
+	});
+
+/** Reads at most MAX_BYTES; null when the body is longer. */
+async function readCapped(body: ReadableStream<Uint8Array>) {
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	for await (const chunk of body) {
+		size += chunk.byteLength;
+		if (size > MAX_BYTES) return null;
+		chunks.push(chunk);
+	}
+	return Buffer.concat(chunks);
+}
+
+export function logoRoutes(deps: {
+	secret: string;
+	fetch: typeof fetch;
+}): Hono {
+	const app = new Hono();
+	app.get("/logo/:ref", async (c) => {
+		const url = urlOfRef(deps.secret, c.req.param("ref"));
+		if (!url) return refused(404, "not_found");
+		let upstream: Response;
+		try {
+			upstream = await deps.fetch(url, {
+				redirect: "manual",
+				credentials: "omit",
+				headers: { accept: [...IMAGE_TYPES].join(", ") },
+				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+			});
+		} catch (error) {
+			const timedOut = error instanceof Error && error.name === "TimeoutError";
+			return timedOut
+				? refused(504, "logo_timeout")
+				: refused(502, "logo_unavailable");
+		}
+		const type = upstream.headers
+			.get("content-type")
+			?.split(";")[0]
+			?.trim()
+			.toLowerCase();
+		const length = Number(upstream.headers.get("content-length") ?? 0);
+		if (
+			upstream.status !== 200 ||
+			!type ||
+			!IMAGE_TYPES.has(type) ||
+			length > MAX_BYTES ||
+			!upstream.body
+		) {
+			await upstream.body?.cancel().catch(() => undefined);
+			return refused(502, "logo_unavailable");
+		}
+		let bytes: Buffer | null;
+		try {
+			bytes = await readCapped(upstream.body);
+		} catch {
+			return refused(502, "logo_unavailable");
+		}
+		if (!bytes) return refused(502, "logo_unavailable");
+		return new Response(new Uint8Array(bytes), {
+			headers: {
+				"content-type": type,
+				"x-content-type-options": "nosniff",
+				"cache-control": `public, max-age=${CACHE_SECONDS}`,
+				"content-security-policy": "default-src 'none'",
+			},
+		});
+	});
+	return app;
+}

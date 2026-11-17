@@ -32,6 +32,8 @@ export type RunToolContext = {
 	drafts: CampaignDrafts;
 	/** This service's own origin: where the widgets' images may come from. */
 	publicOrigin: string;
+	/** Signs the `/logo` refs a card draws a logo from (`src/logo.ts`). */
+	logoSecret: string;
 	/** The network for the few requests that aren't `/connector/v1` calls: a photo's download and its upload. */
 	fetch: typeof fetch;
 	dropConnection(userId: string): Promise<void>;
@@ -145,7 +147,8 @@ async function settle(
 		const replayed = isKeyedAction(spec.action) && answer.status === 200;
 		const text = await answerText(spec, connection, input, answer, ctx, locale);
 		const cx = { locale, input, replayed };
-		return ok(present(spec, text, answer.body, cx));
+		const body = spec.shape?.(answer.body, ctx) ?? answer.body;
+		return ok(present(spec, text, body, cx));
 	} catch (error) {
 		// A throw out of here would reach the chat as its message, so whatever
 		// `failure` can't word (its own drop included) is answered by `unexpected`.
