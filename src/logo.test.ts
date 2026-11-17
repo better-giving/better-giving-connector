@@ -36,12 +36,19 @@ test("a ref for each logo host fetches that URL and returns the image with its h
 		expect(res.headers.get("cache-control")).toBe(
 			"public, max-age=21600, s-maxage=21600, stale-while-revalidate=86400",
 		);
+		expect(res.headers.get("content-security-policy")).toBe(
+			"default-src 'none'",
+		);
 		expect(fetcher).toHaveBeenCalledTimes(1);
 		const [fetched, init] = fetcher.mock.calls[0] ?? [];
 		expect(fetched).toBe(url);
 		expect(init?.redirect).toBe("manual");
 		expect(init?.credentials).toBe("omit");
-		expect(init?.headers).not.toHaveProperty("cookie");
+		expect(init?.signal).toBeInstanceOf(AbortSignal);
+		// exact, so a cookie or authorization header added later goes red
+		expect(init?.headers).toEqual({
+			accept: "image/png, image/jpeg, image/gif, image/webp",
+		});
 	}
 });
 
@@ -140,6 +147,58 @@ test("an image over 2 MiB is refused by its length header and by its streamed si
 		() => new Response(big, { headers: { "content-type": "image/png" } }),
 	).get(refOf(S3));
 	expect(streamed.status).toBe(502);
+});
+
+const MAX_BYTES = 2 * 1024 * 1024;
+
+/** A body that arrives as one chunk of each size. */
+const streamOf = (...sizes: number[]) =>
+	new ReadableStream<Uint8Array>({
+		start(controller) {
+			for (const size of sizes) controller.enqueue(new Uint8Array(size));
+			controller.close();
+		},
+	});
+
+const streamed = (...sizes: number[]) => () =>
+	new Response(streamOf(...sizes), { headers: { "content-type": "image/png" } });
+
+test("an image of exactly 2 MiB is served whole, streamed or declared, and one byte more is refused", async () => {
+	const whole = await serve(streamed(MAX_BYTES / 2, MAX_BYTES / 2)).get(
+		refOf(S3),
+	);
+	expect(whole.status).toBe(200);
+	expect((await whole.arrayBuffer()).byteLength).toBe(MAX_BYTES);
+
+	const declared = await serve(() =>
+		image("image/png", { "content-length": String(MAX_BYTES) }),
+	).get(refOf(S3));
+	expect(declared.status).toBe(200);
+
+	const over = await serve(streamed(MAX_BYTES / 2, MAX_BYTES / 2, 1)).get(
+		refOf(S3),
+	);
+	expect(over.status).toBe(502);
+	expect(await over.json()).toEqual({ error: "logo_unavailable" });
+});
+
+test("a body that fails partway through, for a reason other than the time limit, answers 502", async () => {
+	let pulls = 0;
+	const body = new ReadableStream<Uint8Array>({
+		pull(controller) {
+			pulls += 1;
+			if (pulls === 1) controller.enqueue(PNG);
+			else controller.error(new TypeError("terminated"));
+		},
+	});
+
+	const res = await serve(
+		() => new Response(body, { headers: { "content-type": "image/png" } }),
+	).get(refOf(S3));
+
+	expect(pulls).toBe(2);
+	expect(res.status).toBe(502);
+	expect(await res.json()).toEqual({ error: "logo_unavailable" });
 });
 
 test("a fetch that outlasts the time limit answers 504", async () => {

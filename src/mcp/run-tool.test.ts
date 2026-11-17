@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { memoryDrafts } from "../../test/memory-drafts";
 import { type CallAnswer, DeploymentRejected } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
+import { logoRoutes } from "../logo";
 import { Secret } from "../secret";
 import { ACTIONS } from "./actions";
 import { LOCAL_TOOLS } from "./local";
@@ -343,4 +344,40 @@ test("list_nonprofits draws a logo on a logo host from this service's /logo rout
 	expect(data[0]?.logo_url?.startsWith(own)).toBe(true);
 	expect(data[1]?.logo_url?.startsWith(own)).toBe(true);
 	expect(data.slice(2)).toEqual(rows.slice(2));
+});
+
+test("each row's rewritten logo leads back to that row's own logo URL", async () => {
+	const s3 = "https://endow-profiles.s3.amazonaws.com/logos/harbor.png";
+	const cloudinary = "https://res.cloudinary.com/demo/image/upload/bayanihan.jpg";
+	const rows = [
+		{ id: "1", name: "Harbor", current: true, logo_url: s3 },
+		{ id: "2", name: "Bayanihan", current: false, logo_url: cloudinary },
+	];
+
+	const result = await runTool(
+		specOf("list_nonprofits"),
+		connection(),
+		{},
+		answering({ status: 200, body: { data: rows, next_cursor: null } }),
+		"en-US",
+	);
+
+	const drawn = (result.structuredContent as { data: { logo_url: string }[] })
+		.data;
+	const fetcher = vi.fn(
+		async (_url: unknown) =>
+			new Response(new Uint8Array([137, 80, 78, 71]), {
+				headers: { "content-type": "image/png" },
+			}),
+	);
+	const logos = logoRoutes({
+		secret: "test-logo-secret",
+		fetch: fetcher as typeof fetch,
+	});
+	for (const row of drawn) {
+		const served = await logos.request(new URL(row.logo_url).pathname);
+		expect(served.status).toBe(200);
+	}
+	// one fetch per row, in row order: each ref named its own row's URL
+	expect(fetcher.mock.calls.map(([url]) => url)).toEqual([s3, cloudinary]);
 });

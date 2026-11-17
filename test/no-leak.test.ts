@@ -836,6 +836,71 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		expectCleanScenario();
 	});
 
+	// A logo on a logo host is rewritten to a /logo path whose ref carries the
+	// public logo URL and nothing of the connection; the path is a request, not a
+	// tool result, so the scan covers what the service logs and answers for it.
+	async function drawnLogo(): Promise<{ drawn: string; logoUrl: string }> {
+		world.db.close();
+		world = await startWorld(true);
+		const bearer = await world.signIn();
+		const logoUrl = `https://res.cloudinary.com/${plant("result:np-logo-host", "leak-np-logo-host-5b3c", true)}/l.png`;
+		world.dep.setMemberships([
+			{ id: "1", name: ORG, role: "admin", can_manage: true, current: true },
+			{
+				id: 8,
+				name: "Other",
+				role: "admin",
+				can_manage: true,
+				current: false,
+				logo_url: logoUrl,
+			},
+		]);
+
+		const result = await callTool(bearer, "list_nonprofits", {});
+
+		const rows = result.structuredContent?.data as { logo_url?: string }[];
+		const drawn = rows[1]?.logo_url ?? "";
+		expect(drawn.startsWith(`${BASE}/logo/`)).toBe(true);
+		expect(JSON.stringify(result)).not.toContain(logoUrl);
+		return { drawn, logoUrl };
+	}
+
+	test("a drawn logo whose upstream fails answers 502 and keeps the logo URL out of every log line and header", async () => {
+		const { drawn } = await drawnLogo();
+
+		// the fake network refuses a host that isn't a deployment, like a DNS miss
+		const res = await world.call(new Request(drawn));
+
+		expect(res.status).toBe(502);
+		expect(await res.json()).toEqual({ error: "logo_unavailable" });
+		expectCleanScenario();
+	});
+
+	test("a drawn logo that is served keeps the logo URL out of every log line and header", async () => {
+		const { drawn, logoUrl } = await drawnLogo();
+		const fetched: string[] = [];
+		const logos = createApp({
+			env,
+			db: world.db,
+			fetch: async (input) => {
+				fetched.push(String(input));
+				return new Response(new Uint8Array([137, 80, 78, 71]), {
+					headers: { "content-type": "image/png" },
+				});
+			},
+			platformOrigin: world.dep.origin,
+		});
+
+		const res = await logos.request(new Request(drawn));
+		for (const [name, value] of res.headers)
+			record("header", `${name}: ${value}`);
+		record("body", await res.clone().text());
+
+		expect(res.status).toBe(200);
+		expect(fetched).toEqual([logoUrl]);
+		expectCleanScenario();
+	});
+
 	test("get_profile answers the user id and org name alone, never the key or the site's address", async () => {
 		const bearer = await world.signIn();
 		const sent = world.dep.calls.length;
