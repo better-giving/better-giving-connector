@@ -3,7 +3,7 @@ import { isLogoUrl, logoPath, logoRoutes } from "./logo";
 
 const SECRET = "logo-test-secret";
 const S3 = "https://endow-profiles.s3.amazonaws.com/logos/a.png";
-const CLOUDINARY = "https://res.cloudinary.com/demo/image/upload/a.jpg";
+const CLOUDINARY = "https://res.cloudinary.com/everydotorg/image/upload/a.jpg";
 const PNG = new Uint8Array([137, 80, 78, 71]);
 
 const image = (type = "image/png", headers: Record<string, string> = {}) =>
@@ -58,6 +58,35 @@ test("every image type but SVG is passed on, with its parameters dropped", async
 		const res = await get(refOf(S3));
 		expect(res.headers.get("content-type")).toBe(type);
 	}
+});
+
+test("Cloudinary is limited to the /everydotorg/ account path, parsed as a browser would", async () => {
+	for (const path of [
+		"/everydotorg/../other/a.png",
+		"/everydotorg%2f..%2fother/a.png",
+		"/everydotorg.evil/a.png",
+		"/EveryDotOrg/a.png",
+		"/other/a.png",
+		"/everydotorg",
+	]) {
+		const url = `https://res.cloudinary.com${path}`;
+		expect(isLogoUrl(url), url).toBe(false);
+		expect(logoPath(SECRET, url), url).toBeNull();
+	}
+	const ok = "https://res.cloudinary.com/everydotorg/image/upload/a.jpg";
+	expect(isLogoUrl(ok)).toBe(true);
+	expect(
+		isLogoUrl("https://endow-profiles.s3.amazonaws.com/any/path.png"),
+	).toBe(true);
+
+	// a ref signed before the limit, over a URL outside it, is refused when served
+	const { fetcher, get } = serve(() => image());
+	const stale = Buffer.from("https://res.cloudinary.com/other/a.png").toString(
+		"base64url",
+	);
+	const [, signature] = refOf(CLOUDINARY).slice("/logo/".length).split(".");
+	expect((await get(`/logo/${stale}.${signature}`)).status).toBe(404);
+	expect(fetcher).not.toHaveBeenCalled();
 });
 
 test("a URL that is not an exact https logo host gets no ref", () => {
@@ -160,8 +189,12 @@ const streamOf = (...sizes: number[]) =>
 		},
 	});
 
-const streamed = (...sizes: number[]) => () =>
-	new Response(streamOf(...sizes), { headers: { "content-type": "image/png" } });
+const streamed =
+	(...sizes: number[]) =>
+	() =>
+		new Response(streamOf(...sizes), {
+			headers: { "content-type": "image/png" },
+		});
 
 test("an image of exactly 2 MiB is served whole, streamed or declared, and one byte more is refused", async () => {
 	const whole = await serve(streamed(MAX_BYTES / 2, MAX_BYTES / 2)).get(

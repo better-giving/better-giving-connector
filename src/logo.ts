@@ -7,10 +7,16 @@ import { Hono } from "hono";
 // image. The ref is signed by this service over a URL it read from the
 // deployment: the route never fetches a URL a caller chose.
 
-/** The exact hosts a logo is fetched from. */
-const LOGO_HOSTS: ReadonlySet<string> = new Set([
-	"endow-profiles.s3.amazonaws.com",
-	"res.cloudinary.com",
+/**
+ * Cloudinary is shared by every customer, so only the one account older logos
+ * live under is fetched; the other bucket's host is ours alone.
+ */
+const CLOUDINARY_ACCOUNT_PREFIX = "/everydotorg/";
+
+/** The exact hosts a logo is fetched from, each with the path prefix it is limited to. */
+const LOGO_HOSTS: ReadonlyMap<string, string> = new Map([
+	["endow-profiles.s3.amazonaws.com", "/"],
+	["res.cloudinary.com", CLOUDINARY_ACCOUNT_PREFIX],
 ]);
 const IMAGE_TYPES: ReadonlySet<string> = new Set([
 	"image/png",
@@ -25,7 +31,11 @@ const CACHE_SECONDS = 6 * 60 * 60;
 /** A day: a stale logo beats initials while the edge refetches it. */
 const STALE_SECONDS = 24 * 60 * 60;
 
-/** `url` is https on a logo host, with no userinfo and no port. */
+/**
+ * `url` is https on a logo host, with no userinfo and no port, and its parsed
+ * path (dot segments already resolved, encoded slashes left encoded) starts
+ * with that host's prefix.
+ */
 export function isLogoUrl(url: string): boolean {
 	let parsed: URL;
 	try {
@@ -33,12 +43,14 @@ export function isLogoUrl(url: string): boolean {
 	} catch {
 		return false;
 	}
+	const prefix = LOGO_HOSTS.get(parsed.hostname);
 	return (
+		prefix !== undefined &&
 		parsed.protocol === "https:" &&
 		parsed.username === "" &&
 		parsed.password === "" &&
 		parsed.port === "" &&
-		LOGO_HOSTS.has(parsed.hostname)
+		parsed.pathname.startsWith(prefix)
 	);
 }
 

@@ -320,13 +320,14 @@ test("list_nonprofits draws a logo on a logo host from this service's /logo rout
 	});
 	const rows = [
 		row("1", "https://endow-profiles.s3.amazonaws.com/a.png"),
-		row("2", "https://res.cloudinary.com/demo/b.jpg"),
+		row("2", "https://res.cloudinary.com/everydotorg/b.jpg"),
 		row("3", "https://x1.public.blob.vercel-storage.com/c.png"),
 		row("4", "https://endow-profiles.s3.amazonaws.com.evil.io/d.png"),
 		row("5", "http://res.cloudinary.com/e.png"),
 		row("6", "res.cloudinary.com/f.png"),
 		row("7", null),
 		row("8"),
+		row("9", "https://res.cloudinary.com/other/g.png"),
 	];
 
 	const result = await runTool(
@@ -348,7 +349,8 @@ test("list_nonprofits draws a logo on a logo host from this service's /logo rout
 
 test("each row's rewritten logo leads back to that row's own logo URL", async () => {
 	const s3 = "https://endow-profiles.s3.amazonaws.com/logos/harbor.png";
-	const cloudinary = "https://res.cloudinary.com/demo/image/upload/bayanihan.jpg";
+	const cloudinary =
+		"https://res.cloudinary.com/everydotorg/image/upload/bayanihan.jpg";
 	const rows = [
 		{ id: "1", name: "Harbor", current: true, logo_url: s3 },
 		{ id: "2", name: "Bayanihan", current: false, logo_url: cloudinary },

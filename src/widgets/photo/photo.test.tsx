@@ -235,7 +235,9 @@ describe("photo card", () => {
 			);
 			const rows = [...root.querySelectorAll(".account-row")].slice(0, 2);
 			expect(
-				rows.map((r) => r.querySelector("img.avatar-logo")?.getAttribute("src")),
+				rows.map((r) =>
+					r.querySelector("img.avatar-logo")?.getAttribute("src"),
+				),
 			).toEqual([harbor, bayanihan]);
 		});
 
@@ -278,7 +280,7 @@ describe("photo card", () => {
 				row(1, {
 					name: "Harbor Food Bank",
 					current: true,
-					logo_url: "https://res.cloudinary.com/demo/harbor.png",
+					logo_url: "https://res.cloudinary.com/everydotorg/harbor.png",
 				}),
 				row(2, {
 					name: "Bayanihan Relief Network",

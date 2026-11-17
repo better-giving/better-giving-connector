@@ -843,7 +843,7 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 		world.db.close();
 		world = await startWorld(true);
 		const bearer = await world.signIn();
-		const logoUrl = `https://res.cloudinary.com/${plant("result:np-logo-host", "leak-np-logo-host-5b3c", true)}/l.png`;
+		const logoUrl = `https://res.cloudinary.com/everydotorg/${plant("result:np-logo-host", "leak-np-logo-host-5b3c", true)}/l.png`;
 		world.dep.setMemberships([
 			{ id: "1", name: ORG, role: "admin", can_manage: true, current: true },
 			{
@@ -1553,7 +1553,9 @@ test("across the whole run nothing written or answered carries a sentinel", () =
 		expect(outcomes("connect", "outcome")).toContain(outcome);
 	}
 	expect(errorSites).toEqual(
-		new Set(["mcp", "connect", "app", "disconnect", "sweep"]),
+		// "auth": the served-logo scenario starts a second app on the same
+		// database, whose auth seeding logs a level-only line
+		new Set(["mcp", "connect", "auth", "app", "disconnect", "sweep"]),
 	);
 	expect(new Set(trace.map((e) => e.sink))).toEqual(
 		new Set(["output", "header", "body"]),
