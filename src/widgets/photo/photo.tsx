@@ -26,6 +26,14 @@ type Nonprofit = AppToolResult<"list_nonprofits">["data"][number];
 /** The most nonprofits the panel lists, the connected one first; the rest are a count. */
 const MAX_LISTED = 8;
 
+/**
+ * Every Switch button sends this one message. A nonprofit's name is set by
+ * whoever administers it, so it never goes into what the chat reads as the
+ * person's own words.
+ */
+const SWITCH_PROMPT =
+	"I want to connect a different Better Giving nonprofit. Walk me through switching.";
+
 function Avatar(props: {
 	name: string;
 	logo: string | null | undefined;
@@ -111,11 +119,7 @@ function Account(props: { origins: readonly string[] }) {
 							<Button
 								variant="secondary"
 								label={`Switch to ${n.name}`}
-								onClick={() =>
-									ask(
-										`I want to connect ${n.name} to this chat. Walk me through switching.`,
-									)
-								}
+								onClick={() => ask(SWITCH_PROMPT)}
 							>
 								Switch
 							</Button>
@@ -137,14 +141,7 @@ function Account(props: { origins: readonly string[] }) {
 							Connect a different one; you pick it when you sign in.
 						</p>
 					</div>
-					<Button
-						variant="secondary"
-						onClick={() =>
-							ask(
-								"I want to connect a different Better Giving nonprofit. Walk me through switching.",
-							)
-						}
-					>
+					<Button variant="secondary" onClick={() => ask(SWITCH_PROMPT)}>
 						Switch nonprofit
 					</Button>
 				</div>
