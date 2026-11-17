@@ -91,7 +91,7 @@ test("Cloudinary is limited to the /everydotorg/ account path, parsed as a brows
 		isLogoUrl("https://endow-profiles.s3.amazonaws.com/any/path.png"),
 	).toBe(true);
 
-	// a ref signed before the limit, over a URL outside it, is refused when served
+	// a ref validly signed over a URL outside the limit is refused when served
 	const { fetcher, get } = serve(() => image());
 	for (const path of refusedPaths) {
 		const url = `https://res.cloudinary.com${path}`;
