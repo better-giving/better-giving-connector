@@ -162,15 +162,6 @@
 	color: #1a2029;
 }
 
-.preview {
-	font-family: var(--font-body);
-}
-
-/* named on the headings too: the widget's global heading rule would beat an inherited face */
-.preview :is(h1, h2, h3) {
-	font-family: var(--font-display);
-}
-
 .preview-desktop {
 	max-width: 720px;
 }
