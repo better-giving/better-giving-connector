@@ -105,8 +105,8 @@ const recurring = z.looseObject({
 	next_date: z.string().nullable().optional(),
 });
 
-// Platform's memberships row. `id` arrives as a string or an integer; the
-// body is passed through, and a reader keeps it as a string.
+// Platform's memberships row. `id` arrives as a string or an integer, and the
+// body is passed through as it came.
 const nonprofit = z.looseObject({
 	id: z.union([z.string(), z.number()]),
 	name: z.string(),

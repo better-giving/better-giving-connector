@@ -955,7 +955,7 @@ test("every action the fake deployment lists answers through call", async () => 
 	const { donor_id } = (await client.call(conn, "donations.record", gift))
 		.body as { donor_id: string };
 	const blocks = [{ type: "text", body: "Warm hands." }];
-	// Standalone's actions: memberships.list is Platform's, tested below
+	// Standalone's actions: memberships.list is Platform's alone
 	const inputs: Record<StandaloneAction, Record<string, unknown>> = {
 		"campaigns.list": { status: "draft" },
 		"campaigns.get": { id },
