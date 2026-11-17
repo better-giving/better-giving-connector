@@ -73,6 +73,7 @@ beforeEach(async () => {
 		drafts: memoryDrafts(),
 		client,
 		fetch,
+		logoSecret: "test-logo-secret",
 		resource: new URL("https://connect.example/mcp"),
 	});
 	return () => db.close();
@@ -550,6 +551,7 @@ test("a Platform hello answered from another origin leaves the connection Standa
 			},
 		},
 		fetch,
+		logoSecret: "test-logo-secret",
 		resource: new URL("https://connect.example/mcp"),
 	});
 

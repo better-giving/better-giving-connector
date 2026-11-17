@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { memoryDrafts } from "../../test/memory-drafts";
 import { type CallAnswer, DeploymentRejected } from "../deployment";
 import { parseOrigin } from "../deployment/origin";
+import { logoRoutes } from "../logo";
 import { Secret } from "../secret";
 import { ACTIONS } from "./actions";
 import { LOCAL_TOOLS } from "./local";
@@ -39,6 +40,7 @@ const answering = (answer: CallAnswer | Error) => ({
 	},
 	drafts: memoryDrafts(),
 	publicOrigin: "https://app.connect.better.giving",
+	logoSecret: "test-logo-secret",
 	fetch,
 	dropConnection: async () => {},
 });
@@ -210,6 +212,7 @@ test("get_profile answers with the connection's user id and org name, as structu
 			client: { call },
 			drafts: memoryDrafts(),
 			publicOrigin: "https://app.connect.better.giving",
+			logoSecret: "test-logo-secret",
 			fetch,
 			dropConnection: async () => {},
 		},
@@ -306,4 +309,78 @@ test("a refusal with nothing to word says the site refused, and a model tool sti
 		{ type: "text", text: "Give's Better Giving refused this request." },
 	]);
 	expect(forModel).toEqual([{ type: "text", text: '{"code":"forbidden"}' }]);
+});
+
+test("list_nonprofits draws a logo on a logo host from this service's /logo route, and leaves every other logo as it came", async () => {
+	const row = (id: string, logo_url?: string | null) => ({
+		id,
+		name: `Nonprofit ${id}`,
+		current: id === "1",
+		...(logo_url === undefined ? {} : { logo_url }),
+	});
+	const rows = [
+		row("1", "https://endow-profiles.s3.amazonaws.com/a.png"),
+		row("2", "https://res.cloudinary.com/everydotorg/image/upload/b.jpg"),
+		row("3", "https://x1.public.blob.vercel-storage.com/c.png"),
+		row("4", "https://endow-profiles.s3.amazonaws.com.evil.io/d.png"),
+		row("5", "http://res.cloudinary.com/e.png"),
+		row("6", "res.cloudinary.com/f.png"),
+		row("7", null),
+		row("8"),
+		row("9", "https://res.cloudinary.com/other/g.png"),
+		row("10", "https://res.cloudinary.com/everydotorg/image/fetch/h.png"),
+	];
+
+	const result = await runTool(
+		specOf("list_nonprofits"),
+		connection(),
+		{},
+		answering({ status: 200, body: { data: rows, next_cursor: null } }),
+		"en-US",
+	);
+
+	const data = (
+		result.structuredContent as { data: { logo_url?: string | null }[] }
+	).data;
+	const own = "https://app.connect.better.giving/logo/";
+	expect(data[0]?.logo_url?.startsWith(own)).toBe(true);
+	expect(data[1]?.logo_url?.startsWith(own)).toBe(true);
+	expect(data.slice(2)).toEqual(rows.slice(2));
+});
+
+test("each row's rewritten logo leads back to that row's own logo URL", async () => {
+	const s3 = "https://endow-profiles.s3.amazonaws.com/logos/harbor.png";
+	const cloudinary =
+		"https://res.cloudinary.com/everydotorg/image/upload/bayanihan.jpg";
+	const rows = [
+		{ id: "1", name: "Harbor", current: true, logo_url: s3 },
+		{ id: "2", name: "Bayanihan", current: false, logo_url: cloudinary },
+	];
+
+	const result = await runTool(
+		specOf("list_nonprofits"),
+		connection(),
+		{},
+		answering({ status: 200, body: { data: rows, next_cursor: null } }),
+		"en-US",
+	);
+
+	const drawn = (result.structuredContent as { data: { logo_url: string }[] })
+		.data;
+	const fetcher = vi.fn(
+		async (_url: unknown) =>
+			new Response(new Uint8Array([137, 80, 78, 71]), {
+				headers: { "content-type": "image/png" },
+			}),
+	);
+	const logos = logoRoutes({
+		secret: "test-logo-secret",
+		fetch: fetcher as typeof fetch,
+	});
+	for (const row of drawn) {
+		const served = await logos.request(new URL(row.logo_url).pathname);
+		expect(served.status).toBe(200);
+	}
+	// one fetch per row, in row order: each ref named its own row's URL
+	expect(fetcher.mock.calls.map(([url]) => url)).toEqual([s3, cloudinary]);
 });

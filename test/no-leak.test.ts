@@ -188,6 +188,8 @@ const loggedLines = (from = 0) =>
 // --- the service under test ----------------------------------------------
 
 const ORG = "Hope Shelter";
+const LOGO_HOST = "res.cloudinary.com";
+const LOGO_IMAGE = new Uint8Array([137, 80, 78, 71]);
 
 // The deployment's answers with sentinels in them: JSON successes gain a
 // field, problems a hidden field and a detail.
@@ -227,7 +229,20 @@ async function startWorld(platform = false) {
 	const dep = fakeDeployment({ name: ORG, platform });
 	movedTo = fakeDeployment({ host: "moved.example.org", name: ORG });
 	deployments.push(dep, movedTo);
-	const net = sentinelled(fakeNetwork(dep, movedTo));
+	// The logo host answers an image once a scenario opens it; until then the
+	// fake network refuses it, like a DNS miss.
+	const logoHost = { open: false, fetched: [] as string[] };
+	const network = fakeNetwork(dep, movedTo);
+	const net = sentinelled(async (input, init) => {
+		const url = input instanceof Request ? input.url : String(input);
+		if (!logoHost.open || new URL(url).hostname !== LOGO_HOST) {
+			return network(input, init);
+		}
+		logoHost.fetched.push(url);
+		return new Response(LOGO_IMAGE, {
+			headers: { "content-type": "image/png" },
+		});
+	});
 	const flaky = failingDb(db);
 
 	// Records every response header and body this service answers with.
@@ -263,6 +278,7 @@ async function startWorld(platform = false) {
 	return {
 		db,
 		dep,
+		logoHost,
 		call,
 		flow,
 		sendAs,
@@ -833,6 +849,57 @@ describe.each(MCP_VERSIONS)("over MCP %s", (v) => {
 			"leak-np-name-1d9f",
 		);
 		expect(JSON.stringify(result)).not.toContain(world.dep.host);
+		expectCleanScenario();
+	});
+
+	// A logo on a logo host is rewritten to a /logo path whose ref carries the
+	// public logo URL and nothing of the connection; the path is a request, not a
+	// tool result, so the scan covers what the service logs and answers for it.
+	async function drawnLogo(): Promise<{ drawn: string; logoUrl: string }> {
+		world.db.close();
+		world = await startWorld(true);
+		const bearer = await world.signIn();
+		const logoUrl = `https://res.cloudinary.com/everydotorg/image/upload/${plant("result:np-logo-host", "leak-np-logo-host-5b3c", true)}/l.png`;
+		world.dep.setMemberships([
+			{ id: "1", name: ORG, role: "admin", can_manage: true, current: true },
+			{
+				id: 8,
+				name: "Other",
+				role: "admin",
+				can_manage: true,
+				current: false,
+				logo_url: logoUrl,
+			},
+		]);
+
+		const result = await callTool(bearer, "list_nonprofits", {});
+
+		const rows = result.structuredContent?.data as { logo_url?: string }[];
+		const drawn = rows[1]?.logo_url ?? "";
+		expect(drawn.startsWith(`${BASE}/logo/`)).toBe(true);
+		expect(JSON.stringify(result)).not.toContain(logoUrl);
+		return { drawn, logoUrl };
+	}
+
+	test("a drawn logo whose upstream fails answers 502 and keeps the logo URL out of every log line and header", async () => {
+		const { drawn } = await drawnLogo();
+
+		// the fake network refuses a host that isn't a deployment, like a DNS miss
+		const res = await world.call(new Request(drawn));
+
+		expect(res.status).toBe(502);
+		expect(await res.json()).toEqual({ error: "logo_unavailable" });
+		expectCleanScenario();
+	});
+
+	test("a drawn logo that is served keeps the logo URL out of every log line and header", async () => {
+		const { drawn, logoUrl } = await drawnLogo();
+		world.logoHost.open = true;
+
+		const res = await world.call(new Request(drawn));
+
+		expect(res.status).toBe(200);
+		expect(world.logoHost.fetched).toEqual([logoUrl]);
 		expectCleanScenario();
 	});
 

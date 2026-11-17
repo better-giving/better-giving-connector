@@ -28,6 +28,9 @@ describe("isAllowedImage", () => {
 			"https://public.blob.vercel-storage.com/a.png",
 			"https://x.public.blob.vercel-storage.com.evil.io/a.png",
 			"http://app.connect.better.giving/a.png",
+			"http://x.public.blob.vercel-storage.com/a.png",
+			"https://endow-profiles.s3.amazonaws.com/logos/a.png",
+			"https://res.cloudinary.com/demo/image/upload/a.jpg",
 			"https://app.connect.better.giving:8443/a.png",
 			"not a url",
 		]) {

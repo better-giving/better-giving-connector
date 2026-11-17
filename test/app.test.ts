@@ -1,8 +1,21 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import { connections, type Db } from "../src/db";
-import { type FakeDeployment, fakeDeployment } from "./fake-deployment";
-import { BASE, env, INITIALIZE, mcpPost, rpc, warmUp } from "./harness";
+import {
+	type FakeDeployment,
+	fakeDeployment,
+	fakeNetwork,
+} from "./fake-deployment";
+import {
+	BASE,
+	env,
+	INITIALIZE,
+	MCP_VERSIONS,
+	mcpPost,
+	mcpRequest,
+	rpc,
+	warmUp,
+} from "./harness";
 import { type Call, refresh } from "./oauth";
 import { type ConnectFlow, connectFlow } from "./operator";
 import {
@@ -213,4 +226,84 @@ test("a thrown error logs one line naming only the error", async () => {
 	expect(lines.mock.calls).toEqual([
 		[JSON.stringify({ kind: "error", where: "app", errorName: "StoreDown" })],
 	]);
+});
+
+const LOGO_URL = "https://endow-profiles.s3.amazonaws.com/logos/a.png";
+const PNG = new Uint8Array([137, 80, 78, 71]);
+
+const urlOf = (input: Parameters<typeof fetch>[0]) =>
+	typeof input === "string"
+		? input
+		: input instanceof URL
+			? input.href
+			: input.url;
+
+// The whole app with the logo host answering from here and every other host
+// the fake deployment's: an unknown host fails like a DNS miss, so nothing
+// leaves the process.
+function appWithLogoHost(platform: FakeDeployment) {
+	const logoFetches: string[] = [];
+	const network = fakeNetwork(platform);
+	const logoHostFetch: typeof fetch = async (input, init) => {
+		const url = urlOf(input);
+		if (new URL(url).hostname !== new URL(LOGO_URL).hostname)
+			return network(input, init);
+		logoFetches.push(url);
+		return new Response(PNG, { headers: { "content-type": "image/png" } });
+	};
+	const app = createApp({
+		env,
+		db,
+		fetch: logoHostFetch,
+		platformOrigin: platform.origin,
+	});
+	return { logoFetches, request: async (req: Request) => app.request(req) };
+}
+
+test("a logo list_nonprofits rewrites is served from its rewritten path, fetched from the logo host", async () => {
+	const platform = fakeDeployment({ name: "Hope Shelter", platform: true });
+	platform.setMemberships([
+		{ id: "1", name: "Hope Shelter", current: true },
+		{ id: "2", name: "Harbor", current: false, logo_url: LOGO_URL },
+	]);
+	const { logoFetches, request } = appWithLogoHost(platform);
+	await warmUp(request);
+	const bearer = `Bearer ${(await connectFlow(request, platform, BASE).connect()).access_token}`;
+
+	const listed = await rpc(
+		await request(
+			mcpRequest(MCP_VERSIONS[0], bearer, "tools/call", {
+				name: "list_nonprofits",
+				arguments: {},
+			}),
+		),
+	);
+	const drawn = listed.result.structuredContent.data[1].logo_url;
+	expect(drawn.startsWith(`${BASE}/logo/`)).toBe(true);
+	expect(logoFetches).toEqual([]);
+
+	const res = await request(new Request(drawn));
+
+	expect(res.status).toBe(200);
+	expect(res.headers.get("content-type")).toBe("image/png");
+	expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG);
+	expect(logoFetches).toEqual([LOGO_URL]);
+});
+
+test("serves the logo route: a ref it did not sign is a 404 and nothing is fetched", async () => {
+	const fetcher = vi.fn(deployment.fetch);
+	const app = createApp({
+		env,
+		db,
+		fetch: fetcher,
+		platformOrigin: deployment.origin,
+	});
+	await warmUp(async (req) => app.request(req));
+	fetcher.mockClear();
+
+	const res = await app.request(new Request(`${BASE}/logo/garbage`));
+
+	expect(res.status).toBe(404);
+	expect(await res.json()).toEqual({ error: "not_found" });
+	expect(fetcher).not.toHaveBeenCalled();
 });

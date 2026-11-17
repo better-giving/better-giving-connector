@@ -92,6 +92,7 @@ export async function runLiveHarness(opts: LiveHarnessOptions): Promise<void> {
 			client,
 			drafts: memoryDrafts(),
 			publicOrigin: "https://app.connect.better.giving",
+			logoSecret: "test-logo-secret",
 			fetch,
 			dropConnection: async () => {
 				dropped = true;

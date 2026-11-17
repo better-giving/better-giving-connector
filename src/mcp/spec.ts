@@ -63,6 +63,11 @@ export type ActionSpec<Tool extends string = string> = Common & {
 	 * usual. A throw is worded as this tool's own failure is.
 	 */
 	compose?: (call: LocalCall) => Promise<LocalAnswer | null>;
+	/** Rewrites the deployment's body before it is answered. */
+	shape?: (
+		body: unknown,
+		cx: { publicOrigin: string; logoSecret: string },
+	) => unknown;
 };
 
 /** What a local tool answers: the text the chat reads, and the structured result beside it. */

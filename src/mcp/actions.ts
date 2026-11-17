@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logoPath } from "../logo";
 import { MAX_SUGGESTED_AMOUNTS, THEME_NAMES } from "../presets/themes";
 import {
 	createCampaignWithPreset,
@@ -22,6 +23,25 @@ import {
 import { OUTPUTS, PLATFORM_OUTPUTS } from "./summary";
 
 export type { ActionSpec } from "./spec";
+
+/** A `{ data: [...] }` body with each row's `logo_url` passed through `route`; any other body as it came. */
+function withLogoRoutes(body: unknown, route: (url: string) => string) {
+	if (typeof body !== "object" || body === null || !("data" in body))
+		return body;
+	const { data } = body;
+	if (!Array.isArray(data)) return body;
+	return {
+		...body,
+		data: data.map((row: unknown) =>
+			typeof row === "object" &&
+			row !== null &&
+			"logo_url" in row &&
+			typeof row.logo_url === "string"
+				? { ...row, logo_url: route(row.logo_url) }
+				: row,
+		),
+	};
+}
 
 // Tool is inferred from the specs' `tool` names alone, so a `checkWith`
 // naming no tool is a type error.
@@ -600,6 +620,13 @@ export const ACTIONS = toolSpecs([
 			"Lists the nonprofits this person is an admin of on Better Giving, with each one's id, name and logo, and which one this connection is for (current is true on that row). Takes no arguments.",
 		input: z.strictObject({}),
 		output: OUTPUTS.list_nonprofits,
+		// a logo on one of the two hosts a card's CSP can't name is drawn from this
+		// service's `/logo` route instead
+		shape: (body, { publicOrigin, logoSecret }) =>
+			withLogoRoutes(body, (url) => {
+				const path = logoPath(logoSecret, url);
+				return path === null ? url : `${publicOrigin}${path}`;
+			}),
 		annotations: READ,
 		_meta: statusLines("Listing your nonprofits…", "Nonprofits listed"),
 		// a Standalone row with null actions would otherwise be offered it

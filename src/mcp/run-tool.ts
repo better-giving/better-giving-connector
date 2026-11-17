@@ -32,6 +32,8 @@ export type RunToolContext = {
 	drafts: CampaignDrafts;
 	/** This service's own origin: where the widgets' images may come from. */
 	publicOrigin: string;
+	/** Signs the `/logo` refs a card draws a logo from (`src/logo.ts`). */
+	logoSecret: string;
 	/** The network for the few requests that aren't `/connector/v1` calls: a photo's download and its upload. */
 	fetch: typeof fetch;
 	dropConnection(userId: string): Promise<void>;
@@ -141,11 +143,14 @@ async function settle(
 		if (!isActionSpec(spec)) return answered(await spec.run(call));
 		const composed = await spec.compose?.(call);
 		if (composed) return answered(composed);
-		const answer = await ctx.client.call(connection, spec.action, input);
+		const called = await ctx.client.call(connection, spec.action, input);
+		// the text the chat reads carries the shaped body too
+		const body = spec.shape?.(called.body, ctx) ?? called.body;
+		const answer = { ...called, body };
 		const replayed = isKeyedAction(spec.action) && answer.status === 200;
 		const text = await answerText(spec, connection, input, answer, ctx, locale);
 		const cx = { locale, input, replayed };
-		return ok(present(spec, text, answer.body, cx));
+		return ok(present(spec, text, body, cx));
 	} catch (error) {
 		// A throw out of here would reach the chat as its message, so whatever
 		// `failure` can't word (its own drop included) is answered by `unexpected`.
