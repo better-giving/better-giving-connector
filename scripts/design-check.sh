@@ -1,8 +1,8 @@
 #!/bin/sh
 # Same check as CI: the registry's own CLI, fetched into a temp dir outside the repo.
 # CI sets BG_DESIGN_CLI_URL and BG_DESIGN_CLI_SHA256 (the pin in ci.yml), and the
-# CLI at that URL must match the hash before it runs. With neither set (a local
-# run) it takes the newest CLI.
+# CLI at that URL must match the hash before it runs. Without BG_DESIGN_CLI_URL
+# (a local run) it takes the newest CLI.
 set -eu
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
