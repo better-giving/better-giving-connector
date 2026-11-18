@@ -28,8 +28,15 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       # the copied registry files in bg-design.json must match the registry's
-      # published versions byte for byte
+      # published versions byte for byte. The check runs a pinned CLI: the
+      # script fetches this URL and refuses to run it unless it matches the
+      # sha256. The design registry update workflow moves the two marked lines;
+      # by hand only when its update PR or issue says it could not push a
+      # workflow file.
       - name: design registry in sync
+        env:
+          BG_DESIGN_CLI_URL: https://design.better.giving/registry/cli/1.1.0/cli.mjs  # bg-design-cli-pin
+          BG_DESIGN_CLI_SHA256: 2f7b1ee44871c0ca4d57b17187cba884d332d7c75498b00748c0f5f25cac9587  # bg-design-cli-pin
         run: pnpm design:check
       - run: pnpm build
       # the bundle must import under plain node: with no env it throws the
