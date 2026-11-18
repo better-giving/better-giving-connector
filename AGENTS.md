@@ -19,7 +19,7 @@ Run from the repo root. These match `.github/workflows/ci.yml`:
 - Typecheck: `pnpm typecheck` (two `tsc --noEmit` projects: `tsconfig.json` for node code, `tsconfig.widgets.json` for `src/widgets/` and `test/fixtures/widget` with DOM types)
 - Test: `pnpm test` (`vitest run`). Hermetic: in-memory libSQL and a fake deployment. No env and no network.
 - Build: `pnpm build` (esbuild → `dist/index.js`)
-- Design registry sync: `pnpm design:check` (`scripts/design-check.sh`; CI runs the same script). It fetches `https://design.better.giving/registry/cli.mjs` into a temp directory and runs `node cli.mjs diff --check` from the repo root; it fails when a file under `src/widgets/registry/` differs from `bg-design.json`, and also when the fetch fails.
+- Design registry sync: `pnpm design:check` (`scripts/design-check.sh`; CI runs the same script). It fetches the registry's CLI into a temp directory and runs `node cli.mjs diff --check` from the repo root; it fails when a file under `src/widgets/registry/` differs from `bg-design.json`, and also when the fetch fails. Locally it fetches the newest CLI (`https://design.better.giving/registry/cli.mjs`). CI pins one: `ci.yml` sets `BG_DESIGN_CLI_URL` (a versioned `/registry/cli/<version>/cli.mjs`) and `BG_DESIGN_CLI_SHA256` on two lines marked `# bg-design-cli-pin`, and the script fails unless the download matches the hash. Do not edit those lines by hand: the design registry update workflow (`.github/workflows/bg-design-update.yml`) moves them in its update PR.
 - Bundle-load: with no environment, the bundle must throw the fail-closed env error and nothing else:
 
 ```bash
