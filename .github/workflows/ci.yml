@@ -31,7 +31,8 @@ jobs:
       # published versions byte for byte. The check runs a pinned CLI: the
       # script fetches this URL and refuses to run it unless it matches the
       # sha256. The design registry update workflow moves the two marked lines;
-      # by hand only when its issue says it could not push a workflow file.
+      # by hand only when its update PR or issue says it could not push a
+      # workflow file.
       - name: design registry in sync
         env:
           BG_DESIGN_CLI_URL: https://design.better.giving/registry/cli/1.1.0/cli.mjs  # bg-design-cli-pin
