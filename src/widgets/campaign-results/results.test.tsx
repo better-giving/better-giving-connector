@@ -4,9 +4,10 @@ import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge
 import { describe, expect, it, vi } from "vitest";
 import { RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
-import { applyStyles, startHost } from "../test-dom";
+import { applyStyles, mount, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignResults } from "./results";
+import { Facts } from "./stats";
 
 async function show(data: CampaignResultsData, context: McpUiHostContext = {}) {
 	const { bridge, host } = await startHost({ context });
@@ -334,26 +335,20 @@ describe("campaign results trend", () => {
 		expect(badge?.classList.contains("ds-badge-success")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(false);
 		expect(note).toBe("Previous 7 days: $100");
+		expect(glyphPath(badge)).toMatch(/^M16 7h6v6/);
 		expect(
 			badge?.querySelector("svg.ds-trend-glyph")?.getAttribute("aria-hidden"),
 		).toBe("true");
 	});
 
 	it("shows a warning badge with a downward glyph for a falling week", async () => {
-		const up = trend(
-			(await show(weeks(["50", "0", "0", "0", "0", "0", "100"]))).root,
-		);
 		const { root } = await show(weeks(["75", "0", "0", "0", "0", "0", "0"]));
 		const { badge, note } = trend(root);
 		expect(badge?.textContent).toBe("Down 25%");
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-success")).toBe(false);
 		expect(note).toBe("Previous 7 days: $100");
-		expect(
-			badge?.querySelector("svg.ds-trend-glyph")?.getAttribute("aria-hidden"),
-		).toBe("true");
-		expect(glyphPath(badge)).toBeTruthy();
-		expect(glyphPath(badge)).not.toBe(glyphPath(up.badge));
+		expect(glyphPath(badge)).toMatch(/^M16 17h6v-6/);
 	});
 
 	it("draws no badge for a flat week, but still names the week before", async () => {
@@ -413,5 +408,27 @@ describe("campaign results trend", () => {
 		const { badge, note } = trend(root);
 		expect(badge).toBeNull();
 		expect(note).toBe("Nothing in the 7 days before");
+	});
+
+	// the model schema fixes `daily` at 14 days, so a shorter series reaches
+	// Facts only by direct render
+	it("says there are too few days to compare under 14, even when all of them are zero", () => {
+		for (const days of [
+			series("5", "5", "5", "5", "5", "5", "5", "5", "5", "5"),
+			series(...Array(13).fill("0.00")),
+		]) {
+			const root = mount(<Facts data={{ ...RESULTS_LIVE, daily: days }} />);
+			const { badge, note } = trend(root);
+			expect(note).toBe("Not enough days to compare");
+			expect(badge).toBeNull();
+		}
+	});
+
+	it("compares from exactly 14 days", async () => {
+		const { root } = await show({
+			...RESULTS_LIVE,
+			daily: series(...Array(14).fill("5.00")),
+		});
+		expect(trend(root).note).toBe("Previous 7 days: $35");
 	});
 });

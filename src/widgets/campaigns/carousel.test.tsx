@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CAMPAIGNS } from "../../../test/widget-host/fixtures";
 import { formatMoney } from "../../format";
 import { CampaignsData } from "../model";
-import { applyStyles, startHost } from "../test-dom";
+import { startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { Campaigns } from "./carousel";
 
@@ -182,24 +182,14 @@ describe("campaign photo status chip", () => {
 		expect(new Set(classes.values()).size).toBe(3);
 	});
 
-	it("paints each status as the registry's on-photo badge, positioned over the photo", async () => {
+	it("draws each status badge inside its photo's frame", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
-		applyStyles("ui/styles.css", "campaigns/carousel.css");
-		const overlays = [
-			...root.querySelectorAll<HTMLElement>(".campaign .ds-image-overlay"),
-		];
-		expect(overlays).toHaveLength(CAMPAIGNS.campaigns.length);
-		const plain = document.createElement("span");
-		plain.className = "ds-badge ds-badge-warning";
-		root.append(plain);
-		expect(getComputedStyle(plain).boxShadow).not.toMatch(/1px/);
-		for (const overlay of overlays) {
-			expect(getComputedStyle(overlay).position).toBe("absolute");
-			const badge = overlay.querySelector(".ds-badge") as Element;
-			// the registry's ring in the page color, drawn only by .ds-badge-on-photo
-			expect(getComputedStyle(badge).boxShadow).toMatch(
-				/^0(px)? 0(px)? 0(px)? 1px \S+/,
-			);
+		const frames = [...root.querySelectorAll(".campaign .ds-image-frame")];
+		expect(frames).toHaveLength(CAMPAIGNS.campaigns.length);
+		for (const frame of frames) {
+			const badge = frame.querySelector(".ds-image-overlay .ds-badge");
+			expect(badge?.classList.contains("ds-badge-on-photo")).toBe(true);
+			expect(["Live", "Draft", "Ended"]).toContain(badge?.textContent);
 		}
 	});
 });

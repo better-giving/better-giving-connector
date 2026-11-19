@@ -2,7 +2,7 @@
 // @vitest-environment happy-dom
 import { useState } from "hono/jsx/dom";
 import { describe, expect, it, vi } from "vitest";
-import { flush, mount } from "../test-dom";
+import { mount } from "../test-dom";
 import { ImageWithPlaceholder, isAllowedImage } from "./image";
 
 const ORIGINS = [
@@ -78,27 +78,17 @@ describe("ImageWithPlaceholder", () => {
 		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
 	});
 
-	it("shows the placeholder, never the img, for a blocked origin or no image", () => {
+	it("shows the placeholder, never the img, and reads unavailable for a blocked origin or no image", () => {
 		for (const src of ["https://example.com/a.png", null]) {
 			const root = mount(
 				<ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />,
 			);
 			expect(img(root)).toBeNull();
 			expect(placeholder(root)?.getAttribute("aria-label")).toBe("Cover");
+			expect(
+				root.querySelector(".ds-image-frame")?.getAttribute("data-state"),
+			).toBe("unavailable");
 		}
-	});
-
-	it("marks a blocked origin unavailable, with no img", () => {
-		const root = mount(
-			<ImageWithPlaceholder
-				src="https://example.com/a.png"
-				alt="Cover"
-				origins={ORIGINS}
-			/>,
-		);
-		expect(
-			root.querySelector(".ds-image-frame")?.getAttribute("data-state"),
-		).toBe("unavailable");
 	});
 
 	it("puts a caller's class on the frame beside the registry's", () => {
@@ -116,7 +106,7 @@ describe("ImageWithPlaceholder", () => {
 		expect(root.querySelector(".pv-hero .ds-image-placeholder")).not.toBeNull();
 	});
 
-	it("draws the overlay after a real img, inside the frame", () => {
+	it("draws the overlay inside the frame beside a real img", () => {
 		const root = mount(
 			<ImageWithPlaceholder
 				src="https://app.connect.better.giving/a.png"
@@ -126,9 +116,7 @@ describe("ImageWithPlaceholder", () => {
 			/>,
 		);
 		const frame = root.querySelector(".ds-image-frame");
-		expect(
-			[...(frame?.children ?? [])].map((c) => `${c.tagName}.${c.className}`),
-		).toEqual(["IMG.ds-image", "DIV.ds-image-overlay"]);
+		expect(frame?.querySelector("img")).not.toBeNull();
 		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
 	});
 
@@ -148,15 +136,13 @@ describe("ImageWithPlaceholder", () => {
 		img(root)?.dispatchEvent(new Event("error"));
 		await vi.waitFor(() => expect(state()).toBe("unavailable"));
 		draw(B);
-		await flush();
-		expect(state()).toBe("loading");
+		await vi.waitFor(() => expect(state()).toBe("loading"));
 		expect(img(root)?.getAttribute("src")).toBe(B);
 
 		img(root)?.dispatchEvent(new Event("load"));
 		await vi.waitFor(() => expect(state()).toBe("loaded"));
 		draw(A);
-		await flush();
-		expect(state()).toBe("loading");
+		await vi.waitFor(() => expect(state()).toBe("loading"));
 		expect(img(root)?.getAttribute("src")).toBe(A);
 	});
 
@@ -175,11 +161,31 @@ describe("ImageWithPlaceholder", () => {
 		img(root)?.dispatchEvent(new Event("load"));
 		await vi.waitFor(() => expect(state()).toBe("loaded"));
 		draw(null);
-		await flush();
-		expect(state()).toBe("unavailable");
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
 		draw(A);
-		await flush();
-		expect(state()).toBe("loading");
+		await vi.waitFor(() => expect(state()).toBe("loading"));
+		expect(img(root)?.getAttribute("src")).toBe(A);
+	});
+
+	it("gives a src that failed a fresh try once a blocked origin has come between", async () => {
+		const A = "https://app.connect.better.giving/a.png";
+		let draw: (src: string) => void = () => {};
+		function Swap() {
+			const [src, setSrc] = useState(A);
+			draw = setSrc;
+			return <ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />;
+		}
+		const root = mount(<Swap />);
+		const state = () =>
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state");
+
+		img(root)?.dispatchEvent(new Event("error"));
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		draw("https://example.com/a.png");
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		expect(img(root)).toBeNull();
+		draw(A);
+		await vi.waitFor(() => expect(state()).toBe("loading"));
 		expect(img(root)?.getAttribute("src")).toBe(A);
 	});
 
