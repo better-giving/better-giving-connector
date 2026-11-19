@@ -64,18 +64,16 @@ describe("ImageWithPlaceholder", () => {
 		);
 	});
 
-	it("draws a square frame and an overlay slot on request", () => {
+	it("draws an overlay slot on request", () => {
 		const root = mount(
 			<ImageWithPlaceholder
 				src={null}
 				alt=""
 				origins={ORIGINS}
-				square
 				overlay={<span>Live</span>}
 			/>,
 		);
 		const frame = root.querySelector(".ds-image-frame");
-		expect(frame?.classList.contains("ds-image-frame-square")).toBe(true);
 		expect(frame?.getAttribute("data-state")).toBe("unavailable");
 		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
 	});
@@ -109,13 +107,11 @@ describe("ImageWithPlaceholder", () => {
 				src={null}
 				alt=""
 				origins={ORIGINS}
-				square
 				class="pv-hero"
 			/>,
 		);
 		const frame = root.querySelector(".ds-image-frame");
 		expect(frame?.classList.contains("ds-image-frame")).toBe(true);
-		expect(frame?.classList.contains("ds-image-frame-square")).toBe(true);
 		expect(frame?.classList.contains("pv-hero")).toBe(true);
 		expect(root.querySelector(".pv-hero .ds-image-placeholder")).not.toBeNull();
 	});
@@ -158,6 +154,29 @@ describe("ImageWithPlaceholder", () => {
 
 		img(root)?.dispatchEvent(new Event("load"));
 		await vi.waitFor(() => expect(state()).toBe("loaded"));
+		draw(A);
+		await flush();
+		expect(state()).toBe("loading");
+		expect(img(root)?.getAttribute("src")).toBe(A);
+	});
+
+	it("reads loading, not loaded, when a loaded src comes back after none", async () => {
+		const A = "https://app.connect.better.giving/a.png";
+		let draw: (src: string | null) => void = () => {};
+		function Swap() {
+			const [src, setSrc] = useState<string | null>(A);
+			draw = setSrc;
+			return <ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />;
+		}
+		const root = mount(<Swap />);
+		const state = () =>
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state");
+
+		img(root)?.dispatchEvent(new Event("load"));
+		await vi.waitFor(() => expect(state()).toBe("loaded"));
+		draw(null);
+		await flush();
+		expect(state()).toBe("unavailable");
 		draw(A);
 		await flush();
 		expect(state()).toBe("loading");

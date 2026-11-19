@@ -1,6 +1,6 @@
 /** @jsxImportSource hono/jsx/dom */
 import type { Child } from "hono/jsx";
-import { useState } from "hono/jsx/dom";
+import { useEffect, useState } from "hono/jsx/dom";
 
 /**
  * `url` is https on one of `origins` (`https://host`, or `https://*.suffix` for
@@ -30,7 +30,6 @@ export function ImageWithPlaceholder(props: {
 	src: string | null;
 	alt: string;
 	origins: readonly string[];
-	square?: boolean;
 	overlay?: Child;
 	class?: string;
 }) {
@@ -39,6 +38,12 @@ export function ImageWithPlaceholder(props: {
 		value: "loaded" | "failed";
 	}>();
 	const { src } = props;
+	// an outcome belongs to one showing of its src: leaving it (another src, or
+	// none) drops it, so coming back reads "loading" until the new img reports.
+	// Functional, so a load the new src already reported is kept.
+	useEffect(() => {
+		setState((s) => (s?.src === src ? s : undefined));
+	}, [src]);
 	const failed = state?.src === src && state.value === "failed";
 	const shown = src !== null && !failed && isAllowedImage(src, props.origins);
 	const data = shown
@@ -46,13 +51,7 @@ export function ImageWithPlaceholder(props: {
 			? "loaded"
 			: "loading"
 		: "unavailable";
-	const cls = [
-		"ds-image-frame",
-		props.square ? "ds-image-frame-square" : "",
-		props.class ?? "",
-	]
-		.filter((c) => c !== "")
-		.join(" ");
+	const cls = props.class ? `ds-image-frame ${props.class}` : "ds-image-frame";
 	return (
 		<div class={cls} data-state={data}>
 			{shown ? (
