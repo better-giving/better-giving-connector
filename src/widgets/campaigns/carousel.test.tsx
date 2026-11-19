@@ -81,7 +81,7 @@ describe("campaign carousel", () => {
 		]) {
 			const c = card(root, title);
 			expect(c.querySelector("img"), title).toBeNull();
-			expect(c.querySelector(".image-placeholder"), title).not.toBeNull();
+			expect(c.querySelector(".ds-image-placeholder"), title).not.toBeNull();
 		}
 		expect(card(root, "Winter coat drive").querySelector("img")).not.toBeNull();
 	});
@@ -209,7 +209,7 @@ describe("campaign photo status chip", () => {
 	it("gives live, draft and ended campaigns each their own class", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
 		const classes = new Map<string, string>();
-		for (const chip of root.querySelectorAll(".campaign-chip .ds-badge")) {
+		for (const chip of root.querySelectorAll(".ds-image-overlay .ds-badge")) {
 			expect(chip.classList.contains("ds-badge-on-photo")).toBe(true);
 			classes.set(chip.textContent ?? "", chip.className);
 		}
@@ -220,20 +220,19 @@ describe("campaign photo status chip", () => {
 	it("paints each status as the registry's on-photo badge, inset from the card's corner", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
 		applyStyles("ui/styles.css", "campaigns/carousel.css");
-		const chips = [...root.querySelectorAll<HTMLElement>(".campaign-chip")];
-		expect(chips.length).toBeGreaterThan(0);
+		const overlays = [
+			...root.querySelectorAll<HTMLElement>(
+				".campaign > .ds-image-frame:first-child > .ds-image-overlay",
+			),
+		];
+		expect(overlays).toHaveLength(CAMPAIGNS.campaigns.length);
 		const plain = document.createElement("span");
 		plain.className = "ds-badge ds-badge-warning";
 		root.append(plain);
 		expect(getComputedStyle(plain).boxShadow).not.toMatch(/1px/);
-		for (const chip of chips) {
-			const style = getComputedStyle(chip);
-			expect([style.position, style.top, style.left]).toEqual([
-				"absolute",
-				"12px",
-				"12px",
-			]);
-			const badge = chip.querySelector(".ds-badge") as Element;
+		for (const overlay of overlays) {
+			expect(getComputedStyle(overlay).position).toBe("absolute");
+			const badge = overlay.querySelector(".ds-badge") as Element;
 			// the registry's ring in the page color, drawn only by .ds-badge-on-photo
 			expect(getComputedStyle(badge).boxShadow).toMatch(
 				/^0(px)? 0(px)? 0(px)? 1px \S+/,
@@ -241,14 +240,25 @@ describe("campaign photo status chip", () => {
 		}
 	});
 
-	it("adds no local fill, ink or edge to the chip's badge", () => {
+	it("adds no local chip, position, fill, ink or edge of its own", () => {
 		applyStyles("ui/styles.css", "campaigns/carousel.css");
 		const all = rules(document.head.querySelector("style")?.textContent ?? "");
-		// liveness: the walker reached carousel.css's own chip rule
-		const chip = all.find((r) => r.path === ".campaign-chip");
-		expect(chip?.body).toContain("position: absolute");
+		// liveness: the walker reached the registry's overlay rule
+		const overlay = all.find((r) => r.path === ".ds-image-overlay");
+		expect(overlay?.body).toContain("position: absolute");
+		// the registry's 12px inset from the top-start corner
+		expect(overlay?.body).toMatch(
+			/inset-block-start: calc\(var\(--ds-spacing\) \* 3\)/,
+		);
+		expect(overlay?.body).toMatch(
+			/inset-inline-start: calc\(var\(--ds-spacing\) \* 3\)/,
+		);
 		expect(
-			all.filter((r) => /\.campaign-chip\s+\.ds-badge/.test(r.path)),
+			all.filter((r) =>
+				/campaign-chip|campaign-media|ds-image-overlay\s+\.ds-badge/.test(
+					r.path,
+				),
+			),
 		).toEqual([]);
 	});
 });

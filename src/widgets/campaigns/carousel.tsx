@@ -67,16 +67,12 @@ function CampaignTile(props: {
 			<Card
 				class="campaign"
 				media={
-					<div class="campaign-media">
-						<ImageWithPlaceholder
-							src={campaign.imageUrl}
-							alt=""
-							origins={props.imageOrigins}
-						/>
-						<span class="campaign-chip">
-							<StatusBadge status={campaign.status} onPhoto />
-						</span>
-					</div>
+					<ImageWithPlaceholder
+						src={campaign.imageUrl}
+						alt=""
+						origins={props.imageOrigins}
+						overlay={<StatusBadge status={campaign.status} onPhoto />}
+					/>
 				}
 			>
 				<h3 class="campaign-title" id={titleId}>

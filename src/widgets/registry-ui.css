@@ -1,7 +1,7 @@
 /*
  * The registry's plain-css components the widgets and the served pages share,
  * over its variables (tokens.css): button, badge, card, field, checkbox,
- * radio, progress, select, switch, spinner, state-card, prose and table, all `ds-` classes, copied by `bg-design` and never edited here.
+ * radio, progress, select, switch, spinner, state-card, prose, table, image and sparkline, all `ds-` classes, copied by `bg-design` and never edited here.
  * What stays local is below: the type sizes the surfaces' own rules read and
  * the touch height.
  */
@@ -19,6 +19,8 @@
 @import "./registry/styles/state-card-css.css";
 @import "./registry/styles/prose-css.css";
 @import "./registry/styles/table-css.css";
+@import "./registry/styles/image-css.css";
+@import "./registry/styles/sparkline-css.css";
 
 :root {
 	/* the registry's items keep their type ladder on their own classes (--ds-*), so the surfaces' rules read these */

@@ -350,6 +350,25 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 	"campaign-results": {
 		draft: { result: { structuredContent: SHOT_DRAFT } },
 		live: { result: { structuredContent: SHOT_LIVE } },
+		"live-flat": {
+			result: {
+				structuredContent: {
+					...SHOT_LIVE,
+					daily: SHOT_LIVE.daily.map((d) => ({ ...d, total: usd("600.00") })),
+				},
+			},
+		},
+		"live-down": {
+			result: {
+				structuredContent: {
+					...SHOT_LIVE,
+					daily: SHOT_LIVE.daily.map((d, i, all) => ({
+						...d,
+						total: all[all.length - 1 - i]?.total ?? d.total,
+					})),
+				},
+			},
+		},
 		"end-confirm": {
 			result: { structuredContent: SHOT_LIVE },
 			click: ["End campaign"],

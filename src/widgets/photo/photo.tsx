@@ -227,7 +227,6 @@ export function PhotoCard(props: { data: PhotoData }) {
 			label="Cover photo"
 			media={
 				<ImageWithPlaceholder
-					class="photo-crop"
 					src={shown}
 					alt={file ? alt : (data.current?.alt ?? "")}
 					origins={data.imageOrigins}

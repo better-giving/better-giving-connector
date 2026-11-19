@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src/widgets/registry",
-  "registryVersion": "3.0.0",
+  "registryVersion": "4.1.0",
   "items": {
     "badge-css": {
       "version": "1.2.1",
@@ -104,6 +104,13 @@
         "styles/fonts/RedHatRoundText-SemiBold.woff2": "ffdb85ce37ceb7c783dc05bc17bd62c51c4aaff961698835ca314b3d0a89ca6d"
       }
     },
+    "image-css": {
+      "version": "1.0.0",
+      "files": {
+        "styles/image-css.css": "d881411eea8efc0646af878d632da0fa79822fb4c4bf613f25ce16cca4fabcc0",
+        "styles/image-css.usage.md": "6c03d4df2544f1effd8cd5ab18b6bcdd82e754421bc12a708fc369bbdfb8d67f"
+      }
+    },
     "progress-css": {
       "version": "1.1.1",
       "files": {
@@ -137,6 +144,13 @@
       "files": {
         "styles/site-nav-css.css": "0cfba98652c93bc4cb64298c3f6f28203f8e38608aed0b60a939109e9a894bb8",
         "styles/site-nav-css.usage.md": "800b6236ad4ed86d43e2b4676cdbc94adc78524d01b4e864cd869ccb877367bb"
+      }
+    },
+    "sparkline-css": {
+      "version": "1.0.0",
+      "files": {
+        "styles/sparkline-css.css": "082130a2780099777e6c31d28b82cd99a49aff87b01ec7d81f4bfec075c3b969",
+        "styles/sparkline-css.usage.md": "8f9f0839f83bc320c55793cf26c65fbb69a6f102947ff5df7d335588dd475cd0"
       }
     },
     "spinner-css": {

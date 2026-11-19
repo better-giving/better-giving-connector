@@ -42,9 +42,9 @@ describe("isAllowedImage", () => {
 describe("ImageWithPlaceholder", () => {
 	const img = (root: HTMLElement) => root.querySelector("img");
 	const placeholder = (root: HTMLElement) =>
-		root.querySelector('.image-placeholder[role="img"]');
+		root.querySelector('.ds-image-placeholder[role="img"]');
 
-	it("shows an allowed image with its alt text", () => {
+	it("shows an allowed image with its alt text", async () => {
 		const root = mount(
 			<ImageWithPlaceholder
 				src="https://app.connect.better.giving/a.png"
@@ -53,7 +53,30 @@ describe("ImageWithPlaceholder", () => {
 			/>,
 		);
 		expect(img(root)?.getAttribute("alt")).toBe("Coats on a rack");
+		expect(img(root)?.className).toBe("ds-image");
 		expect(placeholder(root)).toBeNull();
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.getAttribute("data-state")).toBe("loading");
+		img(root)?.dispatchEvent(new Event("load"));
+		await vi.waitFor(() =>
+			expect(frame?.getAttribute("data-state")).toBe("loaded"),
+		);
+	});
+
+	it("draws a square frame and an overlay slot on request", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src={null}
+				alt=""
+				origins={ORIGINS}
+				square
+				overlay={<span>Live</span>}
+			/>,
+		);
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.classList.contains("ds-image-frame-square")).toBe(true);
+		expect(frame?.getAttribute("data-state")).toBe("unavailable");
+		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
 	});
 
 	it("shows the placeholder, never the img, for a blocked origin or no image", () => {
@@ -70,7 +93,7 @@ describe("ImageWithPlaceholder", () => {
 		const root = mount(
 			<ImageWithPlaceholder src={null} alt="" origins={ORIGINS} />,
 		);
-		const box = root.querySelector(".image-placeholder");
+		const box = root.querySelector(".ds-image-placeholder");
 		expect(box?.getAttribute("aria-hidden")).toBe("true");
 		expect(box?.hasAttribute("role")).toBe(false);
 		expect(box?.hasAttribute("aria-label")).toBe(false);
@@ -87,5 +110,8 @@ describe("ImageWithPlaceholder", () => {
 		img(root)?.dispatchEvent(new Event("error"));
 		await vi.waitFor(() => expect(img(root)).toBeNull());
 		expect(placeholder(root)).not.toBeNull();
+		expect(
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state"),
+		).toBe("unavailable");
 	});
 });

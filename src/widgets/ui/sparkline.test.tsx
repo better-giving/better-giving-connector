@@ -29,6 +29,10 @@ describe("weekOverWeek", () => {
 		expect(weekOverWeek(daily).change).toBeNull();
 	});
 
+	it("has no change to show with fewer than 14 days", () => {
+		expect(weekOverWeek(days(...Array(10).fill("5.00"))).change).toBeNull();
+	});
+
 	it("rounds a fall to a whole negative percent", () => {
 		const daily = days(...Array(7).fill("3.00"), "1.00", ...Array(6).fill("0"));
 		expect(weekOverWeek(daily).change).toBe(-95);
@@ -61,10 +65,14 @@ describe("Sparkline", () => {
 				label="Gifts per day, last 14 days"
 			/>,
 		);
-		const svg = root.querySelector('svg[role="img"]');
+		const svg = root.querySelector('svg.ds-sparkline[role="img"]');
 		expect(svg?.getAttribute("aria-label")).toBe("Gifts per day, last 14 days");
-		const before = svg?.querySelector(".spark-before")?.getAttribute("points");
-		const recent = svg?.querySelector(".spark-recent")?.getAttribute("points");
+		const before = svg
+			?.querySelector(".ds-spark-before")
+			?.getAttribute("points");
+		const recent = svg
+			?.querySelector(".ds-spark-recent")
+			?.getAttribute("points");
 		expect(before?.split(" ")).toHaveLength(8);
 		expect(recent?.split(" ")).toHaveLength(7);
 	});

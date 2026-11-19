@@ -1,4 +1,5 @@
 /** @jsxImportSource hono/jsx/dom */
+import type { Child } from "hono/jsx";
 import { useState } from "hono/jsx/dom";
 
 /**
@@ -20,41 +21,72 @@ export function isAllowedImage(url: string, origins: readonly string[]) {
 	});
 }
 
-/** An image (decorative when `alt` is empty), or a neutral placeholder when there is none, its origin is blocked, or it fails to load. */
+/**
+ * The registry's image frame: an image (decorative when `alt` is empty), or the
+ * placeholder when there is none, its origin is blocked, or it fails to load.
+ * `overlay` is the frame's top-start slot, for a badge over either.
+ */
 export function ImageWithPlaceholder(props: {
 	src: string | null;
 	alt: string;
 	origins: readonly string[];
+	square?: boolean;
+	overlay?: Child;
 	class?: string;
 }) {
-	const [failed, setFailed] = useState<string | null>(null);
+	const [state, setState] = useState<{
+		src: string;
+		value: "loaded" | "failed";
+	}>();
 	const { src } = props;
-	const cls = props.class ? `image ${props.class}` : "image";
-	if (src && src !== failed && isAllowedImage(src, props.origins)) {
-		return (
-			<img
-				class={cls}
-				src={src}
-				alt={props.alt}
-				loading="lazy"
-				decoding="async"
-				onError={() => setFailed(src)}
-			/>
-		);
-	}
+	const failed = state?.src === src && state.value === "failed";
+	const shown = src !== null && !failed && isAllowedImage(src, props.origins);
+	const data = shown
+		? state?.src === src && state.value === "loaded"
+			? "loaded"
+			: "loading"
+		: "unavailable";
+	const cls = [
+		"ds-image-frame",
+		props.square ? "ds-image-frame-square" : "",
+		props.class ?? "",
+	]
+		.filter((c) => c !== "")
+		.join(" ");
 	return (
-		<div
-			class={`${cls} image-placeholder`}
-			{...(props.alt
-				? { role: "img", "aria-label": props.alt }
-				: { "aria-hidden": "true" })}
-		>
-			<svg viewBox="0 0 40 32" aria-hidden="true">
-				<path
-					fill-rule="evenodd"
-					d="M4 2h32a2 2 0 0 1 2 2v24a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm1 3v19l9-9 7 7 5-5 9 9V5zm23 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"
+		<div class={cls} data-state={data}>
+			{shown ? (
+				<img
+					class="ds-image"
+					src={src}
+					alt={props.alt}
+					loading="lazy"
+					decoding="async"
+					onLoad={() => setState({ src, value: "loaded" })}
+					onError={() => setState({ src, value: "failed" })}
 				/>
-			</svg>
+			) : (
+				<div
+					class="ds-image-placeholder"
+					{...(props.alt
+						? { role: "img", "aria-label": props.alt }
+						: { "aria-hidden": "true" })}
+				>
+					<svg
+						aria-hidden="true"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+						<circle cx="9" cy="9" r="2" />
+						<path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+					</svg>
+				</div>
+			)}
+			{props.overlay && <div class="ds-image-overlay">{props.overlay}</div>}
 		</div>
 	);
 }

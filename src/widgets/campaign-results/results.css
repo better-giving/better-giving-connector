@@ -173,6 +173,7 @@
 }
 
 .fact {
+	margin: 0;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -195,17 +196,6 @@
 .fact dd.fact-sub {
 	color: var(--gray-11);
 	font-size: var(--text-xs);
-}
-
-.fact-line {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 6px;
-}
-
-.fact-chart {
-	margin-top: 4px;
 }
 
 .checks {
