@@ -57,7 +57,7 @@ describe("sparklinePoints", () => {
 });
 
 describe("Sparkline", () => {
-	it("is one labelled image, the last week drawn apart from the week before", () => {
+	it("is one labelled image", () => {
 		const root = mount(
 			<Sparkline
 				values={Array.from({ length: 14 }, (_, i) => i)}
@@ -67,13 +67,15 @@ describe("Sparkline", () => {
 		);
 		const svg = root.querySelector('svg.ds-sparkline[role="img"]');
 		expect(svg?.getAttribute("aria-label")).toBe("Gifts per day, last 14 days");
-		const before = svg
-			?.querySelector(".ds-spark-before")
-			?.getAttribute("points");
-		const recent = svg
-			?.querySelector(".ds-spark-recent")
-			?.getAttribute("points");
-		expect(before?.split(" ")).toHaveLength(8);
-		expect(recent?.split(" ")).toHaveLength(7);
+	});
+
+	it("gives the before line the earlier days and the recent line the last ones, meeting on one point", () => {
+		const root = mount(
+			<Sparkline values={[0, 28, 14, 28]} emphasize={2} label="Gifts" />,
+		);
+		const points = (cls: string) =>
+			root.querySelector(`.${cls}`)?.getAttribute("points");
+		expect(points("ds-spark-before")).toBe("0.0,30.0 46.7,2.0 93.3,16.0");
+		expect(points("ds-spark-recent")).toBe("93.3,16.0 140.0,2.0");
 	});
 });

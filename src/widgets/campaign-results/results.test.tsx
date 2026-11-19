@@ -2,7 +2,7 @@
 // @vitest-environment happy-dom
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { describe, expect, it, vi } from "vitest";
-import { RESULTS_LIVE } from "../../../test/widget-host/fixtures";
+import { FIXTURES, RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
 import { applyStyles, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
@@ -299,5 +299,68 @@ describe("campaign results type", () => {
 		const badge = root.querySelector(".head > .ds-card-status > .ds-badge");
 		expect(badge?.textContent).toBe("Live");
 		expect(badge?.classList.contains("ds-badge-outline")).toBe(false);
+	});
+});
+
+describe("campaign results trend", () => {
+	const usd = (amount: string) => ({ amount, currency: "USD" });
+	const series = (...amounts: string[]) =>
+		amounts.map((amount, i) => ({
+			date: `2026-10-${String(i + 1).padStart(2, "0")}`,
+			total: usd(amount),
+		}));
+	const fixture = (name: string) => {
+		const reply = FIXTURES["campaign-results"]?.[name]?.result;
+		if (!reply || "error" in reply) throw new Error(`no fixture ${name}`);
+		return CampaignResultsData.parse(reply.structuredContent);
+	};
+	const trend = (root: HTMLElement) => {
+		const block = root.querySelector(".ds-trend");
+		if (!block) throw new Error("no trend block");
+		return {
+			badge: block.querySelector(".ds-trend-main .ds-badge"),
+			note: block.querySelector(".ds-trend-note")?.textContent,
+		};
+	};
+
+	it("shows a success badge with an upward glyph and the week before", async () => {
+		const { root } = await show(fixture("live"));
+		const { badge, note } = trend(root);
+		expect(badge?.textContent).toBe("Up 32%");
+		expect(badge?.classList.contains("ds-badge-success")).toBe(true);
+		expect(badge?.classList.contains("ds-badge-warning")).toBe(false);
+		expect(note).toBe("Previous 7 days: $3,757");
+		const glyph = badge?.querySelector("svg.ds-trend-glyph");
+		expect(glyph?.getAttribute("aria-hidden")).toBe("true");
+		expect(glyph?.querySelector("path")?.getAttribute("d")).toBe("M16 7h6v6");
+	});
+
+	it("shows a warning badge with a downward glyph for a falling week", async () => {
+		const { root } = await show(fixture("live-down"));
+		const { badge, note } = trend(root);
+		expect(badge?.textContent).toBe("Down 24%");
+		expect(badge?.classList.contains("ds-badge-warning")).toBe(true);
+		expect(badge?.classList.contains("ds-badge-success")).toBe(false);
+		expect(note).toBe("Previous 7 days: $4,960");
+		const glyph = badge?.querySelector("svg.ds-trend-glyph");
+		expect(glyph?.getAttribute("aria-hidden")).toBe("true");
+		expect(glyph?.querySelector("path")?.getAttribute("d")).toBe("M16 17h6v-6");
+	});
+
+	it("draws no badge for a flat week, but still names the week before", async () => {
+		const { root } = await show(fixture("live-flat"));
+		const { badge, note } = trend(root);
+		expect(badge).toBeNull();
+		expect(note).toBe("Previous 7 days: $4,200");
+	});
+
+	it("draws no badge when the week before took nothing", async () => {
+		const { root } = await show({
+			...RESULTS_LIVE,
+			daily: series(...Array(7).fill("0.00"), ...Array(7).fill("5.00")),
+		});
+		const { badge, note } = trend(root);
+		expect(badge).toBeNull();
+		expect(note).toBe("Nothing in the 7 days before");
 	});
 });

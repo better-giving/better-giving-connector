@@ -1,7 +1,8 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
+import { useState } from "hono/jsx/dom";
 import { describe, expect, it, vi } from "vitest";
-import { mount } from "../test-dom";
+import { flush, mount } from "../test-dom";
 import { ImageWithPlaceholder, isAllowedImage } from "./image";
 
 const ORIGINS = [
@@ -87,6 +88,80 @@ describe("ImageWithPlaceholder", () => {
 			expect(img(root)).toBeNull();
 			expect(placeholder(root)?.getAttribute("aria-label")).toBe("Cover");
 		}
+	});
+
+	it("marks a blocked origin unavailable, with no img", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src="https://example.com/a.png"
+				alt="Cover"
+				origins={ORIGINS}
+			/>,
+		);
+		expect(
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state"),
+		).toBe("unavailable");
+	});
+
+	it("puts a caller's class on the frame beside the registry's", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src={null}
+				alt=""
+				origins={ORIGINS}
+				square
+				class="pv-hero"
+			/>,
+		);
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.className).toBe(
+			"ds-image-frame ds-image-frame-square pv-hero",
+		);
+		expect(root.querySelector(".pv-hero .ds-image-placeholder")).not.toBeNull();
+	});
+
+	it("draws the overlay after a real img, inside the frame", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src="https://app.connect.better.giving/a.png"
+				alt="Cover"
+				origins={ORIGINS}
+				overlay={<span>Live</span>}
+			/>,
+		);
+		const frame = root.querySelector(".ds-image-frame");
+		expect(
+			[...(frame?.children ?? [])].map((c) => `${c.tagName}.${c.className}`),
+		).toEqual(["IMG.ds-image", "DIV.ds-image-overlay"]);
+		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
+	});
+
+	it("starts a new src over as loading, however the last one ended", async () => {
+		const A = "https://app.connect.better.giving/a.png";
+		const B = "https://app.connect.better.giving/b.png";
+		let draw: (src: string) => void = () => {};
+		function Swap() {
+			const [src, setSrc] = useState(A);
+			draw = setSrc;
+			return <ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />;
+		}
+		const root = mount(<Swap />);
+		const state = () =>
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state");
+
+		img(root)?.dispatchEvent(new Event("error"));
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		draw(B);
+		await flush();
+		expect(state()).toBe("loading");
+		expect(img(root)?.getAttribute("src")).toBe(B);
+
+		img(root)?.dispatchEvent(new Event("load"));
+		await vi.waitFor(() => expect(state()).toBe("loaded"));
+		draw(A);
+		await flush();
+		expect(state()).toBe("loading");
+		expect(img(root)?.getAttribute("src")).toBe(A);
 	});
 
 	it("hides the placeholder from screen readers when it has no alt text", () => {
