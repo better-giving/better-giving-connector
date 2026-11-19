@@ -111,7 +111,7 @@ export function Facts(props: { data: CampaignResultsData }) {
 				)}
 			</dl>
 			{!ended && (
-				<div class="fact">
+				<div class="fact fact-trend">
 					{/* biome-ignore lint/a11y/useSemanticElements: the registry's trend block is a role="group" div; a fieldset is not a card block */}
 					<div class="ds-trend" role="group" aria-labelledby={labelId}>
 						<p class="ds-trend-label" id={labelId}>

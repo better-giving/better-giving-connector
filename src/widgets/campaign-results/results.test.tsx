@@ -408,6 +408,17 @@ describe("campaign results trend", () => {
 		]);
 	});
 
+	it("puts the trend in its own tile of the facts row, after donors and the average gift", async () => {
+		const { root } = await show(RESULTS_LIVE);
+		const tiles = [...(root.querySelector(".facts")?.children ?? [])];
+		expect(tiles.map((t) => t.classList.contains("fact-trend"))).toEqual([
+			false,
+			false,
+			true,
+		]);
+		expect(tiles[2]?.querySelector(".ds-trend")).not.toBeNull();
+	});
+
 	it("draws no badge when the week before took nothing", async () => {
 		const { root } = await show({
 			...RESULTS_LIVE,
