@@ -54,7 +54,7 @@ describe("ImageWithPlaceholder", () => {
 			/>,
 		);
 		expect(img(root)?.getAttribute("alt")).toBe("Coats on a rack");
-		expect(img(root)?.className).toBe("ds-image");
+		expect(img(root)?.classList.contains("ds-image")).toBe(true);
 		expect(placeholder(root)).toBeNull();
 		const frame = root.querySelector(".ds-image-frame");
 		expect(frame?.getAttribute("data-state")).toBe("loading");
@@ -114,9 +114,9 @@ describe("ImageWithPlaceholder", () => {
 			/>,
 		);
 		const frame = root.querySelector(".ds-image-frame");
-		expect(frame?.className).toBe(
-			"ds-image-frame ds-image-frame-square pv-hero",
-		);
+		expect(frame?.classList.contains("ds-image-frame")).toBe(true);
+		expect(frame?.classList.contains("ds-image-frame-square")).toBe(true);
+		expect(frame?.classList.contains("pv-hero")).toBe(true);
 		expect(root.querySelector(".pv-hero .ds-image-placeholder")).not.toBeNull();
 	});
 

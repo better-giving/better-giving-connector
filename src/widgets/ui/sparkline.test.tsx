@@ -54,6 +54,10 @@ describe("sparklinePoints", () => {
 			[10, 4],
 		]);
 	});
+
+	it("puts a single value at the left edge, at the top when it is the busiest", () => {
+		expect(sparklinePoints([5], 100, 20)).toEqual([[0, 0]]);
+	});
 });
 
 describe("Sparkline", () => {
@@ -77,5 +81,42 @@ describe("Sparkline", () => {
 			root.querySelector(`.${cls}`)?.getAttribute("points");
 		expect(points("ds-spark-before")).toBe("0.0,30.0 46.7,2.0 93.3,16.0");
 		expect(points("ds-spark-recent")).toBe("93.3,16.0 140.0,2.0");
+	});
+
+	const points = (root: Element, cls: string) =>
+		root.querySelector(`.${cls}`)?.getAttribute("points");
+
+	it("draws everything in the recent line when more days are emphasized than exist", () => {
+		const root = mount(
+			<Sparkline values={[0, 28, 14]} emphasize={5} label="Gifts" />,
+		);
+		expect(points(root, "ds-spark-before")).toBe("0.0,30.0");
+		expect(points(root, "ds-spark-recent")).toBe(
+			"0.0,30.0 70.0,2.0 140.0,16.0",
+		);
+	});
+
+	it("draws everything in the before line, leaving none recent, when emphasize is 0", () => {
+		const root = mount(
+			<Sparkline values={[0, 28, 14]} emphasize={0} label="Gifts" />,
+		);
+		expect(points(root, "ds-spark-before")).toBe(
+			"0.0,30.0 70.0,2.0 140.0,16.0",
+		);
+		expect(points(root, "ds-spark-recent")).toBe("");
+	});
+
+	it("draws a single day as one point on each line", () => {
+		const root = mount(<Sparkline values={[5]} emphasize={1} label="Gifts" />);
+		expect(points(root, "ds-spark-before")).toBe("0.0,2.0");
+		expect(points(root, "ds-spark-recent")).toBe("0.0,2.0");
+	});
+
+	it("lays a run of empty days flat along the bottom", () => {
+		const root = mount(
+			<Sparkline values={[0, 0, 0]} emphasize={2} label="Gifts" />,
+		);
+		expect(points(root, "ds-spark-before")).toBe("0.0,30.0 70.0,30.0");
+		expect(points(root, "ds-spark-recent")).toBe("70.0,30.0 140.0,30.0");
 	});
 });

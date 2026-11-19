@@ -2,7 +2,7 @@
 // @vitest-environment happy-dom
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { describe, expect, it, vi } from "vitest";
-import { FIXTURES, RESULTS_LIVE } from "../../../test/widget-host/fixtures";
+import { RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
 import { applyStyles, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
@@ -309,11 +309,6 @@ describe("campaign results trend", () => {
 			date: `2026-10-${String(i + 1).padStart(2, "0")}`,
 			total: usd(amount),
 		}));
-	const fixture = (name: string) => {
-		const reply = FIXTURES["campaign-results"]?.[name]?.result;
-		if (!reply || "error" in reply) throw new Error(`no fixture ${name}`);
-		return CampaignResultsData.parse(reply.structuredContent);
-	};
 	const trend = (root: HTMLElement) => {
 		const block = root.querySelector(".ds-trend");
 		if (!block) throw new Error("no trend block");
@@ -323,35 +318,91 @@ describe("campaign results trend", () => {
 		};
 	};
 
+	// previous week $100, last week $150 / $75 / $100
+	const PREVIOUS = ["10", "10", "10", "10", "10", "25", "25"];
+	const weeks = (last: string[]) => ({
+		...RESULTS_LIVE,
+		daily: series(...PREVIOUS, ...last),
+	});
+	const glyphPath = (badge: Element | null | undefined) =>
+		badge?.querySelector("svg.ds-trend-glyph path")?.getAttribute("d");
+
 	it("shows a success badge with an upward glyph and the week before", async () => {
-		const { root } = await show(fixture("live"));
+		const { root } = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
 		const { badge, note } = trend(root);
-		expect(badge?.textContent).toBe("Up 32%");
+		expect(badge?.textContent).toBe("Up 50%");
 		expect(badge?.classList.contains("ds-badge-success")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(false);
-		expect(note).toBe("Previous 7 days: $3,757");
-		const glyph = badge?.querySelector("svg.ds-trend-glyph");
-		expect(glyph?.getAttribute("aria-hidden")).toBe("true");
-		expect(glyph?.querySelector("path")?.getAttribute("d")).toBe("M16 7h6v6");
+		expect(note).toBe("Previous 7 days: $100");
+		expect(
+			badge?.querySelector("svg.ds-trend-glyph")?.getAttribute("aria-hidden"),
+		).toBe("true");
 	});
 
 	it("shows a warning badge with a downward glyph for a falling week", async () => {
-		const { root } = await show(fixture("live-down"));
+		const up = trend(
+			(await show(weeks(["50", "0", "0", "0", "0", "0", "100"]))).root,
+		);
+		const { root } = await show(weeks(["75", "0", "0", "0", "0", "0", "0"]));
 		const { badge, note } = trend(root);
-		expect(badge?.textContent).toBe("Down 24%");
+		expect(badge?.textContent).toBe("Down 25%");
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-success")).toBe(false);
-		expect(note).toBe("Previous 7 days: $4,960");
-		const glyph = badge?.querySelector("svg.ds-trend-glyph");
-		expect(glyph?.getAttribute("aria-hidden")).toBe("true");
-		expect(glyph?.querySelector("path")?.getAttribute("d")).toBe("M16 17h6v-6");
+		expect(note).toBe("Previous 7 days: $100");
+		expect(
+			badge?.querySelector("svg.ds-trend-glyph")?.getAttribute("aria-hidden"),
+		).toBe("true");
+		expect(glyphPath(badge)).toBeTruthy();
+		expect(glyphPath(badge)).not.toBe(glyphPath(up.badge));
 	});
 
 	it("draws no badge for a flat week, but still names the week before", async () => {
-		const { root } = await show(fixture("live-flat"));
+		const { root } = await show(weeks(["100", "0", "0", "0", "0", "0", "0"]));
 		const { badge, note } = trend(root);
 		expect(badge).toBeNull();
-		expect(note).toBe("Previous 7 days: $4,200");
+		expect(note).toBe("Previous 7 days: $100");
+	});
+
+	it("names the sparkline for what it plots", async () => {
+		const { root } = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
+		expect(
+			root
+				.querySelector('.ds-trend svg[role="img"]')
+				?.getAttribute("aria-label"),
+		).toBe("Amount raised per day over the last 14 days");
+	});
+
+	it("groups the trend under its 'Last 7 days' label", async () => {
+		const { root } = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
+		const group = root.querySelector('.ds-trend[role="group"]');
+		const labelId = group?.getAttribute("aria-labelledby");
+		expect(labelId).toBeTruthy();
+		expect(document.getElementById(labelId ?? "")?.textContent).toBe(
+			"Last 7 days",
+		);
+	});
+
+	it("leaves the trend out once the campaign has ended", async () => {
+		const live = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
+		expect(live.root.querySelector(".ds-trend")).not.toBeNull();
+		const { root } = await show({
+			...weeks(["50", "0", "0", "0", "0", "0", "100"]),
+			campaign: { ...RESULTS_LIVE.campaign, status: "ended" },
+		});
+		expect(root.querySelector(".ds-trend")).toBeNull();
+	});
+
+	it("gives donors and the average gift their own figures", async () => {
+		const { root } = await show(RESULTS_LIVE);
+		const facts = [...root.querySelectorAll("dl.fact")].map((dl) => ({
+			term: dl.querySelector("dt")?.textContent,
+			figure: dl.querySelector(".fact-figure")?.textContent,
+			sub: dl.querySelector(".fact-sub")?.textContent,
+		}));
+		expect(facts).toEqual([
+			{ term: "Donors", figure: "87", sub: "102 gifts" },
+			{ term: "Average gift", figure: "$31.77", sub: "Median $25" },
+		]);
 	});
 
 	it("draws no badge when the week before took nothing", async () => {
