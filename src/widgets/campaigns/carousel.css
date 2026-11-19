@@ -71,16 +71,6 @@
 	font-weight: 700;
 }
 
-.campaign-media {
-	position: relative;
-}
-
-.campaign-chip {
-	position: absolute;
-	top: 12px;
-	left: 12px;
-}
-
 .campaign-title {
 	font-size: var(--text-base);
 }

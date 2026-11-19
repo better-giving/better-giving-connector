@@ -1,0 +1,110 @@
+/* the registry's sparkline and trend block as plain css, no tailwind: the
+   14-day line split into the earlier days and the recent seven, the inline
+   size for a row, and the card block around it (the label, the figure, the
+   change badge's glyph, the line under the figure). reads only the variables
+   the `variables` item declares. sparkline-css.test.tsx renders the React
+   `Sparkline` and `Trend` beside it and asserts the same computed look in
+   light and dark, for the default and example themes.
+
+   the spacing step, the type sizes and the weight live only in tailwind's
+   theme; they are declared here under ds- names with the same values, and the
+   test holds them equal. */
+.ds-trend {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  --ds-text-sm: calc(0.875 * var(--ds-rem, 1rem));
+  --ds-text-sm-lh: calc(1.25 / 0.875);
+  --ds-text-3xl: calc(1.875 * var(--ds-rem, 1rem));
+  --ds-text-3xl-lh: calc(2.25 / 1.875);
+  --ds-font-weight-bold: 700;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ds-spacing) * 1);
+}
+/* "Last 7 days" and the line under the figure */
+.ds-trend-label,
+.ds-trend-note {
+  font-size: var(--ds-text-sm);
+  line-height: var(--ds-text-sm-lh);
+  color: var(--gray-11);
+}
+/* the figure and the badge; the badge wraps under a long figure */
+.ds-trend-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: safe center;
+  gap: calc(var(--ds-spacing) * 3);
+}
+.ds-trend-figure {
+  font-family: var(--font-display);
+  font-size: var(--ds-text-3xl);
+  line-height: var(--ds-text-3xl-lh);
+  font-weight: var(--ds-font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* the rising or falling glyph inside a badge-css badge, 12px */
+.ds-trend-glyph {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  inline-size: calc(var(--ds-spacing) * 3);
+  block-size: calc(var(--ds-spacing) * 3);
+  flex-shrink: 0;
+}
+
+/* "No change", "No previous week" or "Not enough days to compare" in a table
+   cell where no badge draws, for assistive technology only */
+.ds-trend-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* the svg stretches to its box (preserveAspectRatio="none") and the strokes
+   keep their width (non-scaling-stroke), so the weight that splits the two
+   lines holds at any size: the container's width, 32px high */
+.ds-sparkline {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  display: block;
+  inline-size: 100%;
+  block-size: calc(var(--ds-spacing) * 8);
+  overflow: visible;
+}
+/* in a table cell or a list row: 96 by 24px */
+.ds-sparkline-inline {
+  inline-size: calc(var(--ds-spacing) * 24);
+  block-size: calc(var(--ds-spacing) * 6);
+  flex: none;
+}
+/* in the card block, 12px under the note */
+.ds-trend > .ds-sparkline {
+  margin-block-start: calc(var(--ds-spacing) * 3);
+}
+.ds-spark-before,
+.ds-spark-recent {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ds-spark-before {
+  stroke: var(--gray-8);
+  stroke-width: 1.5;
+}
+.ds-spark-recent {
+  stroke: var(--primary);
+  stroke-width: 2.5;
+}
+/* the split survives the repaint: the earlier days in the muted system ink */
+@media (forced-colors: active) {
+  .ds-spark-before {
+    stroke: GrayText;
+  }
+  .ds-spark-recent {
+    stroke: CanvasText;
+  }
+}

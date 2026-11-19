@@ -1,5 +1,6 @@
 /** @jsxImportSource hono/jsx/dom */
 // @vitest-environment happy-dom
+import { useState } from "hono/jsx/dom";
 import { describe, expect, it, vi } from "vitest";
 import { mount } from "../test-dom";
 import { ImageWithPlaceholder, isAllowedImage } from "./image";
@@ -42,9 +43,9 @@ describe("isAllowedImage", () => {
 describe("ImageWithPlaceholder", () => {
 	const img = (root: HTMLElement) => root.querySelector("img");
 	const placeholder = (root: HTMLElement) =>
-		root.querySelector('.image-placeholder[role="img"]');
+		root.querySelector('.ds-image-placeholder[role="img"]');
 
-	it("shows an allowed image with its alt text", () => {
+	it("shows an allowed image with its alt text", async () => {
 		const root = mount(
 			<ImageWithPlaceholder
 				src="https://app.connect.better.giving/a.png"
@@ -53,24 +54,147 @@ describe("ImageWithPlaceholder", () => {
 			/>,
 		);
 		expect(img(root)?.getAttribute("alt")).toBe("Coats on a rack");
+		expect(img(root)?.classList.contains("ds-image")).toBe(true);
 		expect(placeholder(root)).toBeNull();
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.querySelector(".ds-image-overlay")).toBeNull();
+		expect(frame?.getAttribute("data-state")).toBe("loading");
+		img(root)?.dispatchEvent(new Event("load"));
+		await vi.waitFor(() =>
+			expect(frame?.getAttribute("data-state")).toBe("loaded"),
+		);
 	});
 
-	it("shows the placeholder, never the img, for a blocked origin or no image", () => {
+	it("draws an overlay slot on request", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src={null}
+				alt=""
+				origins={ORIGINS}
+				overlay={<span>Live</span>}
+			/>,
+		);
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.getAttribute("data-state")).toBe("unavailable");
+		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
+	});
+
+	it("shows the placeholder, never the img, and reads unavailable for a blocked origin or no image", () => {
 		for (const src of ["https://example.com/a.png", null]) {
 			const root = mount(
 				<ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />,
 			);
 			expect(img(root)).toBeNull();
 			expect(placeholder(root)?.getAttribute("aria-label")).toBe("Cover");
+			expect(
+				root.querySelector(".ds-image-frame")?.getAttribute("data-state"),
+			).toBe("unavailable");
 		}
+	});
+
+	it("puts a caller's class on the frame beside the registry's", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src={null}
+				alt=""
+				origins={ORIGINS}
+				class="pv-hero"
+			/>,
+		);
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.classList.contains("ds-image-frame")).toBe(true);
+		expect(frame?.classList.contains("pv-hero")).toBe(true);
+		expect(root.querySelector(".pv-hero .ds-image-placeholder")).not.toBeNull();
+	});
+
+	it("draws the overlay inside the frame beside a real img", () => {
+		const root = mount(
+			<ImageWithPlaceholder
+				src="https://app.connect.better.giving/a.png"
+				alt="Cover"
+				origins={ORIGINS}
+				overlay={<span>Live</span>}
+			/>,
+		);
+		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.querySelector("img")).not.toBeNull();
+		expect(frame?.querySelector(".ds-image-overlay")?.textContent).toBe("Live");
+	});
+
+	it("starts a new src over as loading, however the last one ended", async () => {
+		const A = "https://app.connect.better.giving/a.png";
+		const B = "https://app.connect.better.giving/b.png";
+		let draw: (src: string) => void = () => {};
+		function Swap() {
+			const [src, setSrc] = useState(A);
+			draw = setSrc;
+			return <ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />;
+		}
+		const root = mount(<Swap />);
+		const state = () =>
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state");
+
+		img(root)?.dispatchEvent(new Event("error"));
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		draw(B);
+		await vi.waitFor(() => expect(state()).toBe("loading"));
+		expect(img(root)?.getAttribute("src")).toBe(B);
+
+		img(root)?.dispatchEvent(new Event("load"));
+		await vi.waitFor(() => expect(state()).toBe("loaded"));
+		draw(A);
+		await vi.waitFor(() => expect(state()).toBe("loading"));
+		expect(img(root)?.getAttribute("src")).toBe(A);
+	});
+
+	it("reads loading, not loaded, when a loaded src comes back after none", async () => {
+		const A = "https://app.connect.better.giving/a.png";
+		let draw: (src: string | null) => void = () => {};
+		function Swap() {
+			const [src, setSrc] = useState<string | null>(A);
+			draw = setSrc;
+			return <ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />;
+		}
+		const root = mount(<Swap />);
+		const state = () =>
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state");
+
+		img(root)?.dispatchEvent(new Event("load"));
+		await vi.waitFor(() => expect(state()).toBe("loaded"));
+		draw(null);
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		draw(A);
+		await vi.waitFor(() => expect(state()).toBe("loading"));
+		expect(img(root)?.getAttribute("src")).toBe(A);
+	});
+
+	it("gives a src that failed a fresh try once a blocked origin has come between", async () => {
+		const A = "https://app.connect.better.giving/a.png";
+		let draw: (src: string) => void = () => {};
+		function Swap() {
+			const [src, setSrc] = useState(A);
+			draw = setSrc;
+			return <ImageWithPlaceholder src={src} alt="Cover" origins={ORIGINS} />;
+		}
+		const root = mount(<Swap />);
+		const state = () =>
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state");
+
+		img(root)?.dispatchEvent(new Event("error"));
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		draw("https://example.com/a.png");
+		await vi.waitFor(() => expect(state()).toBe("unavailable"));
+		expect(img(root)).toBeNull();
+		draw(A);
+		await vi.waitFor(() => expect(state()).toBe("loading"));
+		expect(img(root)?.getAttribute("src")).toBe(A);
 	});
 
 	it("hides the placeholder from screen readers when it has no alt text", () => {
 		const root = mount(
 			<ImageWithPlaceholder src={null} alt="" origins={ORIGINS} />,
 		);
-		const box = root.querySelector(".image-placeholder");
+		const box = root.querySelector(".ds-image-placeholder");
 		expect(box?.getAttribute("aria-hidden")).toBe("true");
 		expect(box?.hasAttribute("role")).toBe(false);
 		expect(box?.hasAttribute("aria-label")).toBe(false);
@@ -87,5 +211,8 @@ describe("ImageWithPlaceholder", () => {
 		img(root)?.dispatchEvent(new Event("error"));
 		await vi.waitFor(() => expect(img(root)).toBeNull());
 		expect(placeholder(root)).not.toBeNull();
+		expect(
+			root.querySelector(".ds-image-frame")?.getAttribute("data-state"),
+		).toBe("unavailable");
 	});
 });

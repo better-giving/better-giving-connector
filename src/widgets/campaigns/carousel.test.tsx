@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CAMPAIGNS } from "../../../test/widget-host/fixtures";
 import { formatMoney } from "../../format";
 import { CampaignsData } from "../model";
-import { applyStyles, startHost } from "../test-dom";
+import { startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { Campaigns } from "./carousel";
 
@@ -81,7 +81,7 @@ describe("campaign carousel", () => {
 		]) {
 			const c = card(root, title);
 			expect(c.querySelector("img"), title).toBeNull();
-			expect(c.querySelector(".image-placeholder"), title).not.toBeNull();
+			expect(c.querySelector(".ds-image-placeholder"), title).not.toBeNull();
 		}
 		expect(card(root, "Winter coat drive").querySelector("img")).not.toBeNull();
 	});
@@ -171,45 +171,10 @@ describe("campaign carousel", () => {
 });
 
 describe("campaign photo status chip", () => {
-	// Walks the sheet text, not happy-dom's CSSOM, so a rule nested in @media,
-	// @container or @layer is reached whether or not the DOM implements it.
-	// `path` joins the enclosing preludes with the rule's own selector.
-	type Rule = { path: string; body: string };
-	function rules(css: string, outer: string[] = []): Rule[] {
-		const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
-		const found: Rule[] = [];
-		let depth = 0;
-		let preludeStart = 0;
-		let bodyStart = 0;
-		let prelude = "";
-		for (let i = 0; i < text.length; i++) {
-			const ch = text[i];
-			if (ch === "{") {
-				if (depth === 0) {
-					prelude = text.slice(preludeStart, i).trim();
-					bodyStart = i + 1;
-				}
-				depth++;
-			} else if (ch === "}") {
-				depth--;
-				if (depth === 0) {
-					const body = text.slice(bodyStart, i);
-					const path = [...outer, prelude];
-					if (body.includes("{")) found.push(...rules(body, path));
-					else found.push({ path: path.join(" "), body });
-					preludeStart = i + 1;
-				}
-			} else if (ch === ";" && depth === 0) {
-				preludeStart = i + 1;
-			}
-		}
-		return found;
-	}
-
 	it("gives live, draft and ended campaigns each their own class", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
 		const classes = new Map<string, string>();
-		for (const chip of root.querySelectorAll(".campaign-chip .ds-badge")) {
+		for (const chip of root.querySelectorAll(".ds-image-overlay .ds-badge")) {
 			expect(chip.classList.contains("ds-badge-on-photo")).toBe(true);
 			classes.set(chip.textContent ?? "", chip.className);
 		}
@@ -217,38 +182,25 @@ describe("campaign photo status chip", () => {
 		expect(new Set(classes.values()).size).toBe(3);
 	});
 
-	it("paints each status as the registry's on-photo badge, inset from the card's corner", async () => {
+	it("draws each status badge inside its photo's frame", async () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
-		applyStyles("ui/styles.css", "campaigns/carousel.css");
-		const chips = [...root.querySelectorAll<HTMLElement>(".campaign-chip")];
-		expect(chips.length).toBeGreaterThan(0);
-		const plain = document.createElement("span");
-		plain.className = "ds-badge ds-badge-warning";
-		root.append(plain);
-		expect(getComputedStyle(plain).boxShadow).not.toMatch(/1px/);
-		for (const chip of chips) {
-			const style = getComputedStyle(chip);
-			expect([style.position, style.top, style.left]).toEqual([
-				"absolute",
-				"12px",
-				"12px",
-			]);
-			const badge = chip.querySelector(".ds-badge") as Element;
-			// the registry's ring in the page color, drawn only by .ds-badge-on-photo
-			expect(getComputedStyle(badge).boxShadow).toMatch(
-				/^0(px)? 0(px)? 0(px)? 1px \S+/,
+		const frames = [...root.querySelectorAll(".campaign .ds-image-frame")];
+		expect(frames).toHaveLength(CAMPAIGNS.campaigns.length);
+		const label = {
+			published: "Live",
+			draft: "Draft",
+			ended: "Ended",
+		} as const;
+		for (const campaign of CAMPAIGNS.campaigns) {
+			const tile = [...root.querySelectorAll(".campaign")].find(
+				(t) =>
+					t.querySelector(".campaign-title")?.textContent === campaign.title,
 			);
+			const badge = tile?.querySelector(
+				".ds-image-frame .ds-image-overlay .ds-badge",
+			);
+			expect(badge?.classList.contains("ds-badge-on-photo")).toBe(true);
+			expect(badge?.textContent).toBe(label[campaign.status]);
 		}
-	});
-
-	it("adds no local fill, ink or edge to the chip's badge", () => {
-		applyStyles("ui/styles.css", "campaigns/carousel.css");
-		const all = rules(document.head.querySelector("style")?.textContent ?? "");
-		// liveness: the walker reached carousel.css's own chip rule
-		const chip = all.find((r) => r.path === ".campaign-chip");
-		expect(chip?.body).toContain("position: absolute");
-		expect(
-			all.filter((r) => /\.campaign-chip\s+\.ds-badge/.test(r.path)),
-		).toEqual([]);
 	});
 });

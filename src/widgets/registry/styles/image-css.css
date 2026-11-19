@@ -1,0 +1,62 @@
+/* the registry's image as plain css, no tailwind: a photo in a 16:9 or square
+   frame on the --gray-3 fill, the placeholder glyph for no image, a refused
+   origin or a failed load, and the overlay slot at the top-start corner.
+   reads only the variables the `variables` item declares. image-css.test.tsx
+   renders the React `Image` beside it and asserts the same computed look in
+   light and dark, for the default and example themes.
+
+   the spacing step lives only in tailwind's theme; it is declared here under
+   a ds- name with the same value, and the test holds them equal. */
+.ds-image-frame {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  box-sizing: border-box;
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: clip;
+  background-color: var(--gray-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+}
+.ds-image-frame-square {
+  aspect-ratio: 1 / 1;
+}
+/* a card's first child: the card clips the corner and draws the edge; the
+   image keeps a hairline under it */
+.ds-card > .ds-image-frame:first-child {
+  border-width: 0;
+  border-block-end-width: 1px;
+  border-radius: 0;
+}
+
+/* the frame holds the ratio, so a failed load cannot move the layout */
+.ds-image {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* no image: lucide's image glyph, 32px at a 1.5 stroke, centred */
+.ds-image-placeholder {
+  display: grid;
+  place-items: safe center;
+  inline-size: 100%;
+  block-size: 100%;
+  color: var(--gray-11);
+}
+.ds-image-placeholder > svg {
+  inline-size: calc(var(--ds-spacing) * 8);
+  block-size: calc(var(--ds-spacing) * 8);
+  stroke-width: 1.5;
+}
+
+/* a badge-css badge with ds-badge-on-photo, 12px in from the top-start
+   corner. a flex box, so the badge sits on the inset rather than on a line
+   box's baseline below it */
+.ds-image-overlay {
+  position: absolute;
+  display: flex;
+  inset-block-start: calc(var(--ds-spacing) * 3);
+  inset-inline-start: calc(var(--ds-spacing) * 3);
+}

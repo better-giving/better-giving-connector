@@ -189,11 +189,7 @@
 }
 
 .pv-hero {
-	width: 100%;
 	margin-bottom: 12px;
-	border-radius: 4px;
-	aspect-ratio: 16 / 9;
-	object-fit: cover;
 }
 
 .pv-section {

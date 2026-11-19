@@ -6,8 +6,8 @@ type Day = { date: string; total: Money };
 
 /**
  * The last seven days' total against the seven before, and the change as a
- * whole percent (null when the week before took nothing). `daily` is oldest
- * first, in one currency.
+ * whole percent (null with fewer than 14 days, or when the week before took
+ * nothing). `daily` is oldest first, in one currency.
  */
 export function weekOverWeek(daily: readonly Day[]): {
 	last: Money;
@@ -22,7 +22,7 @@ export function weekOverWeek(daily: readonly Day[]): {
 	const scale = scaleOf([last, previous]);
 	const prev = scaled(previous, scale);
 	const change =
-		prev === 0n
+		daily.length < 14 || prev === 0n
 			? null
 			: Math.round((Number(scaled(last, scale) - prev) / Number(prev)) * 100);
 	return {
@@ -62,7 +62,7 @@ export function Sparkline(props: {
 	const split = Math.max(0, points.length - props.emphasize);
 	return (
 		<svg
-			class="sparkline"
+			class="ds-sparkline"
 			role="img"
 			aria-label={props.label}
 			viewBox={`0 0 ${W} ${H}`}
@@ -70,10 +70,13 @@ export function Sparkline(props: {
 		>
 			{/* the earlier line runs into the first emphasised day, so the two meet */}
 			<polyline
-				class="spark-before"
+				class="ds-spark-before"
 				points={points.slice(0, split + 1).join(" ")}
 			/>
-			<polyline class="spark-recent" points={points.slice(split).join(" ")} />
+			<polyline
+				class="ds-spark-recent"
+				points={points.slice(split).join(" ")}
+			/>
 		</svg>
 	);
 }
