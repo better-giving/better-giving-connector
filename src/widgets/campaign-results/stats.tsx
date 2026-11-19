@@ -87,7 +87,7 @@ export function Facts(props: { data: CampaignResultsData }) {
 	const labelId = useId();
 	const note =
 		daily.length < 14
-			? "Not enough days to compare"
+			? "x"
 			: week.change === null
 				? "Nothing in the 7 days before"
 				: `Previous 7 days: ${money(week.previous)}`;
@@ -136,7 +136,7 @@ export function Facts(props: { data: CampaignResultsData }) {
 						<Sparkline
 							values={daily.map((d) => Number(d.total.amount))}
 							emphasize={7}
-							label="Gifts per day over the last 14 days"
+							label="Amount raised per day over the last 14 days"
 						/>
 					</div>
 				</div>
