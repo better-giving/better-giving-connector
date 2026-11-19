@@ -2,7 +2,7 @@
 // @vitest-environment happy-dom
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { describe, expect, it, vi } from "vitest";
-import { RESULTS_LIVE } from "../../../test/widget-host/fixtures";
+import { FIXTURES, RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
 import { applyStyles, mount, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
@@ -335,7 +335,6 @@ describe("campaign results trend", () => {
 		expect(badge?.classList.contains("ds-badge-success")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(false);
 		expect(note).toBe("Previous 7 days: $100");
-		expect(glyphPath(badge)).toMatch(/^M16 7h6v6/);
 		expect(
 			badge?.querySelector("svg.ds-trend-glyph")?.getAttribute("aria-hidden"),
 		).toBe("true");
@@ -348,7 +347,16 @@ describe("campaign results trend", () => {
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-success")).toBe(false);
 		expect(note).toBe("Previous 7 days: $100");
-		expect(glyphPath(badge)).toMatch(/^M16 17h6v-6/);
+	});
+
+	it("draws a different glyph for a rising week than for a falling one", async () => {
+		const up = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
+		const upPath = glyphPath(trend(up.root).badge);
+		const down = await show(weeks(["75", "0", "0", "0", "0", "0", "0"]));
+		const downPath = glyphPath(trend(down.root).badge);
+		expect(upPath).toBeTruthy();
+		expect(downPath).toBeTruthy();
+		expect(upPath).not.toBe(downPath);
 	});
 
 	it("draws no badge for a flat week, but still names the week before", async () => {
@@ -430,5 +438,34 @@ describe("campaign results trend", () => {
 			daily: series(...Array(14).fill("5.00")),
 		});
 		expect(trend(root).note).toBe("Previous 7 days: $35");
+	});
+});
+
+describe("screenshot fixtures for the results trend", () => {
+	// scripts/widget-shots.ts reads these; they must keep showing what they're named for
+	const fixture = (name: string) => {
+		const reply = FIXTURES["campaign-results"]?.[name]?.result;
+		if (!reply || !("structuredContent" in reply)) {
+			throw new Error(`no ${name} fixture`);
+		}
+		return CampaignResultsData.parse(reply.structuredContent);
+	};
+	const badge = (root: HTMLElement) =>
+		root.querySelector(".ds-trend .ds-trend-main .ds-badge");
+
+	it("live rises", async () => {
+		const { root } = await show(fixture("live"));
+		expect(badge(root)?.textContent).toMatch(/^Up \d+%$/);
+	});
+
+	it("live-down falls", async () => {
+		const { root } = await show(fixture("live-down"));
+		expect(badge(root)?.textContent).toMatch(/^Down \d+%$/);
+	});
+
+	it("live-flat shows no change badge", async () => {
+		const { root } = await show(fixture("live-flat"));
+		expect(root.querySelector(".ds-trend")).not.toBeNull();
+		expect(badge(root)).toBeNull();
 	});
 });

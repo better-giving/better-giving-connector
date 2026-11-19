@@ -186,10 +186,16 @@ describe("campaign photo status chip", () => {
 		const { root } = await show({ content: [], structuredContent: CAMPAIGNS });
 		const frames = [...root.querySelectorAll(".campaign .ds-image-frame")];
 		expect(frames).toHaveLength(CAMPAIGNS.campaigns.length);
-		for (const frame of frames) {
+		const label = {
+			published: "Live",
+			draft: "Draft",
+			ended: "Ended",
+		} as const;
+		frames.forEach((frame, i) => {
 			const badge = frame.querySelector(".ds-image-overlay .ds-badge");
 			expect(badge?.classList.contains("ds-badge-on-photo")).toBe(true);
-			expect(["Live", "Draft", "Ended"]).toContain(badge?.textContent);
-		}
+			const status = CAMPAIGNS.campaigns[i]?.status;
+			expect(badge?.textContent).toBe(status && label[status]);
+		});
 	});
 });
