@@ -87,7 +87,7 @@ export function Facts(props: { data: CampaignResultsData }) {
 	const labelId = useId();
 	const note =
 		daily.length < 14
-			? "x"
+			? "Not enough days to compare"
 			: week.change === null
 				? "Nothing in the 7 days before"
 				: `Previous 7 days: ${money(week.previous)}`;
