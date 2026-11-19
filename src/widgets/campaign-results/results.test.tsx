@@ -335,9 +335,9 @@ describe("campaign results trend", () => {
 		expect(badge?.classList.contains("ds-badge-success")).toBe(true);
 		expect(badge?.classList.contains("ds-badge-warning")).toBe(false);
 		expect(note).toBe("Previous 7 days: $100");
-		expect(
-			badge?.querySelector("svg.ds-trend-glyph")?.getAttribute("aria-hidden"),
-		).toBe("true");
+		const glyph = badge?.querySelector("svg.ds-trend-glyph");
+		expect(glyph?.getAttribute("aria-hidden")).toBe("true");
+		expect(glyphPath(badge)).toBe("M16 7h6v6");
 	});
 
 	it("shows a warning badge with a downward glyph for a falling week", async () => {
@@ -349,14 +349,33 @@ describe("campaign results trend", () => {
 		expect(note).toBe("Previous 7 days: $100");
 	});
 
-	it("draws a different glyph for a rising week than for a falling one", async () => {
+	it("draws the rising arrow for a rising week and the falling arrow for a falling one", async () => {
 		const up = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
-		const upPath = glyphPath(trend(up.root).badge);
+		expect(glyphPath(trend(up.root).badge)).toBe("M16 7h6v6");
 		const down = await show(weeks(["75", "0", "0", "0", "0", "0", "0"]));
-		const downPath = glyphPath(trend(down.root).badge);
-		expect(upPath).toBeTruthy();
-		expect(downPath).toBeTruthy();
-		expect(upPath).not.toBe(downPath);
+		expect(glyphPath(trend(down.root).badge)).toBe("M16 17h6v-6");
+	});
+
+	it("draws no badge when a week rounds to no change, but shows one at 1%", async () => {
+		const prev = ["10", "10", "10", "10", "10", "25", "25"];
+		const rounded = await show({
+			...RESULTS_LIVE,
+			daily: series(...prev, "100.40", "0", "0", "0", "0", "0", "0"),
+		});
+		expect(trend(rounded.root).badge).toBeNull();
+		const one = await show(weeks(["101", "0", "0", "0", "0", "0", "0"]));
+		expect(trend(one.root).badge?.textContent).toBe("Up 1%");
+	});
+
+	it("keeps the cents of a fractional previous total in the note", async () => {
+		const { root } = await show({
+			...RESULTS_LIVE,
+			daily: series(
+				...["10", "10", "10", "10", "10", "25", "25.50"],
+				...["50", "0", "0", "0", "0", "0", "100"],
+			),
+		});
+		expect(trend(root).note).toBe("Previous 7 days: $100.50");
 	});
 
 	it("draws no badge for a flat week, but still names the week before", async () => {
@@ -373,6 +392,22 @@ describe("campaign results trend", () => {
 				.querySelector('.ds-trend svg[role="img"]')
 				?.getAttribute("aria-label"),
 		).toBe("Amount raised per day over the last 14 days");
+	});
+
+	it("plots the daily amounts, the last seven days emphasized", async () => {
+		const { root } = await show(weeks(["50", "0", "0", "0", "0", "0", "100"]));
+		const points = (cls: string) =>
+			root
+				.querySelector(`.ds-trend .${cls}`)
+				?.getAttribute("points")
+				?.split(" ");
+		const before = points("ds-spark-before");
+		const recent = points("ds-spark-recent");
+		expect(before).toHaveLength(8);
+		expect(recent).toHaveLength(7);
+		// amounts 10 and 100 against a max of 100, never gift counts
+		expect(before?.[0]).toBe("0.0,27.2");
+		expect(recent?.[6]).toBe("140.0,2.0");
 	});
 
 	it("groups the trend under its 'Last 7 days' label", async () => {

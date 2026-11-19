@@ -57,6 +57,7 @@ describe("ImageWithPlaceholder", () => {
 		expect(img(root)?.classList.contains("ds-image")).toBe(true);
 		expect(placeholder(root)).toBeNull();
 		const frame = root.querySelector(".ds-image-frame");
+		expect(frame?.querySelector(".ds-image-overlay")).toBeNull();
 		expect(frame?.getAttribute("data-state")).toBe("loading");
 		img(root)?.dispatchEvent(new Event("load"));
 		await vi.waitFor(() =>

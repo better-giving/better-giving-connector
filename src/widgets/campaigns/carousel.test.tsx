@@ -191,11 +191,16 @@ describe("campaign photo status chip", () => {
 			draft: "Draft",
 			ended: "Ended",
 		} as const;
-		frames.forEach((frame, i) => {
-			const badge = frame.querySelector(".ds-image-overlay .ds-badge");
+		for (const campaign of CAMPAIGNS.campaigns) {
+			const tile = [...root.querySelectorAll(".campaign")].find(
+				(t) =>
+					t.querySelector(".campaign-title")?.textContent === campaign.title,
+			);
+			const badge = tile?.querySelector(
+				".ds-image-frame .ds-image-overlay .ds-badge",
+			);
 			expect(badge?.classList.contains("ds-badge-on-photo")).toBe(true);
-			const status = CAMPAIGNS.campaigns[i]?.status;
-			expect(badge?.textContent).toBe(status && label[status]);
-		});
+			expect(badge?.textContent).toBe(label[campaign.status]);
+		}
 	});
 });
