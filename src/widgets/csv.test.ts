@@ -8,6 +8,7 @@ describe("csvCell", () => {
 		["-2+3", "'-2+3"],
 		["@cmd", "'@cmd"],
 		["\t=1", "'\t=1"],
+		["\r=1", '"\'\r=1"'],
 	])("puts a quote before %j so a spreadsheet won't run it", (value, cell) => {
 		expect(csvCell(value)).toBe(cell);
 	});
@@ -39,6 +40,6 @@ describe("csvText", () => {
 					["Bo", "ok"],
 				],
 			),
-		).toBe("﻿Name,Note\r\nAna,'=1+1\r\nBo,ok\r\n");
+		).toBe("\ufeffName,Note\r\nAna,'=1+1\r\nBo,ok\r\n");
 	});
 });

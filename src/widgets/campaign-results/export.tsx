@@ -1,5 +1,5 @@
 /** @jsxImportSource hono/jsx/dom */
-import { useState } from "hono/jsx/dom";
+import { useRef, useState } from "hono/jsx/dom";
 import { csvText } from "../csv";
 import type { Host } from "../host";
 import { Button } from "../ui/button";
@@ -100,14 +100,19 @@ export function Export(props: {
 	const locale = useLocale();
 	const [busy, setBusy] = useState<Kind | null>(null);
 	const [note, setNote] = useState("");
+	// a second press can land before the busy render does
+	const running = useRef(false);
 	if (!host.canDownloadFiles()) return null;
 
 	const run = async (kind: Kind) => {
+		if (running.current) return;
+		running.current = true;
 		setBusy(kind);
 		props.onError(null);
 		setNote("");
 		const built = await build(host, kind, props.campaignId);
 		if (!built.ok) {
+			running.current = false;
 			setBusy(null);
 			props.onError(built.error);
 			return;
@@ -120,6 +125,7 @@ export function Export(props: {
 				text: built.text,
 			})
 			.catch(() => false);
+		running.current = false;
 		setBusy(null);
 		if (!saved) {
 			props.onError(`The file wasn't saved. Try ${noun} again.`);
@@ -141,6 +147,7 @@ export function Export(props: {
 					variant="secondary"
 					busy={busy === "gifts"}
 					disabled={busy !== null}
+					keepFocus
 					onClick={() => void run("gifts")}
 				>
 					Download gifts (CSV)
@@ -149,6 +156,7 @@ export function Export(props: {
 					variant="secondary"
 					busy={busy === "donors"}
 					disabled={busy !== null}
+					keepFocus
 					onClick={() => void run("donors")}
 				>
 					Download donors (CSV)

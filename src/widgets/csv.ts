@@ -10,5 +10,5 @@ export function csvCell(value: string): string {
 
 /** A CSV file's text: a header row and the rows, CRLF-separated, with the byte-order mark that has Excel read UTF-8. */
 export function csvText(header: string[], rows: string[][]): string {
-	return `﻿${[header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
+	return `\ufeff${[header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }

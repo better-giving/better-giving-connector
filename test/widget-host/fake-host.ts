@@ -32,7 +32,7 @@ export type HostLog = {
 	messages: string[];
 	links: string[];
 	sizes: { width?: number; height?: number }[];
-	/** Files the widget handed the host to save. */
+	/** Files the host saved for the widget, by file name. */
 	downloads: { name: string; mimeType: string | undefined; text: string }[];
 };
 
@@ -99,7 +99,7 @@ export async function startFakeHost(
 		const answer = fixture.calls?.[name];
 		return toCallToolResult(
 			answer
-				? answer(args)
+				? await answer(args)
 				: { error: `The fake host has no scripted answer for ${name}.` },
 		);
 	};
@@ -114,6 +114,10 @@ export async function startFakeHost(
 		return {};
 	};
 	bridge.ondownloadfile = async ({ contents }) => {
+		if (fixture.save === "failed") {
+			throw new Error("The fake host could not save the file.");
+		}
+		if (fixture.save === "refused") return { isError: true };
 		for (const item of contents) {
 			if (item.type !== "resource" || !("text" in item.resource)) continue;
 			log.downloads.push({

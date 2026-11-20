@@ -23,7 +23,12 @@ export type Fixture = {
 	displayMode?: "inline" | "fullscreen";
 	toolInput?: Record<string, unknown>;
 	/** Scripted answers to `callServerTool`, by tool name. */
-	calls?: Record<string, (args: Record<string, unknown>) => ToolReply>;
+	calls?: Record<
+		string,
+		(args: Record<string, unknown>) => ToolReply | Promise<ToolReply>
+	>;
+	/** How the host answers a file the widget hands it: saved unless refused (the person cancelled) or failed (the request errors). */
+	save?: "refused" | "failed";
 	/** Buttons the screenshot presses, by accessible name, once the widget has rendered. */
 	click?: string[];
 	/** The chat column's width in px, where it isn't the default. */

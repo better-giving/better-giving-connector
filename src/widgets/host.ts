@@ -96,6 +96,10 @@ function outcomeOf(result: CallToolResult): ToolOutcome {
 	return { ok: true, data: result.structuredContent, text };
 }
 
+// The host answers a save once its dialog closes. The SDK's 60 s default would
+// report "not saved" to a person who took longer, while the host still saves.
+const SAVE_DIALOG_TIMEOUT_MS = 10 * 60_000;
+
 function canonicalLocale(tag: unknown): string | undefined {
 	if (typeof tag !== "string") return undefined;
 	try {
@@ -298,14 +302,17 @@ export async function connectHost(
 		canDownloadFiles: () =>
 			app.getHostCapabilities()?.downloadFile !== undefined,
 		async downloadFile({ name, mimeType, text }) {
-			const sent = await app.downloadFile({
-				contents: [
-					{
-						type: "resource",
-						resource: { uri: `file:///${name}`, mimeType, text },
-					},
-				],
-			});
+			const sent = await app.downloadFile(
+				{
+					contents: [
+						{
+							type: "resource",
+							resource: { uri: `file:///${name}`, mimeType, text },
+						},
+					],
+				},
+				{ timeout: SAVE_DIALOG_TIMEOUT_MS },
+			);
 			return sent.isError !== true;
 		},
 		canUploadFiles:

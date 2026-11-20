@@ -921,7 +921,11 @@ test("only Claude's editor and results resources ask for the side panel, and no 
 	expect(
 		await read(CHATGPT, WIDGETS["campaign-results"].uri),
 	).not.toHaveProperty("preferredDisplayMode");
-	expect(await read(CLAUDE, WIDGETS.photo.uri)).not.toHaveProperty(
-		"preferredDisplayMode",
-	);
+	const sidePanel = new Set(["campaign-editor", "campaign-results"]);
+	for (const [name, widget] of Object.entries(WIDGETS)) {
+		if (sidePanel.has(name)) continue;
+		expect(await read(CLAUDE, widget.uri), name).not.toHaveProperty(
+			"preferredDisplayMode",
+		);
+	}
 });

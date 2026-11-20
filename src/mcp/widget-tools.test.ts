@@ -138,7 +138,7 @@ test("the campaigns summary totals each currency on its own, never adding one to
 	).toBe("2 campaigns, 0 live, £5.25 raised");
 });
 
-test("show_campaigns is ChatGPT's global sidebar entry: a title within 60 characters, no required argument, its card linked", () => {
+test("show_campaigns is Claude's Artifacts-page entry point: a title within 60 characters, no required argument, its card linked", () => {
 	const spec = LOCAL_TOOLS.find((s) => s.tool === "show_campaigns");
 	if (!spec) throw new Error("no show_campaigns spec");
 	expect(spec._meta["openai/ui"]).toEqual({

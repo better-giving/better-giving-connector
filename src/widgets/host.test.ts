@@ -452,4 +452,22 @@ describe("file downloads", () => {
 		refuse = true;
 		expect(await host.downloadFile(file)).toBe(false);
 	});
+
+	it("waits past a minute for a person still in the host's save dialog", async () => {
+		const { bridge, host } = await start({ caps: { downloadFile: {} } });
+		vi.useFakeTimers();
+		try {
+			bridge.ondownloadfile = () =>
+				new Promise((resolve) => setTimeout(() => resolve({}), 5 * 60_000));
+			const saved = host.downloadFile({
+				name: "gifts.csv",
+				mimeType: "text/csv",
+				text: "a,b",
+			});
+			await vi.advanceTimersByTimeAsync(5 * 60_000 + 1);
+			expect(await saved).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });
