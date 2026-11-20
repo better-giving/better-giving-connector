@@ -153,7 +153,11 @@ const SHOW_CAMPAIGNS: LocalSpec = {
 		},
 	},
 	annotations: READ,
-	_meta: renderMeta("campaigns", "Loading campaigns…", "Campaigns ready"),
+	_meta: {
+		...renderMeta("campaigns", "Loading campaigns…", "Campaigns ready"),
+		// ChatGPT lists this tool in its global sidebar and launches it with no arguments.
+		"openai/ui": { entrypoints: [{ type: "global" }] },
+	},
 	needs: ["campaigns.list", "campaigns.get", "results.summary"],
 	async run(call) {
 		const status = z

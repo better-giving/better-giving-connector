@@ -32,6 +32,8 @@ export type HostLog = {
 	messages: string[];
 	links: string[];
 	sizes: { width?: number; height?: number }[];
+	/** Files the widget handed the host to save. */
+	downloads: { name: string; mimeType: string | undefined; text: string }[];
 };
 
 export const PHONE_BELOW = 640;
@@ -72,12 +74,23 @@ export async function startFakeHost(
 	extra: { onSize?: (size: { width?: number; height?: number }) => void } = {},
 ) {
 	const { fixture } = options;
-	const log: HostLog = { calls: [], messages: [], links: [], sizes: [] };
+	const log: HostLog = {
+		calls: [],
+		messages: [],
+		links: [],
+		sizes: [],
+		downloads: [],
+	};
 	let context = hostContext(options);
 	const bridge = new AppBridge(
 		null,
 		{ name: "better-giving-fake-host", version: "1.0.0" },
-		{ openLinks: {}, serverTools: {}, message: { text: {} } },
+		{
+			openLinks: {},
+			serverTools: {},
+			message: { text: {} },
+			downloadFile: {},
+		},
 		{ hostContext: context },
 	);
 
@@ -98,6 +111,17 @@ export async function startFakeHost(
 	};
 	bridge.onopenlink = async ({ url }) => {
 		log.links.push(url);
+		return {};
+	};
+	bridge.ondownloadfile = async ({ contents }) => {
+		for (const item of contents) {
+			if (item.type !== "resource" || !("text" in item.resource)) continue;
+			log.downloads.push({
+				name: item.resource.uri.replace("file:///", ""),
+				mimeType: item.resource.mimeType,
+				text: item.resource.text,
+			});
+		}
 		return {};
 	};
 	bridge.onrequestdisplaymode = async ({ mode }) => {

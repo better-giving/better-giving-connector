@@ -236,7 +236,8 @@ export const PhotoData = z.object({
 export type PhotoData = z.infer<typeof PhotoData>;
 
 // The tools the widgets' buttons call. Every app_ tool is app-only
-// (`_meta.ui.visibility: ["app"]`); get_profile and list_nonprofits are model-visible.
+// (`_meta.ui.visibility: ["app"]`); get_profile, list_nonprofits, list_donations
+// and list_donors are model-visible (the results card's CSV reads the last two).
 
 // strict, as every other tool's input is: a key the server doesn't read is refused, not dropped
 const CampaignId = z.strictObject({ id: z.string() });
@@ -279,6 +280,44 @@ export const APP_TOOLS = {
 	app_photo_upload_link: {
 		args: CampaignId,
 		result: z.object({ url: Url, expiresAt: z.iso.datetime({ offset: true }) }),
+	},
+	list_donations: {
+		args: z.strictObject({
+			campaign_id: z.string(),
+			limit: z.int().min(1).max(100),
+			cursor: z.string().optional(),
+		}),
+		result: z.object({
+			data: z.array(
+				z.object({
+					id: z.string(),
+					amount: Money,
+					date: z.string(),
+					donor_id: z.string(),
+					method: z.string().optional(),
+					note: z.string().nullable().optional(),
+				}),
+			),
+			next_cursor: z.string().nullable().optional(),
+		}),
+	},
+	list_donors: {
+		args: z.strictObject({
+			limit: z.int().min(1).max(100),
+			cursor: z.string().optional(),
+		}),
+		result: z.object({
+			data: z.array(
+				z.object({
+					id: z.string(),
+					name: z.string(),
+					email: z.string().nullable().optional(),
+					total: Money,
+					gift_count: z.number(),
+				}),
+			),
+			next_cursor: z.string().nullable().optional(),
+		}),
 	},
 	get_profile: {
 		args: z.strictObject({}),

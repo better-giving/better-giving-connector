@@ -49,6 +49,7 @@ export const ALL_CAPS: McpUiHostCapabilities = {
 	openLinks: {},
 	serverTools: {},
 	message: { text: {} },
+	downloadFile: {},
 };
 
 /** A real AppBridge host and the widget-side `Host` connected to it. */
