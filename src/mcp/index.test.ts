@@ -819,9 +819,27 @@ const PROMPT_TEXTS = [
 		description: "Send a campaign's draft changes live.",
 		text: "Publish my campaign draft. Say what will change and wait for my explicit yes in this chat before calling publish_campaign.",
 	},
+	{
+		name: "thank-donor",
+		title: "Thank a donor",
+		description: "Draft a thank-you note for a donor or a recent gift.",
+		text: "Draft a thank-you note to one of our donors. If I haven't said which donor or gift, ask me, or suggest from our most recent gifts. Look up their giving, then write a short, warm note that names their gift. Only read from our account; don't record or change anything.",
+	},
+	{
+		name: "year-end-summary",
+		title: "Year-end summary",
+		description: "Summarize this year's giving and each campaign's totals.",
+		text: "Write our year-end summary for this calendar year: the total raised, the number of gifts and donors, and how each campaign did. Say if anything looks incomplete.",
+	},
+	{
+		name: "end-campaign",
+		title: "End my campaign",
+		description: "End a campaign, after you say yes.",
+		text: "End my campaign. If I haven't said which one, ask me. Tell me what ending it does, that it stops taking gifts for good, and wait for my explicit yes in this chat before calling end_campaign.",
+	},
 ];
 
-test("prompts/list offers the three prompts, and prompts/get answers each with its one user message", async () => {
+test("prompts/list offers the six prompts, and prompts/get answers each with its one user message", async () => {
 	await reconnect(null);
 
 	const listed = (await rpc(await asClient(CLAUDE, "prompts/list"))).result
@@ -849,7 +867,28 @@ test("a prompt is offered only where the tools it names are", async () => {
 		await rpc(await asClient(CLAUDE, "prompts/list"))
 	).result.prompts.map((p: { name: string }) => p.name);
 
-	expect(names).toEqual(["campaign-results"]);
+	expect(names).toEqual([
+		"campaign-results",
+		"thank-donor",
+		"year-end-summary",
+	]);
+});
+
+test("a prompt is left out where its task's lookup tool is missing, though the tool it acts with is served", async () => {
+	await reconnect(
+		ALL_ACTIONS.filter((a) => a !== "donors.list" && a !== "campaigns.list"),
+	);
+
+	const names = (
+		await rpc(await asClient(CLAUDE, "prompts/list"))
+	).result.prompts.map((p: { name: string }) => p.name);
+
+	// start-campaign goes too: its presets read the campaign list
+	expect(names).toEqual([
+		"campaign-results",
+		"publish-draft",
+		"year-end-summary",
+	]);
 });
 
 test("only Claude's editor resource asks for the side panel, and no other widget does", async () => {
