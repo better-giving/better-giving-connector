@@ -330,6 +330,9 @@ export function DocsPage() {
 				<li>Create a draft campaign called Spring Food Drive.</li>
 				<li>Show me the gifts we received last week.</li>
 				<li>List our donors and how much each has given.</li>
+				<li>Draft a thank-you note to our latest donor.</li>
+				<li>Write our year-end summary.</li>
+				<li>End my campaign. It asks for your yes before it does.</li>
 			</ul>
 
 			<h2>What it cannot do</h2>

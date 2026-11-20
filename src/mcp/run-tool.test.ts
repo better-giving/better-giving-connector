@@ -384,3 +384,91 @@ test("each row's rewritten logo leads back to that row's own logo URL", async ()
 	// one fetch per row, in row order: each ref named its own row's URL
 	expect(fetcher.mock.calls.map(([url]) => url)).toEqual([s3, cloudinary]);
 });
+
+const donors = (n: number) => ({
+	data: Array.from({ length: n }, (_, i) => ({
+		id: `don_${i}`,
+		name: `Donor ${i} ${"x".repeat(900)}`,
+		email: `d${i}@example.org`,
+		total: { amount: "10.00", currency: "USD" },
+		gift_count: 1,
+	})),
+	next_cursor: "page_2",
+});
+
+test("a donor list too big for the chat is cut to fit, with the note saying how many rows were left out", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	const body = donors(100);
+
+	const result = await runTool(
+		specOf("list_donors"),
+		connection(),
+		{ limit: 100 },
+		answering({ status: 200, body }),
+		"en-US",
+	);
+
+	const kept = (result.structuredContent as typeof body).data;
+	const sent = result.content
+		.map((part) => (part.type === "text" ? part.text : ""))
+		.join("");
+	expect(kept.length).toBeGreaterThan(0);
+	expect(kept.length).toBeLessThan(100);
+	expect(kept).toEqual(body.data.slice(0, kept.length));
+	expect(
+		sent.length + JSON.stringify(result.structuredContent).length,
+	).toBeLessThanOrEqual(120_000 + 1_000);
+	const note = result.content[1];
+	expect(note).toEqual({
+		type: "text",
+		text: `This result was too big to show whole: ${kept.length} of 100 donors are shown and ${100 - kept.length} were left out. Call it again with q to match a name or email, or with a smaller limit and the same cursor.`,
+	});
+	expect((result.structuredContent as typeof body).next_cursor).toBeNull();
+});
+
+test("a donor list that fits is answered whole", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	const body = donors(20);
+
+	const result = await runTool(
+		specOf("list_donors"),
+		connection(),
+		{},
+		answering({ status: 200, body }),
+		"en-US",
+	);
+
+	expect(result.structuredContent).toEqual(body);
+	expect(result.content).toHaveLength(2);
+});
+
+test("results too big keep their totals exact and cut only the campaign rows", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	const body = {
+		...RESULTS,
+		campaigns: Array.from({ length: 800 }, (_, i) => ({
+			id: `cmp_${i}`,
+			title: `Campaign ${i} ${"y".repeat(100)}`,
+			total: { amount: "1.00", currency: "USD" },
+		})),
+	};
+
+	const result = await runTool(
+		specOf("get_results"),
+		connection(),
+		{},
+		answering({ status: 200, body }),
+		"en-US",
+	);
+
+	const shown = result.structuredContent as typeof body;
+	expect(shown.total).toEqual(RESULTS.total);
+	expect(shown.gift_count).toBe(31);
+	expect(shown.donor_count).toBe(20);
+	expect(shown.campaigns.length).toBeLessThan(800);
+	expect(result.content[1]).toMatchObject({
+		text: expect.stringContaining(
+			`${shown.campaigns.length} of 800 campaign totals are shown`,
+		),
+	});
+});

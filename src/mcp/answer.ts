@@ -19,6 +19,8 @@ export async function answerText(
 	answer: CallAnswer,
 	ctx: RunToolContext,
 	locale: string,
+	// What the JSON line prints where the body was cut to fit; the lead still reads the whole.
+	printed: unknown = answer.body,
 ): Promise<string> {
 	const replayed = isKeyedAction(spec.action) && answer.status === 200;
 	const lead = await leadOf(
@@ -32,7 +34,7 @@ export async function answerText(
 	).catch(() => null);
 	const lines = [lead ?? generic(connection.orgName)];
 	if (replayed) lines.push(REPLAY_PREFIX);
-	lines.push(JSON.stringify(answer.body));
+	lines.push(JSON.stringify(printed));
 	return lines.join("\n");
 }
 

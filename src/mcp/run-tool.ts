@@ -16,6 +16,7 @@ import {
 import { log, type ToolOutcome } from "../log";
 import type { Secret } from "../secret";
 import { answerText } from "./answer";
+import { capResult } from "./cap";
 import {
 	type ActionSpec,
 	isActionSpec,
@@ -148,9 +149,18 @@ async function settle(
 		const body = spec.shape?.(called.body, ctx) ?? called.body;
 		const answer = { ...called, body };
 		const replayed = isKeyedAction(spec.action) && answer.status === 200;
-		const text = await answerText(spec, connection, input, answer, ctx, locale);
+		const capped = capResult(spec.tool, body);
+		const text = await answerText(
+			spec,
+			connection,
+			input,
+			answer,
+			ctx,
+			locale,
+			capped?.body ?? body,
+		);
 		const cx = { locale, input, replayed };
-		return ok(present(spec, text, body, cx));
+		return ok(present(spec, text, capped?.body ?? body, cx, capped?.note));
 	} catch (error) {
 		// A throw out of here would reach the chat as its message, so whatever
 		// `failure` can't word (its own drop included) is answered by `unexpected`.
@@ -177,6 +187,8 @@ function present(
 	text: string,
 	body: unknown,
 	cx: SummaryContext,
+	// Says rows were left out; it takes the place of a summary, which would count only the rows kept.
+	cut?: string,
 ): CallToolResult {
 	const textOnly: CallToolResult = { content: [{ type: "text", text }] };
 	if (!isObject(body)) return textOnly;
@@ -184,7 +196,7 @@ function present(
 	let summary: string | undefined;
 	try {
 		if (!parsed.success) throw parsed.error;
-		summary = spec.output.summary?.(parsed.data, cx);
+		summary = cut ?? spec.output.summary?.(parsed.data, cx);
 	} catch {
 		log({ kind: "output_invalid", tool: loggedName(spec) });
 		return textOnly;

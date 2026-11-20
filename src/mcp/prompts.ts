@@ -38,6 +38,27 @@ export const PROMPTS: readonly PromptSpec[] = [
 		text: "Publish my campaign draft. Say what will change and wait for my explicit yes in this chat before calling publish_campaign.",
 		needs: ["publish_campaign"],
 	},
+	{
+		name: "thank-donor",
+		title: "Thank a donor",
+		description: "Draft a thank-you note for a donor or a recent gift.",
+		text: "Draft a thank-you note to one of our donors. If I haven't said which donor or gift, ask me, or suggest from our most recent gifts. Look up their giving, then write a short, warm note that names their gift. Only read from our account; don't record or change anything.",
+		needs: ["get_donor", "list_donations"],
+	},
+	{
+		name: "year-end-summary",
+		title: "Year-end summary",
+		description: "Summarize this year's giving and each campaign's totals.",
+		text: "Write our year-end summary for this calendar year: the total raised, the number of gifts and donors, and how each campaign did. Say if anything looks incomplete.",
+		needs: ["get_results"],
+	},
+	{
+		name: "end-campaign",
+		title: "End my campaign",
+		description: "End a campaign, after you say yes.",
+		text: "End my campaign. If I haven't said which one, ask me. Tell me what ending it does, that it stops taking gifts for good, and wait for my explicit yes in this chat before calling end_campaign.",
+		needs: ["end_campaign"],
+	},
 ];
 
 /** Registers the prompts whose tools are all among `tools`. */
