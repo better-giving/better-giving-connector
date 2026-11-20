@@ -7,7 +7,11 @@ export type ButtonVariant =
 	| "destructive"
 	| "destructive-outline";
 
-/** A button; `busy` disables it and tells assistive tech it is working. */
+/**
+ * A button; `busy` disables it and tells assistive tech it is working.
+ * With `keepFocus`, busy and disabled hold it with `aria-disabled` instead, so
+ * a focused button keeps focus, and a press is ignored while it is held.
+ */
 export function Button(props: {
 	variant: ButtonVariant;
 	onClick: () => void;
@@ -15,12 +19,15 @@ export function Button(props: {
 	busy?: boolean;
 	full?: boolean;
 	disabled?: boolean;
+	keepFocus?: boolean;
 	label?: string;
 	class?: string;
 	id?: string;
 	describedBy?: string;
 }) {
 	const busy = props.busy === true;
+	const off = busy || props.disabled === true;
+	const held = off && props.keepFocus === true;
 	return (
 		<button
 			type="button"
@@ -29,8 +36,11 @@ export function Button(props: {
 			aria-label={props.label}
 			aria-describedby={props.describedBy}
 			aria-busy={busy ? "true" : undefined}
-			disabled={busy || props.disabled === true}
-			onClick={props.onClick}
+			aria-disabled={held ? "true" : undefined}
+			disabled={off && !held}
+			onClick={() => {
+				if (!held) props.onClick();
+			}}
 		>
 			{props.children}
 		</button>

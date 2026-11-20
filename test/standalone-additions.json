@@ -2052,7 +2052,8 @@
 					"resourceUri": "ui://better-giving/campaigns.html",
 					"visibility": ["model", "app"]
 				},
-				"openai/outputTemplate": "ui://better-giving/campaigns.html"
+				"openai/outputTemplate": "ui://better-giving/campaigns.html",
+				"openai/ui": { "entrypoints": [{ "type": "global" }] }
 			}
 		},
 		{

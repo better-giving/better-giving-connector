@@ -74,6 +74,14 @@ export interface Host {
 	readonly canUploadFiles: boolean;
 	/** Uploads `file` to the host; resolves with a URL the server can fetch it from. */
 	uploadFile(file: File): Promise<{ fileId: string; downloadUrl: string }>;
+	/** The host saves a file the widget hands it (MCP Apps `downloadFile`); a sandboxed view can't download one itself. */
+	canDownloadFiles(): boolean;
+	/** Hands `text` to the host as the file `name`; false when the host refused or the user cancelled. */
+	downloadFile(file: {
+		name: string;
+		mimeType: string;
+		text: string;
+	}): Promise<boolean>;
 }
 
 // Shown when a call never reached a tool, so there is no tool sentence to show.
@@ -87,6 +95,10 @@ function outcomeOf(result: CallToolResult): ToolOutcome {
 	if (result.isError) return { ok: false, error: text || UNREACHABLE };
 	return { ok: true, data: result.structuredContent, text };
 }
+
+// The host answers a save once its dialog closes. The SDK's 60 s default would
+// report "not saved" to a person who took longer, while the host still saves.
+const SAVE_DIALOG_TIMEOUT_MS = 10 * 60_000;
 
 function canonicalLocale(tag: unknown): string | undefined {
 	if (typeof tag !== "string") return undefined;
@@ -286,6 +298,22 @@ export async function connectHost(
 				// ChatGPT keeps it for the next render; this view already holds it
 				Promise.resolve(openai.setWidgetState(next)).catch(() => {});
 			}
+		},
+		canDownloadFiles: () =>
+			app.getHostCapabilities()?.downloadFile !== undefined,
+		async downloadFile({ name, mimeType, text }) {
+			const sent = await app.downloadFile(
+				{
+					contents: [
+						{
+							type: "resource",
+							resource: { uri: `file:///${name}`, mimeType, text },
+						},
+					],
+				},
+				{ timeout: SAVE_DIALOG_TIMEOUT_MS },
+			);
+			return sent.isError !== true;
 		},
 		canUploadFiles:
 			typeof openai?.uploadFile === "function" &&

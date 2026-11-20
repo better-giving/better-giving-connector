@@ -11,6 +11,7 @@ import { DateText, useMoney } from "../ui/text";
 import { callTool } from "../ui/tools";
 import { useLocale, useSession } from "../ui/widget";
 import { EndConfirm } from "./end-confirm";
+import { Export } from "./export";
 import { Facts, Totals } from "./stats";
 import "./results.css";
 
@@ -309,6 +310,9 @@ export function CampaignResults(props: { data: CampaignResultsData }) {
 			<Header data={data} id={titleId} />
 			<Totals data={data} />
 			<Facts data={data} />
+			{data.giftCount > 0 && (
+				<Export campaignId={campaign.id} onError={setError} />
+			)}
 			{ended && (
 				<p class="muted">
 					This campaign no longer takes gifts.

@@ -178,7 +178,7 @@ describe("show_photo data", () => {
 });
 
 describe("app-only tools", () => {
-	it("are the app_ twins of the model-facing writes, plus get_profile and list_nonprofits", () => {
+	it("are the app_ twins of the model-facing writes, plus get_profile, list_donations, list_donors and list_nonprofits", () => {
 		expect(Object.keys(APP_TOOLS).sort()).toEqual([
 			"app_create_campaign",
 			"app_discard_campaign_draft",
@@ -189,6 +189,8 @@ describe("app-only tools", () => {
 			"app_save_campaign_edit",
 			"app_set_campaign_photo",
 			"get_profile",
+			"list_donations",
+			"list_donors",
 			"list_nonprofits",
 		]);
 	});

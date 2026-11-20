@@ -891,7 +891,7 @@ test("a prompt is left out where its task's lookup tool is missing, though the t
 	]);
 });
 
-test("only Claude's editor resource asks for the side panel, and no other widget does", async () => {
+test("only Claude's editor and results resources ask for the side panel, and no other widget does", async () => {
 	await reconnect(null);
 	const editorUri = WIDGETS["campaign-editor"].uri;
 	const read = async (client: typeof CLAUDE, uri: string) =>
@@ -915,7 +915,17 @@ test("only Claude's editor resource asks for the side panel, and no other widget
 		domain: ORIGIN,
 		prefersBorder: true,
 	});
-	expect(await read(CLAUDE, WIDGETS.photo.uri)).not.toHaveProperty(
-		"preferredDisplayMode",
-	);
+	expect(await read(CLAUDE, WIDGETS["campaign-results"].uri)).toMatchObject({
+		preferredDisplayMode: "fullscreen",
+	});
+	expect(
+		await read(CHATGPT, WIDGETS["campaign-results"].uri),
+	).not.toHaveProperty("preferredDisplayMode");
+	const sidePanel = new Set(["campaign-editor", "campaign-results"]);
+	for (const [name, widget] of Object.entries(WIDGETS)) {
+		if (sidePanel.has(name)) continue;
+		expect(await read(CLAUDE, widget.uri), name).not.toHaveProperty(
+			"preferredDisplayMode",
+		);
+	}
 });

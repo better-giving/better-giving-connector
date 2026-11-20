@@ -153,7 +153,11 @@ const SHOW_CAMPAIGNS: LocalSpec = {
 		},
 	},
 	annotations: READ,
-	_meta: renderMeta("campaigns", "Loading campaigns…", "Campaigns ready"),
+	_meta: {
+		...renderMeta("campaigns", "Loading campaigns…", "Campaigns ready"),
+		// Marks this tool as a global entry point: Claude can list the app on its Artifacts page (custom and Verified connectors, limited organizations). Needs ui.resourceUri above; no required arguments.
+		"openai/ui": { entrypoints: [{ type: "global" }] },
+	},
 	needs: ["campaigns.list", "campaigns.get", "results.summary"],
 	async run(call) {
 		const status = z

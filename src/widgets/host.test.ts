@@ -417,3 +417,57 @@ describe("display modes", () => {
 		expect(bridge.getAppCapabilities()?.availableDisplayModes).toBeUndefined();
 	});
 });
+
+describe("file downloads", () => {
+	it("offers a download only when the host lists downloadFile", async () => {
+		expect(
+			(await start({ caps: { openLinks: {} } })).host.canDownloadFiles(),
+		).toBe(false);
+		const { host } = await start({ caps: { downloadFile: {} } });
+		expect(host.canDownloadFiles()).toBe(true);
+	});
+
+	it("hands the host the file as text and reports a refusal", async () => {
+		const { bridge, host } = await start({ caps: { downloadFile: {} } });
+		const seen: unknown[] = [];
+		let refuse = false;
+		bridge.ondownloadfile = async ({ contents }) => {
+			seen.push(contents);
+			return { isError: refuse };
+		};
+		const file = { name: "gifts.csv", mimeType: "text/csv", text: "a,b" };
+		expect(await host.downloadFile(file)).toBe(true);
+		expect(seen).toEqual([
+			[
+				{
+					type: "resource",
+					resource: {
+						uri: "file:///gifts.csv",
+						mimeType: "text/csv",
+						text: "a,b",
+					},
+				},
+			],
+		]);
+		refuse = true;
+		expect(await host.downloadFile(file)).toBe(false);
+	});
+
+	it("waits past a minute for a person still in the host's save dialog", async () => {
+		const { bridge, host } = await start({ caps: { downloadFile: {} } });
+		vi.useFakeTimers();
+		try {
+			bridge.ondownloadfile = () =>
+				new Promise((resolve) => setTimeout(() => resolve({}), 5 * 60_000));
+			const saved = host.downloadFile({
+				name: "gifts.csv",
+				mimeType: "text/csv",
+				text: "a,b",
+			});
+			await vi.advanceTimersByTimeAsync(5 * 60_000 + 1);
+			expect(await saved).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});
