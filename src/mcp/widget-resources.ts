@@ -17,10 +17,11 @@ export const widgetMeta = (publicOrigin: string, domain: string) => ({
 });
 
 /**
- * The editor and the results card open in Claude's side panel without a click: `_meta.ui` on the
- * content item of `resources/read`, which claude.com/docs/connectors/building/
- * mcp-apps/display-modes.md says Claude reads and other hosts don't. A Claude
- * without the side panel keeps it inline.
+ * The editor and the results card open in Claude's side panel without a
+ * click: `_meta.ui` on the content item of `resources/read`, which
+ * claude.com/docs/connectors/building/mcp-apps/display-modes.md says Claude
+ * reads and other hosts don't. A Claude without the side panel keeps it
+ * inline.
  */
 const readMeta = (
 	name: string,

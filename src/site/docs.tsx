@@ -410,7 +410,7 @@ export function DocsPage() {
 				card can save that campaign's gifts, or all your donors, as a CSV file
 				(at most 2,000 rows each; the card says when there are more). The file
 				is built in the card from the donation and donor lists, goes to your
-				assistant to save, and is not kept by the Connector. Text a donor typed
+				assistant to save, and is not kept by the connector. Text a donor typed
 				that a spreadsheet would run as a formula is saved with a leading quote
 				so it stays text. A read-only connection can save these files too.
 			</p>
