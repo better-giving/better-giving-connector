@@ -147,20 +147,13 @@ async function settle(
 		const called = await ctx.client.call(connection, spec.action, input);
 		// the text the chat reads carries the shaped body too
 		const body = spec.shape?.(called.body, ctx) ?? called.body;
-		const answer = { ...called, body };
-		const replayed = isKeyedAction(spec.action) && answer.status === 200;
 		const capped = capResult(spec.tool, body);
-		const text = await answerText(
-			spec,
-			connection,
-			input,
-			answer,
-			ctx,
-			locale,
-			capped?.body ?? body,
-		);
+		// the lead reads the rows as shown, so its count and cursor match the cut
+		const answer = { ...called, body: capped?.body ?? body };
+		const replayed = isKeyedAction(spec.action) && answer.status === 200;
+		const text = await answerText(spec, connection, input, answer, ctx, locale);
 		const cx = { locale, input, replayed };
-		return ok(present(spec, text, capped?.body ?? body, cx, capped?.note));
+		return ok(present(spec, text, answer.body, cx, capped ?? undefined));
 	} catch (error) {
 		// A throw out of here would reach the chat as its message, so whatever
 		// `failure` can't word (its own drop included) is answered by `unexpected`.
@@ -187,25 +180,31 @@ function present(
 	text: string,
 	body: unknown,
 	cx: SummaryContext,
-	// Says rows were left out; it takes the place of a summary, which would count only the rows kept.
-	cut?: string,
+	// Says rows were left out. It follows a summary that reads totals outside
+	// the rows, and takes the place of one that would count only the rows kept.
+	cut?: { note: string; summaryHolds: boolean },
 ): CallToolResult {
 	const textOnly: CallToolResult = { content: [{ type: "text", text }] };
 	if (!isObject(body)) return textOnly;
 	const parsed = spec.output.schema.safeParse(body);
-	let summary: string | undefined;
+	const lines: string[] = [];
 	try {
 		if (!parsed.success) throw parsed.error;
-		summary = cut ?? spec.output.summary?.(parsed.data, cx);
+		const summary =
+			cut === undefined || cut.summaryHolds
+				? spec.output.summary?.(parsed.data, cx)
+				: undefined;
+		if (summary !== undefined) lines.push(summary);
+		if (cut !== undefined) lines.push(cut.note);
 	} catch {
 		log({ kind: "output_invalid", tool: loggedName(spec) });
 		return textOnly;
 	}
 	return {
-		content:
-			summary === undefined
-				? textOnly.content
-				: [...textOnly.content, { type: "text", text: summary }],
+		content: [
+			...textOnly.content,
+			...lines.map((line) => ({ type: "text" as const, text: line })),
+		],
 		structuredContent: body,
 	};
 }

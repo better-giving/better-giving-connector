@@ -396,9 +396,9 @@ const donors = (n: number) => ({
 	next_cursor: "page_2",
 });
 
-test("a donor list too big for the chat is cut to fit, with the note saying how many rows were left out", async () => {
+test("a last page of donors too big for the chat is cut to fit, with the note saying how many rows were left out", async () => {
 	vi.spyOn(console, "log").mockImplementation(() => {});
-	const body = donors(100);
+	const body = { ...donors(100), next_cursor: null };
 
 	const result = await runTool(
 		specOf("list_donors"),
@@ -421,9 +421,28 @@ test("a donor list too big for the chat is cut to fit, with the note saying how 
 	const note = result.content[1];
 	expect(note).toEqual({
 		type: "text",
-		text: `This result was too big to show whole: ${kept.length} of 100 donors are shown and ${100 - kept.length} were left out. Call it again with q to match a name or email, or with a smaller limit and the same cursor.`,
+		text: `This result was too big to show whole: ${kept.length} of 100 donors are shown and ${100 - kept.length} were left out. Call it again with q to match a name or email, or with a smaller limit and, if you sent one, the same cursor.`,
 	});
-	expect((result.structuredContent as typeof body).next_cursor).toBeNull();
+});
+
+test("the text channel of a cut list prints the rows shown, not the deployment's whole body", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	const body = { ...donors(100), next_cursor: null };
+
+	const result = await runTool(
+		specOf("list_donors"),
+		connection(),
+		{ limit: 100 },
+		answering({ status: 200, body }),
+		"en-US",
+	);
+
+	const shown = result.structuredContent as typeof body;
+	expect(shown.data.length).toBeLessThan(100);
+	expect(result.content[0]).toEqual({
+		type: "text",
+		text: `From Give's Better Giving site:\n${JSON.stringify(shown)}`,
+	});
 });
 
 test("a donor list that fits is answered whole", async () => {
@@ -440,6 +459,99 @@ test("a donor list that fits is answered whole", async () => {
 
 	expect(result.structuredContent).toEqual(body);
 	expect(result.content).toHaveLength(2);
+});
+
+test("a donor list over the cap only by its cursor's length is answered whole, its cursor kept", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	const cursor = "c".repeat(2_000);
+	const unpadded = { ...donors(10), next_cursor: cursor };
+	// pad one name until the body, printed and carried, is 600 characters over
+	// 120,000: the cursor alone is worth 4,000 of them
+	const pad = "x".repeat(60_300 - JSON.stringify(unpadded).length);
+	const body = {
+		...unpadded,
+		data: unpadded.data.map((d, i) =>
+			i === 0 ? { ...d, name: d.name + pad } : d,
+		),
+	};
+
+	const result = await runTool(
+		specOf("list_donors"),
+		connection(),
+		{},
+		answering({ status: 200, body }),
+		"en-US",
+	);
+
+	expect(result.structuredContent).toEqual(body);
+	expect(result.content[1]).toEqual({
+		type: "text",
+		text: "10 donors, more on the next page",
+	});
+});
+
+const donations = (n: number, next_cursor: string | null) => ({
+	data: Array.from({ length: n }, (_, i) => ({
+		id: `gift_${i}`,
+		amount: { amount: "25.00", currency: "USD" },
+		date: "2026-11-01",
+		donor_id: `don_${i}`,
+		note: "n".repeat(900),
+	})),
+	next_cursor,
+});
+
+const texts = (result: { content: { type: string; text?: string }[] }) =>
+	result.content.map((part) => part.text ?? "");
+
+test("a cut donation list leads with the rows shown, sends no cursor, and says the list goes on and how to read the rest", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+
+	const result = await runTool(
+		specOf("list_donations"),
+		connection(),
+		{ limit: 100 },
+		answering({ status: 200, body: donations(100, "page_2") }),
+		"en-US",
+	);
+
+	const shown = result.structuredContent as ReturnType<typeof donations>;
+	const kept = shown.data.length;
+	expect(kept).toBeLessThan(100);
+	expect(shown.next_cursor).toBeNull();
+	const [text, note] = texts(result);
+	expect(text).toBe(`Give: ${kept} donations.\n${JSON.stringify(shown)}`);
+	expect(note).toBe(
+		`This result was too big to show whole: ${kept} of 100 donations are shown and ${100 - kept} were left out, and the list goes on past those 100. Call it again with a campaign_id, a from and to date, or a smaller limit and, if you sent one, the same cursor.`,
+	);
+});
+
+test("a donor with too many gifts keeps the donor's summary, cuts only the gifts, and says their list goes on", async () => {
+	vi.spyOn(console, "log").mockImplementation(() => {});
+	const body = {
+		id: "don_1",
+		name: "Jane Smith",
+		total: { amount: "2500.00", currency: "USD" },
+		gift_count: 100,
+		gifts: donations(100, "gifts_2"),
+	};
+
+	const result = await runTool(
+		specOf("get_donor"),
+		connection(),
+		{ id: "don_1" },
+		answering({ status: 200, body }),
+		"en-US",
+	);
+
+	const shown = result.structuredContent as typeof body;
+	const kept = shown.gifts.data.length;
+	expect(kept).toBeLessThan(100);
+	expect(shown.gifts.next_cursor).toBeNull();
+	expect(texts(result).slice(1)).toEqual([
+		"Jane Smith: $2,500.00 from 100 gifts",
+		`This result was too big to show whole: ${kept} of 100 gifts are shown and ${100 - kept} were left out, and the list goes on past those 100. The donor's total and gift count above are exact. Call it again with a smaller limit and, if you sent one, the same cursor to read the gifts in smaller pages.`,
+	]);
 });
 
 test("results too big keep their totals exact and cut only the campaign rows", async () => {
@@ -465,10 +577,11 @@ test("results too big keep their totals exact and cut only the campaign rows", a
 	expect(shown.total).toEqual(RESULTS.total);
 	expect(shown.gift_count).toBe(31);
 	expect(shown.donor_count).toBe(20);
-	expect(shown.campaigns.length).toBeLessThan(800);
-	expect(result.content[1]).toMatchObject({
-		text: expect.stringContaining(
-			`${shown.campaigns.length} of 800 campaign totals are shown`,
-		),
-	});
+	const kept = shown.campaigns.length;
+	expect(kept).toBeLessThan(800);
+	// the summary reads the totals, not the rows, so it stays, and the note follows it
+	expect(texts(result).slice(1)).toEqual([
+		"$12,480.00 raised from 31 gifts by 20 donors",
+		`This result was too big to show whole: ${kept} of 800 campaign totals are shown and ${800 - kept} were left out. The totals above are exact. Call it again with a campaign_id, or a from and to date, to read one campaign or a shorter period.`,
+	]);
 });

@@ -43,7 +43,7 @@ export const PROMPTS: readonly PromptSpec[] = [
 		title: "Thank a donor",
 		description: "Draft a thank-you note for a donor or a recent gift.",
 		text: "Draft a thank-you note to one of our donors. If I haven't said which donor or gift, ask me, or suggest from our most recent gifts. Look up their giving, then write a short, warm note that names their gift. Only read from our account; don't record or change anything.",
-		needs: ["get_donor", "list_donations"],
+		needs: ["get_donor", "list_donors", "list_donations"],
 	},
 	{
 		name: "year-end-summary",
@@ -57,7 +57,7 @@ export const PROMPTS: readonly PromptSpec[] = [
 		title: "End my campaign",
 		description: "End a campaign, after you say yes.",
 		text: "End my campaign. If I haven't said which one, ask me. Tell me what ending it does, that it stops taking gifts for good, and wait for my explicit yes in this chat before calling end_campaign.",
-		needs: ["end_campaign"],
+		needs: ["list_campaigns", "end_campaign"],
 	},
 ];
 

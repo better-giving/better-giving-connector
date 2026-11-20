@@ -874,6 +874,23 @@ test("a prompt is offered only where the tools it names are", async () => {
 	]);
 });
 
+test("a prompt is left out where its task's lookup tool is missing, though the tool it acts with is served", async () => {
+	await reconnect(
+		ALL_ACTIONS.filter((a) => a !== "donors.list" && a !== "campaigns.list"),
+	);
+
+	const names = (
+		await rpc(await asClient(CLAUDE, "prompts/list"))
+	).result.prompts.map((p: { name: string }) => p.name);
+
+	// start-campaign goes too: its presets read the campaign list
+	expect(names).toEqual([
+		"campaign-results",
+		"publish-draft",
+		"year-end-summary",
+	]);
+});
+
 test("only Claude's editor resource asks for the side panel, and no other widget does", async () => {
 	await reconnect(null);
 	const editorUri = WIDGETS["campaign-editor"].uri;
