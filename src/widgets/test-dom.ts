@@ -100,3 +100,48 @@ export function applyStyles(...sheets: string[]) {
 		.join("\n");
 	document.head.replaceChildren(style);
 }
+
+const CARD_LOOK =
+	/^(background(-color)?|border(-(left|right|inline(-start|-end)?))?(-width|-style|-color)?|border(-[a-z]+)*-radius|box-shadow)$/;
+
+/**
+ * The declarations in a sheet (a path under src/widgets) that draw a card on
+ * `className`: a fill, a side edge, a corner or a shadow, in every rule whose
+ * selector ends on that class. The registry's card rule (card-css) gives a
+ * group inside a card none of them; a hairline above or below it is a
+ * separator. Read from the source: happy-dom computes no var() color or edge.
+ */
+export const cardRules = (sheet: string, className: string) =>
+	declarationsOn(sheet, className, CARD_LOOK);
+
+/** The `border-top` declarations on `className` in a sheet: the hairline that sets a group off inside a card. */
+export const separatorRules = (sheet: string, className: string) =>
+	declarationsOn(sheet, className, /^border-top$/);
+
+function declarationsOn(
+	sheet: string,
+	className: string,
+	look: RegExp,
+): string[] {
+	const css = readFileSync(
+		`${process.cwd()}/src/widgets/${sheet}`,
+		"utf8",
+	).replace(/\/\*[\s\S]*?\*\//g, "");
+	const ends = new RegExp(`\\.${className}(?![\\w-])[^\\s>+~]*$`);
+	const found: string[] = [];
+	for (const [, selectors = "", body = ""] of css.matchAll(
+		/([^{}]+)\{([^{}]*)\}/g,
+	)) {
+		const selector = selectors.trim();
+		if (!selector.split(",").some((s) => ends.test(s.trim()))) continue;
+		for (const decl of body.split(";")) {
+			const property = decl.split(":")[0]?.trim() ?? "";
+			if (look.test(property)) found.push(`${selector} { ${decl.trim()} }`);
+		}
+	}
+	return found;
+}
+
+/** Every `ds-card` inside another, as its class list: the registry draws no card inside a card. */
+export const nestedCards = (root: Element) =>
+	[...root.querySelectorAll(".ds-card .ds-card")].map((el) => el.className);

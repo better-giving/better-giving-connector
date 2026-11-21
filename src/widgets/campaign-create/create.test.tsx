@@ -4,7 +4,7 @@ import type { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { describe, expect, it, vi } from "vitest";
 import { CREATE } from "../../../test/widget-host/fixtures";
 import { CampaignCreateData, type CreateResult } from "../model";
-import { startHost } from "../test-dom";
+import { cardRules, nestedCards, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignCreate } from "./create";
 
@@ -50,6 +50,22 @@ describe("the create card's header", () => {
 		const badge = root.querySelector(".ds-card-status > .ds-badge-warning");
 		expect(badge?.textContent).toBe("Draft");
 		expect(badge?.classList.contains("ds-badge")).toBe(true);
+	});
+});
+
+describe("the create card's groups", () => {
+	it("draws no card inside the widget's card; the recommendations are a group of it", async () => {
+		const root = await mountForm(RESULT);
+		expect(root.querySelectorAll("article.ds-card")).toHaveLength(1);
+		expect(nestedCards(root)).toEqual([]);
+		expect(root.querySelector(".ds-card .recs")).not.toBeNull();
+		expect(cardRules("campaign-create/create.css", "recs")).toEqual([]);
+	});
+
+	it("draws no card inside the created card", async () => {
+		const root = await createWith(RESULT);
+		expect(root.querySelectorAll("article.ds-card")).toHaveLength(1);
+		expect(nestedCards(root)).toEqual([]);
 	});
 });
 

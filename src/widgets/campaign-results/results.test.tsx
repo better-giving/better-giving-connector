@@ -4,7 +4,13 @@ import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge
 import { describe, expect, it, vi } from "vitest";
 import { FIXTURES, RESULTS_LIVE } from "../../../test/widget-host/fixtures";
 import { CampaignResultsData } from "../model";
-import { applyStyles, mount, startHost } from "../test-dom";
+import {
+	applyStyles,
+	cardRules,
+	mount,
+	nestedCards,
+	startHost,
+} from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignResults } from "./results";
 import { Facts } from "./stats";
@@ -187,6 +193,20 @@ describe("campaign results card footer", () => {
 		expect(buttons).not.toContain("Share link");
 		// the card still renders: the ended note is in its body
 		expect(endedNote(root)).toContain("no longer takes gifts");
+	});
+});
+
+describe("the results card's groups", () => {
+	it("draws no card inside the widget's card, the facts included", async () => {
+		const { root } = await show(RESULTS_LIVE);
+		expect(root.querySelectorAll("article.ds-card")).toHaveLength(1);
+		expect(nestedCards(root)).toEqual([]);
+		expect(root.querySelectorAll(".facts > .fact")).toHaveLength(3);
+		expect([
+			...cardRules("campaign-results/results.css", "facts"),
+			...cardRules("campaign-results/results.css", "fact"),
+			...cardRules("campaign-results/results.css", "fact-trend"),
+		]).toEqual([]);
 	});
 });
 
@@ -443,7 +463,7 @@ describe("campaign results trend", () => {
 		]);
 	});
 
-	it("puts the trend in its own tile of the facts row, after donors and the average gift", async () => {
+	it("puts the trend in its own group of the facts row, after donors and the average gift", async () => {
 		const { root } = await show(RESULTS_LIVE);
 		const tiles = [...(root.querySelector(".facts")?.children ?? [])];
 		expect(tiles.map((t) => t.classList.contains("fact-trend"))).toEqual([

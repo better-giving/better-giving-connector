@@ -36,7 +36,7 @@ export const SITE_PRELOAD = preload(
 	"RedHatRoundDisplay-Bold.woff2",
 );
 
-/** The connect card's faces: body text, the heading and the button (`.ds-btn`, 700). */
+/** The connect page's faces: body text, the heading and the button (`.ds-btn`, 700). */
 export const CONNECT_PRELOAD = preload(
 	"RedHatRoundText-Regular.woff2",
 	"RedHatRoundDisplay-Bold.woff2",

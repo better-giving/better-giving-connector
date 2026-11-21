@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PHOTO } from "../../../test/widget-host/fixtures";
 import { PhotoData } from "../model";
-import { startHost } from "../test-dom";
+import { cardRules, nestedCards, separatorRules, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { PhotoCard } from "./photo";
 
@@ -128,6 +128,43 @@ describe("photo card", () => {
 			),
 		);
 		expect(called.map((c) => c.name)).toContain("app_set_campaign_photo");
+	});
+
+	it("lists the account as rows of the widget's card, with no card of its own", async () => {
+		const { root } = await show(PHOTO, HARBOR, [
+			row(1, { name: "Harbor Food Bank", current: true }),
+			row(2),
+		]);
+		await vi.waitFor(() => expect(root.textContent).toContain("Nonprofit 2"));
+		expect(root.querySelectorAll(".account-row").length).toBe(3);
+		expect(root.querySelectorAll("article.ds-card")).toHaveLength(1);
+		expect(nestedCards(root)).toEqual([]);
+		expect([
+			...cardRules("photo/photo.css", "account"),
+			...cardRules("photo/photo.css", "account-row"),
+		]).toEqual([]);
+	});
+
+	it("reads the sheet's card look on a class that has one, and the hairlines that replace the cards", () => {
+		expect(cardRules("photo/photo.css", "avatar")).toEqual([
+			".avatar { background: var(--primary) }",
+			".avatar { border-radius: var(--radius-control) }",
+		]);
+		expect(separatorRules("photo/photo.css", "account")).toEqual([
+			".account { border-top: 1px solid var(--hairline) }",
+		]);
+		expect(separatorRules("photo/photo.css", "account-row")).toEqual([
+			".account-row + .account-row { border-top: 1px solid var(--hairline) }",
+		]);
+		expect(separatorRules("campaign-create/create.css", "recs")).toEqual([
+			".recs { border-top: 1px solid var(--hairline) }",
+		]);
+		expect(separatorRules("campaign-results/results.css", "fact")).toEqual([
+			".fact + .fact { border-top: 1px solid var(--hairline) }",
+		]);
+		expect(
+			separatorRules("campaign-results/results.css", "fact-trend"),
+		).toEqual([".fact-trend { border-top: 1px solid var(--hairline) }"]);
 	});
 
 	describe("account panel", () => {
@@ -256,9 +293,10 @@ describe("photo card", () => {
 			await vi.waitFor(() =>
 				expect(root.querySelector("img.avatar-logo")).toBeNull(),
 			);
-			expect(root.querySelector(".account-current .avatar")?.textContent).toBe(
-				"HF",
+			const connected = [...root.querySelectorAll(".account-row")].find((r) =>
+				r.querySelector(".ds-badge-success"),
 			);
+			expect(connected?.querySelector(".avatar")?.textContent).toBe("HF");
 		});
 
 		it("draws the connected nonprofit's logo when it is the only one", async () => {
