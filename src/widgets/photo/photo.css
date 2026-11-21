@@ -4,11 +4,11 @@
 	font-weight: 600;
 }
 
+/* list rows inside the widget's one card: the registry's card rule gives the group no card of its own */
 .account {
 	display: flex;
 	flex-direction: column;
-	border: 1px solid var(--hairline);
-	border-radius: var(--radius-control);
+	border-top: 1px solid var(--hairline);
 }
 
 .account p {
@@ -20,16 +20,11 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	padding: 12px 14px;
+	padding: 12px 0;
 }
 
 .account-row + .account-row {
 	border-top: 1px solid var(--hairline);
-}
-
-.account-current {
-	background: var(--band);
-	border-radius: var(--radius-control) var(--radius-control) 0 0;
 }
 
 .account-who {

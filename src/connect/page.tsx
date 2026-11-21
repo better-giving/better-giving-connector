@@ -30,17 +30,15 @@ function Page({ heading, children }: { heading: string; children: Child }) {
 				</head>
 				<body>
 					<main>
-						<div class="ds-card card">
-							<img
-								class="logo"
-								src={LOGO_PATH}
-								alt="Better Giving"
-								width="64"
-								height="64"
-							/>
-							<h1>{heading}</h1>
-							{children}
-						</div>
+						<img
+							class="logo"
+							src={LOGO_PATH}
+							alt="Better Giving"
+							width="64"
+							height="64"
+						/>
+						<h1>{heading}</h1>
+						{children}
 					</main>
 				</body>
 			</html>

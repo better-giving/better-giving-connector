@@ -502,7 +502,7 @@ test("the connect button is at least the registry's control height, a thumb's ta
 	expect(rule).toMatch(/min-block-size:\s*var\(--control-height\)\s*;/);
 });
 
-test("a connect page with a way back renders its action as a registry button in a registry card", async () => {
+test("a connect page with a way back renders its action as a registry button", async () => {
 	const { page } = await unreachablePage();
 
 	const html = shown(await page.text());
@@ -510,7 +510,18 @@ test("a connect page with a way back renders its action as a registry button in 
 	expect(html).toMatch(
 		/<button[^>]*class="ds-btn ds-btn-primary ds-btn-full"[^>]*>Back to your AI assistant<\/button>/,
 	);
-	expect(html).toMatch(/<div class="[^"]*\bds-card\b[^"]*">/);
+});
+
+// the page is one group alone on its page: the registry's card rule (card-css) draws it no card
+test.each([
+	["with a way back", async () => (await unreachablePage()).page],
+	["without one", async () => call(new Request(`${BASE}/connect`))],
+])("a connect page %s draws no card", async (_, open) => {
+	const html = shown(await (await open()).text());
+
+	expect(html).not.toMatch(/class="[^"]*\bds-card/);
+	expect(html).toMatch(/<main><img class="logo"[^>]*><h1>/);
+	expect(connectSource()).not.toMatch(/\.card\b/);
 });
 
 test("/connect/assets/logo.png is served as image/png", async () => {

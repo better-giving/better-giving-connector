@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PHOTO } from "../../../test/widget-host/fixtures";
 import { PhotoData } from "../model";
-import { startHost } from "../test-dom";
+import { cardRules, nestedCards, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { PhotoCard } from "./photo";
 
@@ -128,6 +128,22 @@ describe("photo card", () => {
 			),
 		);
 		expect(called.map((c) => c.name)).toContain("app_set_campaign_photo");
+	});
+
+	it("lists the account as rows of the widget's card, with no card of its own", async () => {
+		const { root } = await show(PHOTO, HARBOR, [
+			row(1, { name: "Harbor Food Bank", current: true }),
+			row(2),
+		]);
+		await vi.waitFor(() =>
+			expect(root.querySelectorAll(".account-row").length).toBe(3),
+		);
+		expect(root.querySelectorAll("article.ds-card")).toHaveLength(1);
+		expect(nestedCards(root)).toEqual([]);
+		expect([
+			...cardRules("photo/photo.css", "account"),
+			...cardRules("photo/photo.css", "account-row"),
+		]).toEqual([]);
 	});
 
 	describe("account panel", () => {
@@ -256,7 +272,7 @@ describe("photo card", () => {
 			await vi.waitFor(() =>
 				expect(root.querySelector("img.avatar-logo")).toBeNull(),
 			);
-			expect(root.querySelector(".account-current .avatar")?.textContent).toBe(
+			expect(root.querySelector(".account-row .avatar")?.textContent).toBe(
 				"HF",
 			);
 		});

@@ -95,7 +95,7 @@ function Account(props: { origins: readonly string[] }) {
 	};
 	return (
 		<section class="account" aria-label="Account">
-			<div class="account-row account-current">
+			<div class="account-row">
 				<Avatar name={name ?? ""} logo={logo} origins={props.origins} />
 				<div class="account-who">
 					<p class="account-name">

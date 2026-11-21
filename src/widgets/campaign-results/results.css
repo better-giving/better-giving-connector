@@ -23,10 +23,13 @@
 	font-weight: 600;
 }
 
+/* groups inside the widget's one card: the registry's card rule gives them no card, so a hairline and space split them */
 .facts {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 12px;
+	gap: 16px;
+	padding-top: 16px;
+	border-top: 1px solid var(--hairline);
 }
 
 .fact {
@@ -34,15 +37,13 @@
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
-	padding: 12px 14px;
-	background: var(--panel);
-	border: 1px solid var(--hairline);
-	border-radius: var(--radius-control);
 }
 
-/* the registry's trend figure and badge want a wide tile: its own line of the facts grid */
+/* the registry's trend figure and badge want a wide group: its own line of the facts grid */
 .fact-trend {
 	grid-column: 1 / -1;
+	padding-top: 16px;
+	border-top: 1px solid var(--hairline);
 }
 
 .fact dt {
@@ -86,9 +87,14 @@
 	.facts {
 		grid-template-columns: minmax(0, 1fr);
 	}
+
+	.fact + .fact {
+		padding-top: 16px;
+		border-top: 1px solid var(--hairline);
+	}
 }
 
-/* the mockup's hierarchy: head, big figure, goal row, tinted tiles */
+/* the mockup's hierarchy: head, big figure, goal row, facts */
 .results .card-body {
 	gap: 16px;
 }

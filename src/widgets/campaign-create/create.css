@@ -131,11 +131,10 @@
 	color: var(--accent-11);
 }
 
+/* a group inside the widget's one card: the registry's card rule gives it no card, so a hairline sets it off */
 .recs {
-	padding: 14px 16px;
-	background: var(--band);
-	border: 1px solid var(--secondary);
-	border-radius: var(--radius-control);
+	padding-top: 16px;
+	border-top: 1px solid var(--hairline);
 }
 
 .recs-title {
