@@ -4,7 +4,7 @@
 	font-weight: 600;
 }
 
-/* list rows inside the widget's one card: the registry's card rule gives the group no card of its own */
+/* stacked account rows inside the widget's one card: the registry's card rule gives the group no card of its own */
 .account {
 	display: flex;
 	flex-direction: column;

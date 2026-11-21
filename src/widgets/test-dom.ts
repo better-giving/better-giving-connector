@@ -111,7 +111,18 @@ const CARD_LOOK =
  * group inside a card none of them; a hairline above or below it is a
  * separator. Read from the source: happy-dom computes no var() colour or edge.
  */
-export function cardRules(sheet: string, className: string): string[] {
+export const cardRules = (sheet: string, className: string) =>
+	declarationsOn(sheet, className, CARD_LOOK);
+
+/** The `border-top` declarations on `className` in a sheet: the hairline that sets a group off inside a card. */
+export const separatorRules = (sheet: string, className: string) =>
+	declarationsOn(sheet, className, /^border-top$/);
+
+function declarationsOn(
+	sheet: string,
+	className: string,
+	look: RegExp,
+): string[] {
 	const css = readFileSync(
 		`${process.cwd()}/src/widgets/${sheet}`,
 		"utf8",
@@ -125,8 +136,7 @@ export function cardRules(sheet: string, className: string): string[] {
 		if (!selector.split(",").some((s) => ends.test(s.trim()))) continue;
 		for (const decl of body.split(";")) {
 			const property = decl.split(":")[0]?.trim() ?? "";
-			if (CARD_LOOK.test(property))
-				found.push(`${selector} { ${decl.trim()} }`);
+			if (look.test(property)) found.push(`${selector} { ${decl.trim()} }`);
 		}
 	}
 	return found;
