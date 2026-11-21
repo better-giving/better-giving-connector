@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src/widgets/registry",
-  "registryVersion": "4.1.0",
+  "registryVersion": "4.4.0",
   "items": {
     "badge-css": {
       "version": "1.2.1",
@@ -25,10 +25,10 @@
       }
     },
     "card-css": {
-      "version": "1.2.2",
+      "version": "1.2.3",
       "files": {
         "styles/card-css.css": "ac06cdb52b106e2a991e7f288a5ba6b037434c8b99f0d6399e197f3104d4efea",
-        "styles/card-css.usage.md": "735729249ba2ad5d681105c25d3266457e4f3cfaa3f9a51f5580cbbcfa3613da"
+        "styles/card-css.usage.md": "b94b45ed6ff72e8991a29521d29df7db4be5e4690bc6283ee764f3b5211269d9"
       }
     },
     "checkbox-css": {
