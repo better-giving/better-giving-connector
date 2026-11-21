@@ -109,7 +109,7 @@ const CARD_LOOK =
  * `className`: a fill, a side edge, a corner or a shadow, in every rule whose
  * selector ends on that class. The registry's card rule (card-css) gives a
  * group inside a card none of them; a hairline above or below it is a
- * separator. Read from the source: happy-dom computes no var() colour or edge.
+ * separator. Read from the source: happy-dom computes no var() color or edge.
  */
 export const cardRules = (sheet: string, className: string) =>
 	declarationsOn(sheet, className, CARD_LOOK);
