@@ -64,21 +64,6 @@
 	border-radius: var(--radius-control);
 }
 
-.confirm {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	padding: 12px 16px;
-	border: 2px solid var(--destructive);
-	border-radius: var(--radius-control);
-}
-
-.confirm-title {
-	margin: 0;
-	font-size: var(--text-base);
-	font-weight: 700;
-}
-
 .error-line:empty {
 	display: none;
 }
@@ -200,22 +185,53 @@
 	gap: 6px;
 }
 
+/* a group inside the widget's one card, like .facts: the tone is the glyph's, never a notice card's fill or edge */
 .confirm {
-	background: var(--destructive-subtle);
-	border: 1px solid var(--destructive);
-	margin-top: -4px;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	column-gap: 12px;
+	padding-top: 16px;
+	border-top: 1px solid var(--hairline);
+	color: var(--gray-12);
+}
+
+/* one title line tall at the title's size, so the glyph centres on its first line */
+.confirm-tone {
+	display: flex;
+	align-items: center;
+	height: 1lh;
+	font-size: var(--text-base);
+	color: var(--destructive-11);
+}
+
+.confirm-tone svg {
+	width: 20px;
+	height: 20px;
 }
 
 .confirm-title {
-	color: var(--destructive-12);
+	font-size: var(--text-base);
+	font-weight: 700;
+}
+
+.confirm-body {
+	grid-column: 2;
+	margin-top: 4px;
 }
 
 .confirm .row {
+	grid-column: 1 / -1;
+	margin-top: 16px;
 	justify-content: flex-end;
 }
 
 @media (max-width: 480px) {
 	.checks {
 		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.confirm .row {
+		flex-direction: column;
+		align-items: stretch;
 	}
 }

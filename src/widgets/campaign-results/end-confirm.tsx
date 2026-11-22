@@ -32,10 +32,25 @@ export function EndConfirm(props: {
 				if (event.key === "Escape") props.onKeep();
 			}}
 		>
+			<span class="confirm-tone">
+				<svg
+					aria-hidden="true"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<circle cx="12" cy="12" r="10" />
+					<line x1="12" x2="12" y1="8" y2="12" />
+					<line x1="12" x2="12.01" y1="16" y2="16" />
+				</svg>
+			</span>
 			<h3 id={`${id}-title`} class="confirm-title">
 				End “{props.title}” for good?
 			</h3>
-			<p id={`${id}-body`}>
+			<p id={`${id}-body`} class="confirm-body">
 				The donation page stops taking gifts immediately. <b>{who}</b> have
 				given so far. This can't be undone.
 			</p>

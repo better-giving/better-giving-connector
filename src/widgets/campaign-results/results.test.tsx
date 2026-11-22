@@ -9,6 +9,7 @@ import {
 	cardRules,
 	mount,
 	nestedCards,
+	separatorRules,
 	startHost,
 } from "../test-dom";
 import { renderWidget } from "../ui/widget";
@@ -207,6 +208,22 @@ describe("the results card's groups", () => {
 			...cardRules("campaign-results/results.css", "fact"),
 			...cardRules("campaign-results/results.css", "fact-trend"),
 		]).toEqual([]);
+	});
+
+	it("draws the end confirm as a plain group under a hairline, no notice card", async () => {
+		const { root } = await show(RESULTS_LIVE);
+		button(root, "End campaign").click();
+		await vi.waitFor(() =>
+			expect(root.querySelector(".confirm")).not.toBeNull(),
+		);
+		expect(nestedCards(root)).toEqual([]);
+		expect([
+			...cardRules("campaign-results/results.css", "confirm"),
+			...cardRules("campaign-results/results.css", "confirm-title"),
+		]).toEqual([]);
+		expect(separatorRules("campaign-results/results.css", "confirm")).toEqual([
+			".confirm { border-top: 1px solid var(--hairline) }",
+		]);
 	});
 });
 
