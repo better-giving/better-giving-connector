@@ -32,6 +32,7 @@ export type RadioCardContent = {
  * (`radio-card-css`): a fieldset of native radio inputs, each lying over its
  * card and named by the card's title. The checked option takes focus; arrows
  * (and Home/End) check and focus the next, Space or a press on the card checks.
+ * `disabled` holds the choice, drawn by the registry's disabled card.
  */
 export function RadioGroup<T extends string>(props: {
 	label: string;
@@ -39,6 +40,7 @@ export function RadioGroup<T extends string>(props: {
 	value: T;
 	onChange: (value: T) => void;
 	renderOption: (value: T) => RadioCardContent;
+	disabled?: boolean;
 	class?: string;
 }) {
 	const name = useId();
@@ -46,6 +48,7 @@ export function RadioGroup<T extends string>(props: {
 	// handled here rather than left to the browser, so wrapping, Home/End and
 	// the focus move behave the same in every host frame
 	const onKeyDown = (event: KeyboardEvent, index: number) => {
+		if (props.disabled) return;
 		if (event.key === " ") {
 			event.preventDefault();
 			props.onChange(props.options[index] as T);
@@ -100,6 +103,7 @@ export function RadioGroup<T extends string>(props: {
 								name={name}
 								value={option}
 								checked={checked}
+								disabled={props.disabled}
 								tabindex={checked ? 0 : -1}
 								aria-labelledby={titleId}
 								aria-describedby={descId}

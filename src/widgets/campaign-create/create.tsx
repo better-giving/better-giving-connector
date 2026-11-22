@@ -253,6 +253,7 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 				options={THEME_NAMES}
 				value={theme}
 				onChange={setTheme}
+				disabled={busy !== null}
 				// the model holds exactly one preset per theme
 				renderOption={(t) => presetCard(byTheme.get(t) as Preset)}
 			/>

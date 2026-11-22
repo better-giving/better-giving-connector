@@ -92,12 +92,14 @@ const inlined = (path: string): string =>
 		inlined(`${path.slice(0, path.lastIndexOf("/"))}/${rel}`),
 	);
 
+/** A sheet's source (a path under src/widgets), imports inlined as the ?widget bundle does. */
+export const sheetText = (sheet: string) =>
+	inlined(`${process.cwd()}/src/widgets/${sheet}`);
+
 /** Puts sheets (paths under src/widgets) on the page in order, imports inlined as the ?widget bundle does. */
 export function applyStyles(...sheets: string[]) {
 	const style = document.createElement("style");
-	style.textContent = sheets
-		.map((sheet) => inlined(`${process.cwd()}/src/widgets/${sheet}`))
-		.join("\n");
+	style.textContent = sheets.map(sheetText).join("\n");
 	document.head.replaceChildren(style);
 }
 

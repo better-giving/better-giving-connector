@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CREATE } from "../../../test/widget-host/fixtures";
 import { THEMES } from "../../presets/themes";
 import { CampaignCreateData, type CreateResult } from "../model";
-import { cardRules, nestedCards, startHost } from "../test-dom";
+import { cardRules, nestedCards, sheetText, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
 import { CampaignCreate } from "./create";
 
@@ -20,12 +20,17 @@ const RESULT: CreateResult = {
 	failedStep: null,
 };
 
-async function mountForm(result: CreateResult) {
+const answer = (result: CreateResult) => ({
+	content: [{ type: "text" as const, text: "ok" }],
+	structuredContent: result,
+});
+
+async function mountForm(
+	result: CreateResult,
+	reply: () => Promise<ReturnType<typeof answer>> = async () => answer(result),
+) {
 	const { bridge, host } = await startHost({ context: {} });
-	bridge.oncalltool = (async () => ({
-		content: [{ type: "text", text: "ok" }],
-		structuredContent: result,
-	})) satisfies AppBridge["oncalltool"];
+	bridge.oncalltool = reply satisfies AppBridge["oncalltool"];
 	document.body.replaceChildren();
 	const root = document.createElement("div");
 	document.body.append(root);
@@ -112,6 +117,57 @@ describe("the create card's presets", () => {
 			),
 		);
 		expect(radio?.checked).toBe(true);
+	});
+
+	it("holds the choice while a create request is in flight", async () => {
+		let release = () => {};
+		const root = await mountForm(
+			RESULT,
+			() =>
+				new Promise((resolve) => {
+					release = () => resolve(answer(RESULT));
+				}),
+		);
+		const summary = root.querySelector(".summary")?.textContent;
+		const radios = [
+			...root.querySelectorAll<HTMLInputElement>(".ds-radio-card input"),
+		];
+		const before = radios.map((r) => r.checked);
+		[...root.querySelectorAll("button")]
+			.find((b) => b.textContent === "Create draft")
+			?.click();
+		await vi.waitFor(() => expect(radios.every((r) => r.disabled)).toBe(true));
+
+		const other = radios.find((r) => !r.checked);
+		other?.click();
+		radios
+			.find((r) => r.checked)
+			?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+			);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(radios.map((r) => r.checked)).toEqual(before);
+		expect(root.querySelector(".summary")?.textContent).toBe(summary);
+
+		release();
+		await vi.waitFor(() =>
+			expect(root.querySelector(".created")).not.toBeNull(),
+		);
+	});
+
+	it("draws each theme's art at the registry cover's ratio, so the cover crops nothing", async () => {
+		const root = await mountForm(RESULT);
+		const cover =
+			/\.ds-radio-card-cover\s*\{[^}]*aspect-ratio:\s*(\d+)\s*\/\s*(\d+)/.exec(
+				sheetText("registry/styles/radio-card-css.css"),
+			);
+		expect(cover).not.toBeNull();
+		const ratio = Number(cover?.[1]) / Number(cover?.[2]);
+		const boxes = [...root.querySelectorAll(".ds-radio-card-cover > svg")].map(
+			(svg) => svg.getAttribute("viewBox")?.split(" ").map(Number) ?? [],
+		);
+		expect(boxes).toHaveLength(CREATE.presets.length);
+		for (const [, , w = 0, h = 1] of boxes) expect(w / h).toBeCloseTo(ratio);
 	});
 });
 
