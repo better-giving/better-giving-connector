@@ -44,6 +44,16 @@ export const IMAGE_ORIGINS = [
 export const blobImage = (name: string) =>
 	`https://bg-test.public.blob.vercel-storage.com/${name}.jpg`;
 
+/** The photo-like SVG the screenshot and preview hosts serve for an image at `path`; the path picks its hues. */
+export function standInImage(path: string): string {
+	let hue = 0;
+	for (const char of path) hue = (hue * 31 + char.charCodeAt(0)) % 360;
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 16 9">
+<defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 55% 62%)"/><stop offset="1" stop-color="hsl(${(hue + 40) % 360} 45% 32%)"/></linearGradient></defs>
+<rect width="16" height="9" fill="url(#g)"/><circle cx="12" cy="2.6" r="1.2" fill="hsl(48 90% 85%)"/>
+<path d="M0 9 5 4.5 8.5 7.5 11 5.5 16 9Z" fill="hsl(${hue} 30% 20% / .55)"/></svg>`;
+}
+
 const usd = (amount: string) => ({ amount, currency: "USD" });
 
 export const CAMPAIGNS: CampaignsData = {
@@ -442,3 +452,12 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 		},
 	},
 };
+
+/** The fixture for `state` of `widget`, where either may be a name from outside (a URL). */
+export const findFixture = (
+	widget: string,
+	state: string,
+): Fixture | undefined =>
+	(FIXTURES as Record<string, Record<string, Fixture> | undefined>)[widget]?.[
+		state
+	];

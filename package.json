@@ -19,7 +19,8 @@
 		"chatgpt:package": "tsx scripts/chatgpt-package.ts",
 		"design:check": "sh scripts/design-check.sh",
 		"widget-shots": "tsx scripts/widget-shots.ts",
-		"surface-shots": "tsx scripts/surface-shots.ts"
+		"surface-shots": "tsx scripts/surface-shots.ts",
+		"preview:widgets": "tsx scripts/widget-preview.ts"
 	},
 	"dependencies": {
 		"@better-auth/cimd": "1.7.7",
