@@ -71,7 +71,6 @@ const SCENES: Record<ThemeName, () => unknown> = {
 export function ThemeArt(props: { theme: ThemeName }) {
 	return (
 		<svg
-			class="preset-art"
 			viewBox="0 0 160 90"
 			preserveAspectRatio="xMidYMid slice"
 			aria-hidden="true"

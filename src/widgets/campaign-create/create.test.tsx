@@ -3,6 +3,7 @@
 import type { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { describe, expect, it, vi } from "vitest";
 import { CREATE } from "../../../test/widget-host/fixtures";
+import { THEMES } from "../../presets/themes";
 import { CampaignCreateData, type CreateResult } from "../model";
 import { cardRules, nestedCards, startHost } from "../test-dom";
 import { renderWidget } from "../ui/widget";
@@ -30,7 +31,9 @@ async function mountForm(result: CreateResult) {
 	document.body.append(root);
 	renderWidget(root, host, CampaignCreateData, CampaignCreate, "Loading…");
 	await bridge.sendToolResult({ content: [], structuredContent: CREATE });
-	await vi.waitFor(() => expect(root.querySelector(".presets")).not.toBeNull());
+	await vi.waitFor(() =>
+		expect(root.querySelector(".ds-radio-cards")).not.toBeNull(),
+	);
 	return root;
 }
 
@@ -66,6 +69,49 @@ describe("the create card's groups", () => {
 		const root = await createWith(RESULT);
 		expect(root.querySelectorAll("article.ds-card")).toHaveLength(1);
 		expect(nestedCards(root)).toEqual([]);
+	});
+});
+
+describe("the create card's presets", () => {
+	it("are the registry's radio cards, one per preset in order, the selected one checked", async () => {
+		const root = await mountForm(RESULT);
+		const group = root.querySelector("fieldset.presets");
+		expect(group?.querySelector("legend")?.textContent).toBe("Campaign preset");
+		const cards = [
+			...(group?.querySelectorAll(".ds-radio-cards > .ds-radio-card") ?? []),
+		];
+		expect(cards).toHaveLength(CREATE.presets.length);
+		for (const card of cards) {
+			expect(card.querySelector(".ds-radio-card-cover > svg")).not.toBeNull();
+			expect(card.querySelector(".ds-radio-card-badge > svg")).not.toBeNull();
+			expect(
+				card.querySelector(".ds-radio-card-body > .ds-radio-card-desc .pills"),
+			).not.toBeNull();
+		}
+		expect(
+			cards.map((c) => c.querySelector(".ds-radio-card-title")?.textContent),
+		).toEqual(CREATE.presets.map((p) => `${THEMES[p.theme].label} ${p.title}`));
+		const radios = cards.map((c) => c.querySelector("input"));
+		expect(radios.map((r) => r?.checked)).toEqual(
+			CREATE.presets.map((p) => p.theme === CREATE.selected),
+		);
+		expect(root.querySelector(".preset, .preset-checked, .radio")).toBeNull();
+		expect(cardRules("campaign-create/create.css", "presets")).toEqual([]);
+	});
+
+	it("checks another preset and names it in the footer's summary", async () => {
+		const root = await mountForm(RESULT);
+		const capital = CREATE.presets.find((p) => p.theme === "capital");
+		const radio = root.querySelector<HTMLInputElement>(
+			'.ds-radio-card input[value="capital"]',
+		);
+		radio?.click();
+		await vi.waitFor(() =>
+			expect(root.querySelector(".summary")?.textContent).toContain(
+				capital?.title,
+			),
+		);
+		expect(radio?.checked).toBe(true);
 	});
 });
 

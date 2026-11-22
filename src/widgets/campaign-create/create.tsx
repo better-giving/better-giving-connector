@@ -1,11 +1,11 @@
 /** @jsxImportSource hono/jsx/dom */
-import { useState } from "hono/jsx/dom";
+import { useId, useState } from "hono/jsx/dom";
 import { THEME_NAMES, THEMES, type ThemeName } from "../../presets/themes";
 import type { CampaignCreateData, CreateResult, Preset } from "../model";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Check } from "../ui/check";
-import { RadioGroup } from "../ui/radio";
+import { type RadioCardContent, RadioGroup } from "../ui/radio";
 import { useWidgetState } from "../ui/state";
 import { useDate, useWholeMoney } from "../ui/text";
 import { callTool } from "../ui/tools";
@@ -24,42 +24,40 @@ const STEP_LABEL: Record<CreateResult["steps"][number]["step"], string> = {
 	page: "Campaign page filled in",
 };
 
-function PresetCard(props: { preset: Preset; checked: boolean }) {
+/** A preset's radio card: its theme's scene on the cover, its title, and its goal, end date and gift amounts below. */
+function usePresetCard() {
 	const money = useWholeMoney();
 	const date = useDate();
-	const { preset } = props;
-	return (
-		<div class={props.checked ? "preset preset-checked" : "preset"}>
-			<div class="preset-media">
-				<ThemeArt theme={preset.theme} />
-				{props.checked && (
-					<span class="preset-badge" aria-hidden="true">
-						✓
-					</span>
-				)}
-			</div>
-			<div class="preset-body">
-				<span class="preset-theme">
-					{THEMES[preset.theme].label}
-					{props.checked && <span class="sr-only"> (selected)</span>}
-				</span>
-				<strong class="preset-title">{preset.title}</strong>
-				<p class="preset-line">
+	const amountsId = useId();
+	return (preset: Preset): RadioCardContent => ({
+		cover: <ThemeArt theme={preset.theme} />,
+		title: (
+			<>
+				<span class="preset-theme">{THEMES[preset.theme].label}</span>{" "}
+				{preset.title}
+			</>
+		),
+		description: (
+			<>
+				<div>
 					Goal <b>{money(preset.goal)}</b>
-				</p>
-				<p class="preset-line">
+				</div>
+				<div>
 					Ends {date(preset.endDate, { month: "short", day: "numeric" })}
-				</p>
-				<ul class="pills" aria-label="Gift amounts">
+				</div>
+				<span class="sr-only" id={`${amountsId}-${preset.theme}`}>
+					Gift amounts
+				</span>
+				<ul class="pills" aria-labelledby={`${amountsId}-${preset.theme}`}>
 					{preset.suggestedAmounts.map((a) => (
 						<li key={a.amount} class="pill-amount">
 							{money(a)}
 						</li>
 					))}
 				</ul>
-			</div>
-		</div>
-	);
+			</>
+		),
+	});
 }
 
 function Recommendations(props: { data: CampaignCreateData }) {
@@ -175,6 +173,7 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 
 	const preset = data.presets.find((p) => p.theme === theme) ?? data.presets[0];
 	const byTheme = new Map(data.presets.map((p) => [p.theme, p]));
+	const presetCard = usePresetCard();
 
 	const openEditor = (result: CreateResult) =>
 		host
@@ -254,10 +253,8 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 				options={THEME_NAMES}
 				value={theme}
 				onChange={setTheme}
-				renderOption={(t, checked) => {
-					const p = byTheme.get(t);
-					return p ? <PresetCard preset={p} checked={checked} /> : null;
-				}}
+				// the model holds exactly one preset per theme
+				renderOption={(t) => presetCard(byTheme.get(t) as Preset)}
 			/>
 			<Recommendations data={data} />
 			<p class="error-line" role="alert">

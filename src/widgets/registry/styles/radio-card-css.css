@@ -1,0 +1,161 @@
+/* the registry's radio card as plain css, no tailwind. reads only the
+   variables the `variables` item declares. radio-card-css.test.tsx renders the
+   React `RadioCard` beside it and asserts the same computed look in light and
+   dark, for the default and example themes.
+
+   the spacing step, the type ladder and the font weight live only in
+   tailwind's theme; they are declared here under ds- names with the same
+   values, and the test holds them equal. */
+
+/* the cards of one group: four across, two under 640px */
+.ds-radio-cards {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--ds-spacing) * 4);
+}
+@media (width >= 40rem) {
+  .ds-radio-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* the predicate under the grid when the group is refused */
+.ds-radio-cards-error {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  --ds-text-xs: calc(0.75 * var(--ds-rem, 1rem));
+  --ds-text-xs-lh: calc(1 / 0.75);
+  margin: calc(var(--ds-spacing) * 1) 0 0;
+  font-size: var(--ds-text-xs);
+  line-height: var(--ds-text-xs-lh);
+  color: var(--destructive-subtle-fg);
+}
+
+.ds-radio-card {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  overflow: clip;
+  cursor: pointer;
+  border: 1px solid var(--gray-7);
+  border-radius: var(--radius-card);
+  background-color: var(--card);
+  color: var(--gray-12);
+  outline-color: var(--ring);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ds-radio-card:hover:not(:has(:checked, :disabled, [aria-invalid="true"])) {
+    border-color: var(--gray-8);
+  }
+}
+/* a refused group: every unchecked card takes the destructive edge, a checked
+   one keeps its checked edge, since the badge and ring already say which is
+   chosen */
+.ds-radio-card:not(:has(:checked)):has([aria-invalid="true"]) {
+  border-color: var(--destructive);
+}
+/* the 1px ring beside the 1px edge reads as 2px without moving the layout */
+.ds-radio-card:has(:checked) {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.ds-radio-card:has(:focus-visible) {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-offset: 2px;
+}
+.ds-radio-card:has(:disabled) {
+  cursor: not-allowed;
+  background-color: var(--gray-3);
+  color: var(--gray-11);
+}
+
+/* the native radio lies over the whole card, unseen: the card is its target */
+.ds-radio-card > input {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.ds-radio-card > input:disabled {
+  cursor: not-allowed;
+}
+
+.ds-radio-card-cover {
+  display: block;
+  aspect-ratio: 4 / 3;
+}
+/* block, as preflight makes an img under RadioCard: a page without
+   preflight would leave a bare img inline on the line */
+.ds-radio-card-cover > * {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.ds-radio-card:has(:disabled) .ds-radio-card-cover {
+  opacity: 0.5;
+}
+
+/* the check in the cover's top corner at the inline end, on the checked card
+   only */
+.ds-radio-card-badge {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  position: absolute;
+  inset-block-start: calc(var(--ds-spacing) * 2);
+  inset-inline-end: calc(var(--ds-spacing) * 2);
+  display: none;
+  place-items: safe center;
+  inline-size: calc(var(--ds-spacing) * 6);
+  block-size: calc(var(--ds-spacing) * 6);
+  border-radius: calc(infinity * 1px);
+  background-color: var(--primary);
+  color: var(--primary-fg);
+}
+.ds-radio-card:has(:checked) .ds-radio-card-badge {
+  display: grid;
+}
+.ds-radio-card-badge > svg {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  inline-size: calc(var(--ds-spacing) * 3.5);
+  block-size: calc(var(--ds-spacing) * 3.5);
+  flex-shrink: 0;
+}
+
+/* a word longer than a narrow card breaks rather than running under its edge */
+.ds-radio-card-body {
+  --ds-spacing: calc(0.25 * var(--ds-rem, 1rem));
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: break-word;
+  gap: calc(var(--ds-spacing) * 0.5);
+  padding: calc(var(--ds-spacing) * 3) calc(var(--ds-spacing) * 4);
+}
+.ds-radio-card-title {
+  --ds-text-sm: calc(0.875 * var(--ds-rem, 1rem));
+  --ds-text-sm-lh: calc(1.25 / 0.875);
+  --ds-font-weight-semibold: 600;
+  font-size: var(--ds-text-sm);
+  line-height: var(--ds-text-sm-lh);
+  font-weight: var(--ds-font-weight-semibold);
+}
+.ds-radio-card-desc {
+  --ds-text-xs: calc(0.75 * var(--ds-rem, 1rem));
+  --ds-text-xs-lh: calc(1 / 0.75);
+  font-size: var(--ds-text-xs);
+  line-height: var(--ds-text-xs-lh);
+  color: var(--gray-11);
+}
+
+/* pressed: the card gives under the finger, where motion is wanted */
+@media (prefers-reduced-motion: no-preference) {
+  .ds-radio-card:active {
+    scale: 0.98;
+  }
+}
