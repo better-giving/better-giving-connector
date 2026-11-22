@@ -46,11 +46,12 @@ type Page = {
 } & { [name: string]: unknown };
 
 export const STAND_IN_PATH = "/_/img";
-/** Hosts the fixtures draw images from; the preview serves a stand-in for each. */
-const IMAGE_HOSTS = [
-	"https://bg-test.public.blob.vercel-storage.com",
-	"https://images.example.com",
-];
+/**
+ * Allowed hosts the fixtures draw images from; the preview serves a stand-in
+ * for each. A fixture image on any other host stays put, so it keeps the
+ * widget's blocked-origin placeholder, as in `pnpm widget-shots`.
+ */
+const IMAGE_HOSTS = ["https://bg-test.public.blob.vercel-storage.com"];
 
 /**
  * The fixture's data with its image URLs on `origin` and that origin allowed:

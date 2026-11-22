@@ -4,8 +4,7 @@
 //
 //   pnpm preview:widgets            http://localhost:4173 (PORT overrides)
 //
-// Paths: / lists every state; /<widget>/<state>?theme=light|dark&width=1440|375
-// shows one (see test/widget-host/preview.ts).
+// Its paths are listed in test/widget-host/preview.ts.
 
 import { serve } from "@hono/node-server";
 import "./binary-register.mjs";

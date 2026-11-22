@@ -55,6 +55,10 @@ const srcdocOf = (page: string) => {
 };
 
 describe("widget preview", () => {
+	afterEach(() => {
+		esbuild.failNext = false;
+	});
+
 	it("shows exactly the known states, so a dropped fixture goes red", () => {
 		expect(states.map((s) => `${s.widget}/${s.state}`).sort()).toEqual(
 			[
@@ -128,6 +132,31 @@ describe("widget preview", () => {
 			expect(html.indexOf("/_/host.js")).toBeLessThan(html.indexOf("<iframe"));
 			expect(srcdocOf(html)).toBe(WIDGETS[widget as keyof typeof WIDGETS].html);
 		}
+	});
+
+	it("carries a dark theme and 1440 width from the URL into the config", async () => {
+		const frame = await (
+			await get("/_/frame/photo/account-long?theme=dark&width=1440")
+		).text();
+		expect(frame).toContain(
+			'window.__preview={"widget":"photo","state":"account-long","theme":"dark","width":1440,"locale":"en-US"}',
+		);
+	});
+
+	it("shows a fullscreen fixture across the viewport and an inline one in the chat column", async () => {
+		const editor = await (await get("/_/frame/campaign-editor/blocks")).text();
+		expect(editor).toContain("main{width:100%;height:100vh;}");
+		expect(editor).toContain("iframe{display:block;width:100%;height:100%;");
+		const photo = await (await get("/_/frame/photo/account")).text();
+		expect(photo).toContain("max-width:768px");
+		expect(photo).toContain("height:120px");
+		expect(photo).not.toContain("height:100vh");
+	});
+
+	it("widens the chat column to a fixture's column", async () => {
+		const five = await (await get("/_/frame/campaigns/five")).text();
+		expect(five).toContain("max-width:1040px");
+		expect(five).not.toContain("max-width:768px");
 	});
 
 	it("falls back to light at 1440 for a theme or width it does not offer", async () => {
@@ -237,27 +266,79 @@ describe("preview failures", () => {
 		vi.useRealTimers();
 	});
 
-	const pageWith = (labels: string[]) => {
-		const clicked: string[] = [];
-		const buttons = labels.map((label) => ({
-			ariaLabel: null,
-			textContent: label,
-			click: () => clicked.push(label),
-		}));
+	type Fake = { ariaLabel: string | null; textContent: string | null };
+	const pageWith = (initial: Fake[]) => {
+		const clicked: (string | null)[] = [];
+		const buttons: (Fake & { click(): void })[] = [];
+		const add = (button: Fake) =>
+			buttons.push({
+				...button,
+				click: () => clicked.push(button.ariaLabel ?? button.textContent),
+			});
+		for (const button of initial) add(button);
 		const page = {
 			document: {
 				getElementById: () => ({
-					contentDocument: { querySelectorAll: () => buttons },
+					contentDocument: {
+						querySelectorAll: (selector: string) =>
+							selector === "button" ? buttons : [],
+					},
 				}),
 			},
 		};
-		return { page, clicked };
+		return { page, clicked, add };
 	};
+	const text = (textContent: string): Fake => ({
+		ariaLabel: null,
+		textContent,
+	});
 
 	it("presses a button the fixture names", async () => {
 		vi.useFakeTimers();
-		const { page, clicked } = pageWith(["End campaign"]);
+		const { page, clicked } = pageWith([text("Cancel"), text("End campaign")]);
 		const pressed = press(page, ["End campaign"]);
+		await vi.runAllTimersAsync();
+		await pressed;
+		expect(clicked).toEqual(["End campaign"]);
+	});
+
+	it("presses a button whose name only contains the label, in any case", async () => {
+		vi.useFakeTimers();
+		const { page, clicked } = pageWith([text("Edit TITLE & story (3)")]);
+		const pressed = press(page, ["title & STORY"]);
+		await vi.runAllTimersAsync();
+		await pressed;
+		expect(clicked).toEqual(["Edit TITLE & story (3)"]);
+	});
+
+	it("matches on the aria-label when a button has one, not its text", async () => {
+		vi.useFakeTimers();
+		const { page, clicked } = pageWith([
+			{ ariaLabel: "Cancel", textContent: "Remove photo 2" },
+			{ ariaLabel: "Remove photo 2", textContent: "x" },
+		]);
+		const pressed = press(page, ["remove PHOTO"]);
+		await vi.runAllTimersAsync();
+		await pressed;
+		expect(clicked).toEqual(["Remove photo 2"]);
+	});
+
+	it("presses each label in order", async () => {
+		vi.useFakeTimers();
+		const { page, clicked } = pageWith([text("Second"), text("First")]);
+		const pressed = press(page, ["first", "second"]);
+		await vi.runAllTimersAsync();
+		await pressed;
+		expect(clicked).toEqual(["First", "Second"]);
+	});
+
+	it("waits for a button that renders after the widget has started", async () => {
+		vi.useFakeTimers();
+		const { page, clicked, add } = pageWith([]);
+		const pressed = press(page, ["End campaign"]);
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(clicked).toEqual([]);
+		add(text("End campaign"));
 		await vi.runAllTimersAsync();
 		await pressed;
 		expect(clicked).toEqual(["End campaign"]);
@@ -265,7 +346,7 @@ describe("preview failures", () => {
 
 	it("fails when a button the fixture names never shows", async () => {
 		vi.useFakeTimers();
-		const { page, clicked } = pageWith(["Cancel"]);
+		const { page, clicked } = pageWith([text("Cancel")]);
 		const pressed = press(page, ["End campaign"]);
 		const failed = expect(pressed).rejects.toThrow(
 			'no button named "End campaign" appeared',
@@ -275,8 +356,9 @@ describe("preview failures", () => {
 		expect(clicked).toEqual([]);
 	});
 
-	it("shows a failure on the page as an alert", () => {
+	const failingPage = (bodyReady: boolean) => {
 		const shown: { role?: string; text: string | null }[] = [];
+		const listeners: Record<string, () => void> = {};
 		const notice = {
 			role: undefined as string | undefined,
 			textContent: null as string | null,
@@ -290,8 +372,8 @@ describe("preview failures", () => {
 				width: 375,
 				locale: "en-US",
 			},
-			addEventListener: () => {
-				throw new Error("the body is already there");
+			addEventListener: (type: string, listener: () => void) => {
+				listeners[type] = listener;
 			},
 			document: {
 				getElementById: () => null,
@@ -306,12 +388,19 @@ describe("preview failures", () => {
 						return notice.textContent;
 					},
 				}),
-				body: {
-					prepend: () =>
-						shown.push({ role: notice.role, text: notice.textContent }),
-				},
+				body: bodyReady
+					? {
+							prepend: () =>
+								shown.push({ role: notice.role, text: notice.textContent }),
+						}
+					: null,
 			},
 		};
+		return { page, shown, listeners };
+	};
+
+	it("shows a failure on the page as an alert", () => {
+		const { page, shown } = failingPage(true);
 		showFailure(page, new Error('no button named "End campaign" appeared'));
 		expect(shown).toEqual([
 			{
@@ -323,6 +412,37 @@ describe("preview failures", () => {
 			"__previewStatus",
 			'error: no button named "End campaign" appeared',
 		);
+	});
+
+	it("holds the alert until the body is parsed when the widget fails before it", () => {
+		const { page, shown, listeners } = failingPage(false);
+		showFailure(page, new Error("no fixture for photo / nope"));
+		expect(shown).toEqual([]);
+		expect(page).toHaveProperty(
+			"__previewStatus",
+			"error: no fixture for photo / nope",
+		);
+		// the body arrives, then the page tells the listener
+		page.document.body = {
+			prepend: () =>
+				shown.push({
+					role: "alert",
+					text: "Preview failed: no fixture for photo / nope",
+				}),
+		} as never;
+		listeners.DOMContentLoaded?.();
+		expect(shown).toEqual([
+			{ role: "alert", text: "Preview failed: no fixture for photo / nope" },
+		]);
+	});
+
+	it("shows a rejection that is not an Error by its string", () => {
+		const { page, shown } = failingPage(true);
+		showFailure(page, "host refused");
+		expect(shown).toEqual([
+			{ role: "alert", text: "Preview failed: host refused" },
+		]);
+		expect(page).toHaveProperty("__previewStatus", "error: host refused");
 	});
 });
 
@@ -338,9 +458,11 @@ describe("stand-in images", () => {
 		expect(shown.imageOrigins).toEqual([...IMAGE_ORIGINS, ORIGIN]);
 		const urls = JSON.stringify(shown);
 		expect(urls).toContain(`${ORIGIN}/_/img/coats.jpg`);
-		expect(urls).toContain(`${ORIGIN}/_/img/roof.jpg`);
 		expect(urls).not.toContain(BLOB);
-		expect(urls).not.toContain("images.example.com");
+		// the blocked-origin card keeps its URL and its origin stays unlisted
+		expect(urls).toContain("https://images.example.com/roof.jpg");
+		expect(urls).not.toContain(`${ORIGIN}/_/img/roof.jpg`);
+		expect(shown.imageOrigins).not.toContain("https://images.example.com");
 	});
 
 	it("leaves a link to a page alone", () => {
