@@ -2,13 +2,15 @@
 import type { ThemeName } from "../../presets/themes";
 
 // One simple scene per theme, drawn the same flat way for every preset. The
-// colours are the scene's own, so they stay the same in a dark host.
+// colours are the scene's own, so they stay the same in a dark host. The
+// figures sit in x 0–160, y 0–90; the frame adds sky above and ground below to
+// reach the registry cover's 4:3, so `slice` crops nothing.
 
 const SCENES: Record<ThemeName, () => unknown> = {
 	emergency: () => (
 		<>
-			<rect width="160" height="90" fill="#a0b4c8" />
-			<path d="M0 70 40 58 90 66 160 56V90H0Z" fill="#5f7d95" />
+			<rect y="-15" width="160" height="120" fill="#a0b4c8" />
+			<path d="M0 70 40 58 90 66 160 56V105H0Z" fill="#5f7d95" />
 			<rect x="26" y="34" width="34" height="30" fill="#e9e0d2" />
 			<path d="M20 36 43 18 66 36Z" fill="#7a4a3d" />
 			<rect x="38" y="46" width="10" height="18" fill="#4a5a68" />
@@ -28,8 +30,8 @@ const SCENES: Record<ThemeName, () => unknown> = {
 	),
 	year_end: () => (
 		<>
-			<rect width="160" height="90" fill="#f0d6a0" />
-			<rect y="62" width="160" height="28" fill="#c98f55" />
+			<rect y="-15" width="160" height="120" fill="#f0d6a0" />
+			<rect y="62" width="160" height="43" fill="#c98f55" />
 			<rect x="14" y="40" width="40" height="28" fill="#7a4a3d" />
 			<rect x="60" y="44" width="40" height="24" fill="#7a4a3d" />
 			<circle cx="26" cy="36" r="6" fill="#d9473d" />
@@ -43,8 +45,8 @@ const SCENES: Record<ThemeName, () => unknown> = {
 	),
 	capital: () => (
 		<>
-			<rect width="160" height="90" fill="#bfe1f5" />
-			<rect y="68" width="160" height="22" fill="#78b068" />
+			<rect y="-15" width="160" height="120" fill="#bfe1f5" />
+			<rect y="68" width="160" height="37" fill="#78b068" />
 			<rect x="38" y="36" width="76" height="34" fill="#f1e4c3" />
 			<path d="M30 38 76 12 122 38Z" fill="#c0503f" />
 			<rect x="70" y="50" width="14" height="20" fill="#7a4a3d" />
@@ -55,7 +57,7 @@ const SCENES: Record<ThemeName, () => unknown> = {
 	),
 	giving_day: () => (
 		<>
-			<rect width="160" height="90" fill="#fbe3d3" />
+			<rect y="-15" width="160" height="120" fill="#fbe3d3" />
 			<circle cx="34" cy="34" r="14" fill="#f4b04a" />
 			<circle cx="130" cy="24" r="8" fill="#5aa5e0" />
 			<circle cx="92" cy="52" r="6" fill="#e8584a" />
@@ -71,8 +73,7 @@ const SCENES: Record<ThemeName, () => unknown> = {
 export function ThemeArt(props: { theme: ThemeName }) {
 	return (
 		<svg
-			class="preset-art"
-			viewBox="0 0 160 90"
+			viewBox="0 -15 160 120"
 			preserveAspectRatio="xMidYMid slice"
 			aria-hidden="true"
 		>

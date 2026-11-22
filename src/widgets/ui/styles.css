@@ -79,25 +79,13 @@ h3 {
 	justify-content: space-between;
 }
 
-/* radio group */
+/* radio group: the registry's radio cards draw it; the fieldset around them draws nothing */
 
-.radio {
-	position: relative;
-	cursor: pointer;
-}
-
-/* the native input keeps focus and state; the label draws the card */
-.radio-input {
-	position: absolute;
-	inset: 0;
+.radio-group {
+	min-inline-size: 0;
 	margin: 0;
-	opacity: 0;
-	cursor: inherit;
-}
-
-.radio:has(.radio-input:focus-visible) {
-	outline: 2px solid var(--ring);
-	outline-offset: 2px;
+	padding: 0;
+	border: 0;
 }
 
 /* layout helpers */

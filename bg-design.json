@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src/widgets/registry",
-  "registryVersion": "4.4.0",
+  "registryVersion": "4.7.0",
   "items": {
     "badge-css": {
       "version": "1.2.1",
@@ -123,6 +123,13 @@
       "files": {
         "styles/prose-css.css": "572f3c5e9319c9cee9eb1e700ef35a27976a0f511c076c4c9fd0a4d07db66275",
         "styles/prose-css.usage.md": "9578b3ade976fbb4027fd8a279bcf6c4b3dc2684b593b34cac9548daecabf475"
+      }
+    },
+    "radio-card-css": {
+      "version": "1.1.1",
+      "files": {
+        "styles/radio-card-css.css": "4d8eecd5e55cd9179427026e3e961c26576a2602a7c55d8525cde18c4761dce9",
+        "styles/radio-card-css.usage.md": "39d122d6a5490e858a8cc56a6dc3c8e49f3fe484c3ffcdc122b74313818c4948"
       }
     },
     "radio-css": {
