@@ -197,7 +197,7 @@ export function previewApp(widgets: Record<string, { html: string }>): Hono {
 		return c.html(
 			shell(
 				"Widget preview",
-				`<header><strong>Widget preview</strong>every state, rendered by the fake host</header><main>${sections}</main>`,
+				`<header><strong>Widget preview</strong></header><main>${sections}</main>`,
 			),
 		);
 	});
