@@ -9,6 +9,7 @@
 //   /_/host.js                   the fake host, bundled for the browser
 //   /_/img/*                     the stand-in photo the fixtures' image URLs are swapped for
 
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { Hono } from "hono";
 import type { WidgetName } from "../../src/widgets/model";
@@ -43,9 +44,13 @@ export const previewStates = (widgets: readonly string[]) =>
 const stateUrl = (widget: string, state: string, theme: Theme, width: number) =>
 	`/${widget}/${state}?theme=${theme}&width=${width}`;
 
+/** The host bundle's entry, as a file path esbuild can open (`pathname` keeps `%20`). */
+export const hostEntry = (base: string | URL = import.meta.url) =>
+	fileURLToPath(new URL("./preview-client.ts", base));
+
 async function bundleHost(): Promise<string> {
 	const result = await build({
-		entryPoints: [new URL("./preview-client.ts", import.meta.url).pathname],
+		entryPoints: [hostEntry()],
 		bundle: true,
 		write: false,
 		format: "iife",
@@ -84,7 +89,11 @@ export function previewApp(widgets: Record<string, { html: string }>): Hono {
 	let host: Promise<string> | undefined;
 
 	app.get("/_/host.js", async (c) => {
-		host ??= bundleHost();
+		// a failed build is not kept: the next request builds again
+		host ??= bundleHost().catch((err: unknown) => {
+			host = undefined;
+			throw err;
+		});
 		return c.body(await host, 200, {
 			"content-type": "text/javascript; charset=utf-8",
 			"cache-control": "no-store",
@@ -98,7 +107,9 @@ export function previewApp(widgets: Record<string, { html: string }>): Hono {
 	);
 
 	const lookup = (widget: string, state: string) => {
-		const document = widgets[widget];
+		const document = Object.hasOwn(widgets, widget)
+			? widgets[widget]
+			: undefined;
 		const fixture = findFixture(widget, state);
 		return document && fixture ? { document, fixture } : null;
 	};

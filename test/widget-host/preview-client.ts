@@ -29,9 +29,18 @@ type Frame = {
 		}[];
 	} | null;
 };
+type Notice = {
+	setAttribute(name: string, value: string): void;
+	textContent: string | null;
+};
 type Page = {
 	location: { origin: string };
-	document: { getElementById(id: string): Frame | null };
+	document: {
+		getElementById(id: string): Frame | null;
+		createElement(tag: "p"): Notice;
+		body: { prepend(node: Notice): void } | null;
+	};
+	addEventListener(type: "DOMContentLoaded", listener: () => void): void;
 	__preview: PreviewConfig;
 	__previewStatus?: string;
 } & { [name: string]: unknown };
@@ -87,28 +96,46 @@ export function withStandInFixture(fixture: Fixture, origin: string): Fixture {
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
-/** Presses the fixture's buttons, by accessible name, once the widget has rendered them. */
-async function press(page: Page, labels: readonly string[]) {
+/**
+ * Presses the fixture's buttons, by accessible name, once the widget has
+ * rendered them; rejects when one never shows, as widget-shots.ts's click does.
+ */
+export async function press(
+	page: { document: Pick<Page["document"], "getElementById"> },
+	labels: readonly string[],
+) {
 	for (const label of labels) {
-		for (let tries = 0; tries < 50; tries++) {
-			const buttons =
-				page.document
+		const find = () =>
+			[
+				...(page.document
 					.getElementById("widget")
-					?.contentDocument?.querySelectorAll("button") ?? [];
-			const button = [...buttons].find(
-				(b) => (b.ariaLabel ?? b.textContent ?? "").trim() === label,
-			);
-			if (button) {
-				button.click();
-				break;
-			}
+					?.contentDocument?.querySelectorAll("button") ?? []),
+			].find((b) => (b.ariaLabel ?? b.textContent ?? "").trim() === label);
+		let button = find();
+		for (let tries = 0; !button && tries < 50; tries++) {
 			await sleep(100);
+			button = find();
 		}
+		if (!button) throw new Error(`no button named "${label}" appeared`);
+		button.click();
 		await sleep(250);
 	}
 }
 
-function start(page: Page) {
+/** Puts a failed run at the top of the frame page, where the person previewing sees it. */
+export function showFailure(page: Page, err: unknown) {
+	const reason = err instanceof Error ? err.message : String(err);
+	page.__previewStatus = `error: ${reason}`;
+	const notice = page.document.createElement("p");
+	notice.setAttribute("role", "alert");
+	notice.textContent = `Preview failed: ${reason}`;
+	const show = () => page.document.body?.prepend(notice);
+	// a failure before the body is parsed waits for it
+	if (page.document.body) show();
+	else page.addEventListener("DOMContentLoaded", show);
+}
+
+async function run(page: Page) {
 	const { widget, state, theme, width, locale } = page.__preview;
 	const fixture = findFixture(widget, state);
 	if (!fixture) throw new Error(`no fixture for ${widget} / ${state}`);
@@ -121,7 +148,7 @@ function start(page: Page) {
 	};
 	page[RELAY.toHost] = (message: Message) => transport.onmessage?.(message);
 	const shown = withStandInFixture(fixture, page.location.origin);
-	const host = startFakeHost(
+	const host = await startFakeHost(
 		transport,
 		{ fixture: shown, theme, locale, width },
 		{
@@ -131,17 +158,17 @@ function start(page: Page) {
 			},
 		},
 	);
-	host
-		.then((fake) => fake.served)
-		.then(() => press(page, fixture.click ?? []))
-		.then(
-			() => {
-				page.__previewStatus = "ready";
-			},
-			(err: unknown) => {
-				page.__previewStatus = `error: ${err instanceof Error ? err.message : String(err)}`;
-			},
-		);
+	await host.served;
+	await press(page, fixture.click ?? []);
+}
+
+function start(page: Page) {
+	run(page).then(
+		() => {
+			page.__previewStatus = "ready";
+		},
+		(err: unknown) => showFailure(page, err),
+	);
 }
 
 // the bundle is a script, not a module: `import` of this file (the tests) starts nothing

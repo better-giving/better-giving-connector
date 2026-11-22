@@ -454,10 +454,13 @@ export const FIXTURES: Partial<Record<WidgetName, Record<string, Fixture>>> = {
 };
 
 /** The fixture for `state` of `widget`, where either may be a name from outside (a URL). */
-export const findFixture = (
+export function findFixture(
 	widget: string,
 	state: string,
-): Fixture | undefined =>
-	(FIXTURES as Record<string, Record<string, Fixture> | undefined>)[widget]?.[
-		state
-	];
+): Fixture | undefined {
+	// own keys only: `constructor` and the rest of Object.prototype are not states
+	const states = Object.hasOwn(FIXTURES, widget)
+		? FIXTURES[widget as WidgetName]
+		: undefined;
+	return states && Object.hasOwn(states, state) ? states[state] : undefined;
+}
