@@ -97,8 +97,9 @@ export function withStandInFixture(fixture: Fixture, origin: string): Fixture {
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 /**
- * Presses the fixture's buttons, by accessible name, once the widget has
- * rendered them; rejects when one never shows, as widget-shots.ts's click does.
+ * Presses the fixture's buttons once the widget has rendered them, each found
+ * by a case-insensitive part of its name, as widget-shots.ts's role query does;
+ * rejects when one never shows.
  */
 export async function press(
 	page: { document: Pick<Page["document"], "getElementById"> },
@@ -110,7 +111,11 @@ export async function press(
 				...(page.document
 					.getElementById("widget")
 					?.contentDocument?.querySelectorAll("button") ?? []),
-			].find((b) => (b.ariaLabel ?? b.textContent ?? "").trim() === label);
+			].find((b) =>
+				(b.ariaLabel ?? b.textContent ?? "")
+					.toLowerCase()
+					.includes(label.toLowerCase()),
+			);
 		let button = find();
 		for (let tries = 0; !button && tries < 50; tries++) {
 			await sleep(100);
