@@ -73,6 +73,8 @@ export function hostPage(options: {
 	openai?: OpenAiSeed;
 	/** The chat column's width; a wider host shows more of a carousel. */
 	column?: number;
+	/** Markup placed last in the head, ahead of the body's iframe: a script there runs before the widget loads. */
+	head?: string;
 }): string {
 	const { bg, fg } = BACKDROP[options.theme];
 	const column = options.fullscreen
@@ -95,6 +97,6 @@ addEventListener("message", (event) => {
 });
 window.${RELAY.toWidget} = (message) => frame().contentWindow.postMessage(message, "*");
 window.${RELAY.resize} = (height) => { ${options.fullscreen ? "" : RESIZE_STATEMENT} };
-</script></head>
+</script>${options.head ?? ""}</head>
 <body><main><iframe id="widget" title="Widget" srcdoc="${escapeAttribute(widgetDocument(options.html, options.openai))}"></iframe></main></body></html>`;
 }

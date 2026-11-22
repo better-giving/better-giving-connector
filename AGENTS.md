@@ -37,6 +37,7 @@ Also:
 - ChatGPT package: `pnpm chatgpt:package` (`scripts/chatgpt-package.ts`; `test/chatgpt-package.test.ts` pins the entries' hashes)
 - Page screenshots: `pnpm surface-shots [outDir]` writes every site and connect page from `createApp` (default `docs/surface-screenshots/after`; only `docs/surface-screenshots/` is gitignored). Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
 - Widget screenshots: `pnpm widget-shots` writes `docs/widget-screenshots/` (gitignored). Not part of CI. playwright-core ships no browser; on a clean machine run `pnpm exec playwright-core install chromium` first.
+- Widget preview: `pnpm preview:widgets` serves every widget state in the fake host on `http://localhost:4173` (`PORT` overrides; it listens on all interfaces), for a browser or a Sky app preview. `/` lists the states; `/<widget>/<state>?theme=light|dark&width=1440|375` shows one. It is a separate server (`scripts/widget-preview.ts`, `test/widget-host/preview.ts`), never mounted in `src/app.ts` (`test/widget-host/preview.test.ts` checks the service 404s its paths). Images show their stand-in only on an https page. Not part of CI.
 
 Done means the CI checks above are all green: lint, typecheck, test, design registry sync (`pnpm design:check`), build, and bundle-load.
 
@@ -60,7 +61,7 @@ Biome enforces the import walls:
 - `src/env.ts`: the only parse of the process environment (zod, fails closed, names variables, never values).
 - `src/secret.ts`: `Secret` holds a deployment's connector key. Printing, interpolating, or serializing it yields `[redacted]`; only `reveal()` reads it.
 - `test/`: integration tests and the harness (`test/harness.ts`, `test/fake-deployment.ts`).
-- `test/widget-host/`: a fake MCP Apps host and the widget state fixtures; the widget tests and `pnpm widget-shots` mount widgets in it. Widget unit tests that need a DOM start with `// @vitest-environment happy-dom`.
+- `test/widget-host/`: a fake MCP Apps host and the widget state fixtures; the widget tests, `pnpm widget-shots` and `pnpm preview:widgets` mount widgets in it. Widget unit tests that need a DOM start with `// @vitest-environment happy-dom`.
 
 A deployment is reached only through its `/connector/v1`. `better-giving-oss` owns and versions that contract. An older release answers with "update Better Giving". A refused key answers with "reconnect" and the row is dropped.
 
