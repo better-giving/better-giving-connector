@@ -239,7 +239,7 @@ export function CampaignCreate(props: { data: CampaignCreateData }) {
 				<div>
 					<h2 class="title">Start a campaign</h2>
 					<p class="subtitle">
-						Pick a starting point. Everything stays editable — nothing goes live
+						Pick a starting point. Everything stays editable. Nothing goes live
 						until you publish.
 					</p>
 				</div>
