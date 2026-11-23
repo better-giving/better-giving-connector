@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src/widgets/registry",
-  "registryVersion": "4.7.0",
+  "registryVersion": "4.9.0",
   "items": {
     "badge-css": {
       "version": "1.2.1",
@@ -11,10 +11,10 @@
       }
     },
     "bare-icon-button-css": {
-      "version": "1.0.1",
+      "version": "1.1.0",
       "files": {
-        "styles/bare-icon-button-css.css": "95c2fc976d21e3409638d55088d23acf9549e7032f1e23bc35f614259faa8019",
-        "styles/bare-icon-button-css.usage.md": "76d4bddcb05bb690a9ea0e249f30555ccdf27743db0f68cce1efb41989d2aa99"
+        "styles/bare-icon-button-css.css": "1e60df0373e5d4b90359e2ae7aa156af54a6dbf1bedf51416a8936c3869b4e8d",
+        "styles/bare-icon-button-css.usage.md": "de3563579178c97e240d9c33e81c8178703a869c22bba871d26c662801a65736"
       }
     },
     "button-css": {
@@ -112,10 +112,10 @@
       }
     },
     "progress-css": {
-      "version": "1.1.1",
+      "version": "1.2.0",
       "files": {
-        "styles/progress-css.css": "f761d141b9a2961ed11b9454fcf484bee078086c836749796041f3808f3be192",
-        "styles/progress-css.usage.md": "75b11f158a8b85da2272ffde8ace604fac9c16202e288007d668cf34540f6907"
+        "styles/progress-css.css": "8799ee0ba70a285432f05cf429d8e967f7468cc75428a814049cafd494c82b73",
+        "styles/progress-css.usage.md": "cd6c7be51362be9143668c37eb09601d2551abe309b76a7fdfcb40611d5c291f"
       }
     },
     "prose-css": {
@@ -147,10 +147,10 @@
       }
     },
     "site-nav-css": {
-      "version": "1.2.2",
+      "version": "1.3.0",
       "files": {
-        "styles/site-nav-css.css": "0cfba98652c93bc4cb64298c3f6f28203f8e38608aed0b60a939109e9a894bb8",
-        "styles/site-nav-css.usage.md": "800b6236ad4ed86d43e2b4676cdbc94adc78524d01b4e864cd869ccb877367bb"
+        "styles/site-nav-css.css": "0b231d80bbd14c6f5c39898a9da26eb7bd3e5b05d4dedb614c02940093cbdd69",
+        "styles/site-nav-css.usage.md": "8044f80b8a7a3b4f77452535e5dd99cf70f94fbdd8ec6b55d6e70e95dcf5ea19"
       }
     },
     "sparkline-css": {
@@ -182,10 +182,10 @@
       }
     },
     "table-css": {
-      "version": "1.1.1",
+      "version": "1.2.0",
       "files": {
-        "styles/table-css.css": "3deb69588aca2496dc59aeccf109ce9547cac4e7f330791ead48e398fd2ca5e6",
-        "styles/table-css.usage.md": "4037054f845934c728b28e316ebe9bcc4550be4abf5f779fbebaf3944b248a3f"
+        "styles/table-css.css": "045208f0f4cc83707168443173fd78aa04cdf4ff08b89c92c1970afab6cf35b5",
+        "styles/table-css.usage.md": "da45e43042134bc0f924534e7cdcb38ee327b2c06ca063e7bfec32508e1387c2"
       }
     },
     "variables": {
